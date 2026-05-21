@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `tb_note_event` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id` bigint UNSIGNED NULL COMMENT '用户id，未登录为空',
   `blog_id` bigint UNSIGNED NULL COMMENT '笔记id',
-  `event_type` varchar(32) NOT NULL COMMENT '事件类型：impression/click/search/detail/like/collect/comment',
+  `event_type` varchar(32) NOT NULL COMMENT '事件类型：impression/detail/like/collect/comment/search/play',
   `scene` varchar(64) NULL COMMENT '发生场景：feed/detail/search/ai',
   `keyword` varchar(128) NULL COMMENT '搜索词或推荐词',
   `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

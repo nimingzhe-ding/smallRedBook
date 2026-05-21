@@ -13,5 +13,8 @@ public enum EventType {
     LIKE,
     COLLECT,
     COMMENT,
+    PLAY,
+    SHARE,
+    UNCOLLECT,
     PURCHASE
 }

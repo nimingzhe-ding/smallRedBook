@@ -36,5 +36,8 @@ public class RedisConstants {
     // 热搜榜缓存
     public static final String HOT_SEARCH_KEY = "hot:search";
     public static final Long HOT_SEARCH_TTL = 15L;
+
+    // 笔记行为事件流
+    public static final String NOTE_EVENT_STREAM_KEY = "stream.notes.events";
 }
 

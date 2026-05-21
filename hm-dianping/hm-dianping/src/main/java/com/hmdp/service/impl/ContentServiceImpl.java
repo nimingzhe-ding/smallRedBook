@@ -504,7 +504,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     /**
      * 构造内容流查询条件。
-     * hot → 互动分 = 点赞×3 + 评论×2 + 收藏×4 + 订单转化×8 + 新鲜度;
+     * hot → 推荐分 = 点赞×3 + 收藏×5 + 评论×4 + 点击×1 + 完播率×8 + 新鲜度;
      * follow → Redis 收件箱（Feed 推送），降级到 DB 关注列表;
      * nearby → Redis GEO 查找附近店铺，再反查关联笔记;
      * video → 视频完成率 + 互动分;
@@ -534,10 +534,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                     });
                 }
             }
-            // 推荐频道使用热度排序
-            wrapper.last("ORDER BY (IFNULL(liked, 0) * 3 + IFNULL(comments, 0) * 2 + " +
-                    "(SELECT COUNT(1) FROM tb_blog_collect c WHERE c.blog_id = tb_blog.id) * 4 + " +
-                    "GREATEST(0, 72 - TIMESTAMPDIFF(HOUR, create_time, NOW()))) DESC, create_time DESC");
+            wrapper.last(orderByRecommendScore(72));
             return wrapper.page(page);
         }
         if ("follow".equals(normalizedChannel)) {
@@ -577,23 +574,15 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                     .inSql("id", "select blog_id from tb_blog_product"));
         }
         if ("hot".equals(normalizedChannel)) {
-            wrapper.last("ORDER BY (IFNULL(liked, 0) * 3 + IFNULL(comments, 0) * 2 + " +
-                    "(SELECT COUNT(1) FROM tb_blog_collect c WHERE c.blog_id = tb_blog.id) * 4 + " +
-                    "(SELECT COUNT(1) FROM tb_mall_order o WHERE o.product_id IN (SELECT bp.product_id FROM tb_blog_product bp WHERE bp.blog_id = tb_blog.id) AND o.status IN (2,3,4,5)) * 8 + " +
-                    "GREATEST(0, 72 - TIMESTAMPDIFF(HOUR, create_time, NOW()))) DESC, create_time DESC");
+            wrapper.last(orderByRecommendScore(72));
         } else if ("video".equals(normalizedChannel)) {
-            wrapper.last("ORDER BY (IFNULL(liked, 0) * 4 + IFNULL(comments, 0) * 3 + " +
-                    "(SELECT COUNT(1) FROM tb_blog_collect c WHERE c.blog_id = tb_blog.id) * 5 + " +
-                    "(SELECT IFNULL(SUM(CASE WHEN m.completed = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(1), 0), 0) FROM tb_video_play_metric m WHERE m.blog_id = tb_blog.id) * 80 + " +
-                    "(SELECT COUNT(1) FROM tb_mall_order o WHERE o.product_id IN (SELECT bp.product_id FROM tb_blog_product bp WHERE bp.blog_id = tb_blog.id) AND o.status IN (2,3,4,5)) * 8 + " +
-                    "GREATEST(0, 48 - TIMESTAMPDIFF(HOUR, create_time, NOW()))) DESC, create_time DESC");
+            wrapper.last(orderByRecommendScore(48));
         } else if ("nearby".equals(normalizedChannel)) {
             if (x != null && y != null) {
                 List<Long> nearbyShopIds = findNearbyShopIds(x, y, 5000);
                 if (!nearbyShopIds.isEmpty()) {
                     wrapper.in("shop_id", nearbyShopIds);
-                    wrapper.last("ORDER BY (IFNULL(liked, 0) * 3 + IFNULL(comments, 0) * 2 + " +
-                            "GREATEST(0, 72 - TIMESTAMPDIFF(HOUR, create_time, NOW()))) DESC, create_time DESC");
+                    wrapper.last(orderByRecommendScore(72));
                 } else {
                     return new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE);
                 }
@@ -604,6 +593,19 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             wrapper.orderByDesc("create_time");
         }
         return wrapper.page(page);
+    }
+
+    private String orderByRecommendScore(int freshHours) {
+        return "ORDER BY (" + recommendScoreSql(freshHours) + ") DESC, create_time DESC";
+    }
+
+    private String recommendScoreSql(int freshHours) {
+        return "IFNULL(liked, 0) * 3 + " +
+                "(SELECT COUNT(1) FROM tb_blog_collect c WHERE c.blog_id = tb_blog.id) * 5 + " +
+                "IFNULL(comments, 0) * 4 + " +
+                "(SELECT COUNT(1) FROM tb_note_event e WHERE e.blog_id = tb_blog.id AND e.event_type IN ('DETAIL', 'CLICK')) * 1 + " +
+                "(SELECT IFNULL(SUM(CASE WHEN m.completed = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(1), 0), 0) FROM tb_video_play_metric m WHERE m.blog_id = tb_blog.id) * 8 + " +
+                "GREATEST(0, " + freshHours + " - TIMESTAMPDIFF(HOUR, create_time, NOW()))";
     }
 
     private NoteFeedResult toFeedResult(Page<Blog> page, String query) {

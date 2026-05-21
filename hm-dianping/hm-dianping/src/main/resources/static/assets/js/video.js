@@ -323,6 +323,7 @@ function reportVideoMetric(video, completed = false) {
       completed: completed || watched / duration >= 0.95
     })
   }).catch(() => {});
+  trackEvent("play", { noteId: Number(noteId), scene: "video" });
 }
 
 async function submitDanmaku(event) {

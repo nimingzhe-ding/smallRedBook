@@ -33,7 +33,7 @@ public class NoteEventController {
         Long userId = user == null ? null : user.getId();
         EventType type;
         try {
-            type = EventType.valueOf(event.getEventType());
+            type = EventType.valueOf(event.getEventType().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的事件类型: " + event.getEventType());
         }
