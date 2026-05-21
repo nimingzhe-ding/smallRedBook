@@ -14,7 +14,7 @@ async function initUser() {
     return;
   }
   try {
-    const user = await request("/user/me");
+    const user = await loadAccount();
     state.currentUser = user;
     renderUser(user);
     loadProfileStats();
@@ -28,25 +28,48 @@ async function initUser() {
 }
 window.initUser = initUser;
 
+async function loadAccount() {
+  try {
+    const account = await request("/user/account");
+    if (account?.id) return account;
+  } catch {
+    // 兼容旧接口，账号摘要失败时退回基础用户信息。
+  }
+  return request("/user/me");
+}
+window.loadAccount = loadAccount;
+
 function renderUser(user) {
   const adminButton = document.querySelector("#openAdminCenter");
+  const loginButton = document.querySelector("#loginButton");
   if (!user) {
     state.currentUser = null;
-    document.querySelector("#loginButton").textContent = "登录";
-    document.querySelector("#loginButton").classList.remove("is-logged-in");
+    loginButton.textContent = "登录";
+    loginButton.classList.remove("is-logged-in");
+    loginButton.innerHTML = "登录";
+    if (els.accountAvatar) els.accountAvatar.src = fallbackAvatar;
+    if (els.accountName) els.accountName.textContent = "未登录";
+    if (els.accountMeta) els.accountMeta.textContent = "登录后同步你的内容和订单";
+    hideAccountPopover();
     if (adminButton) adminButton.hidden = true;
     return;
   }
   state.currentUser = user;
-  document.querySelector("#loginButton").textContent = user.nickName || "已登录";
-  document.querySelector("#loginButton").classList.add("is-logged-in");
+  loginButton.classList.add("is-logged-in");
+  loginButton.innerHTML = `
+    <img src="${normalizeImage(user.icon) || fallbackAvatar}" alt="">
+    <span>${escapeHtml(user.nickName || "已登录")}</span>
+  `;
+  if (els.accountAvatar) els.accountAvatar.src = normalizeImage(user.icon) || fallbackAvatar;
+  if (els.accountName) els.accountName.textContent = user.nickName || "已登录";
+  if (els.accountMeta) els.accountMeta.textContent = user.maskedPhone || roleLabel(user.role);
   if (adminButton) adminButton.hidden = Number(user.role || 1) < 3;
 }
 window.renderUser = renderUser;
 
 function openLoginDialog() {
   if (token() && state.currentUser) {
-    logout();
+    toggleAccountPopover();
     return;
   }
   setLoginFeedback("");
@@ -54,6 +77,30 @@ function openLoginDialog() {
   setTimeout(() => els.loginForm.elements.phone?.focus(), 0);
 }
 window.openLoginDialog = openLoginDialog;
+
+function toggleAccountPopover(force) {
+  if (!els.accountPopover) return;
+  if (!token() || !state.currentUser) {
+    els.accountPopover.hidden = true;
+    return;
+  }
+  els.accountPopover.hidden = force === undefined ? !els.accountPopover.hidden : !force;
+}
+window.toggleAccountPopover = toggleAccountPopover;
+
+function hideAccountPopover() {
+  if (els.accountPopover) els.accountPopover.hidden = true;
+}
+window.hideAccountPopover = hideAccountPopover;
+
+function roleLabel(role) {
+  return {
+    1: "普通用户",
+    2: "商家用户",
+    3: "运营管理员"
+  }[Number(role || 1)] || "普通用户";
+}
+window.roleLabel = roleLabel;
 
 // ------------------------------
 // Login workflow
@@ -115,9 +162,10 @@ async function submitLogin(event) {
     } else {
       await initUser();
     }
-    if (state.afterLoginAction === "profile" && typeof openMyProfile === "function") {
+    if (state.afterLoginAction) {
+      const action = state.afterLoginAction;
       state.afterLoginAction = null;
-      openMyProfile();
+      runAfterLoginAction(action);
       return;
     }
     state.afterLoginAction = null;
@@ -134,6 +182,63 @@ async function submitLogin(event) {
 }
 window.submitLogin = submitLogin;
 
+function runAfterLoginAction(action) {
+  if (typeof action === "function") {
+    action();
+    return;
+  }
+  if (action === "profile" && typeof openMyProfile === "function") {
+    openMyProfile();
+    return;
+  }
+  if (action === "compose" && typeof openComposer === "function") {
+    openComposer();
+    return;
+  }
+  if (action === "orders" && typeof openOrdersDialog === "function") {
+    openOrdersDialog();
+    return;
+  }
+  if (action === "cart" && typeof openCartDialog === "function") {
+    openCartDialog();
+    return;
+  }
+  if (action === "notifications" && typeof openNotificationDialog === "function") {
+    openNotificationDialog();
+  }
+}
+window.runAfterLoginAction = runAfterLoginAction;
+
+function handleAccountAction(action) {
+  hideAccountPopover();
+  if (action === "profile") {
+    openMyProfile?.();
+    return;
+  }
+  if (action === "edit") {
+    if (state.currentProfile?.isMe) {
+      openProfileEdit?.();
+    } else {
+      openUserProfile?.(null).then(() => openProfileEdit?.());
+    }
+    return;
+  }
+  if (action === "orders") {
+    openOrdersDialog?.();
+    return;
+  }
+  if (action === "notifications") {
+    openNotificationDialog?.();
+    if (els.notificationSettings) els.notificationSettings.hidden = false;
+    loadNotificationSettings?.();
+    return;
+  }
+  if (action === "logout") {
+    logout();
+  }
+}
+window.handleAccountAction = handleAccountAction;
+
 async function logout() {
   try {
     if (token()) {
@@ -146,6 +251,7 @@ async function logout() {
   localStorage.removeItem("hmdp_token_expire_at");
   stopNotificationStream?.();
   renderUser(null);
+  state.currentProfile = null;
   showStatus("已退出登录。");
 }
 window.logout = logout;

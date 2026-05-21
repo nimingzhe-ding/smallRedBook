@@ -112,6 +112,10 @@ window.els = {
   notificationList: document.querySelector("#notificationList"),
   notificationBadge: document.querySelector("#notificationBadge"),
   notificationSettings: document.querySelector("#notificationSettings"),
+  accountPopover: document.querySelector("#accountPopover"),
+  accountAvatar: document.querySelector("#accountAvatar"),
+  accountName: document.querySelector("#accountName"),
+  accountMeta: document.querySelector("#accountMeta"),
   customerServiceDialog: document.querySelector("#customerServiceDialog"),
   customerServiceContext: document.querySelector("#customerServiceContext"),
   customerServiceMessages: document.querySelector("#customerServiceMessages"),
@@ -380,10 +384,19 @@ window.hideStatus = hideStatus;
 
 function requireLogin() {
   if (token()) return true;
+  setLoginFeedback?.("");
   els.loginDialog.showModal();
   return false;
 }
 window.requireLogin = requireLogin;
+
+function requireLoginThen(action) {
+  if (token()) return true;
+  state.afterLoginAction = action || null;
+  requireLogin();
+  return false;
+}
+window.requireLoginThen = requireLoginThen;
 
 // 商品数据标准化：补全图片、价格、库存等字段
 function normalizeProduct(product) {

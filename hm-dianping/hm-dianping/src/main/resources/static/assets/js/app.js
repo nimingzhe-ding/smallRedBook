@@ -39,6 +39,9 @@
       els.suggestPopover.classList.remove("is-open");
       els.trendList.hidden = true;
     }
+    if (!event.target.closest("#accountMenu")) {
+      hideAccountPopover?.();
+    }
   });
 
   els.imageFiles.addEventListener("change", function() {
@@ -166,6 +169,11 @@
     });
   });
   document.querySelector("#loginButton").addEventListener("click", openLoginDialog);
+  els.accountPopover?.addEventListener("click", function(event) {
+    var button = event.target.closest("[data-account-action]");
+    if (!button) return;
+    handleAccountAction(button.dataset.accountAction);
+  });
   els.loginDialog.addEventListener("click", function(e) { if (e.target === els.loginDialog) els.loginDialog.close(); });
   document.querySelector("#editProfileButton").addEventListener("click", openProfileEdit);
   els.profileEditForm.addEventListener("submit", submitProfileEdit);

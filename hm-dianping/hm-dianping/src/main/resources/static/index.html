@@ -41,7 +41,25 @@
         <button class="ghost-button notification-button" id="openNotifications" type="button">
           消息<span id="notificationBadge" hidden>0</span>
         </button>
-        <button class="ghost-button" id="loginButton" type="button">登录</button>
+        <div class="account-menu" id="accountMenu">
+          <button class="ghost-button account-button" id="loginButton" type="button">登录</button>
+          <div class="account-popover" id="accountPopover" hidden>
+            <div class="account-summary">
+              <img id="accountAvatar" alt="">
+              <div>
+                <strong id="accountName">未登录</strong>
+                <span id="accountMeta">登录后同步你的内容和订单</span>
+              </div>
+            </div>
+            <div class="account-popover-actions">
+              <button type="button" data-account-action="profile">我的主页</button>
+              <button type="button" data-account-action="edit">编辑资料</button>
+              <button type="button" data-account-action="orders">我的订单</button>
+              <button type="button" data-account-action="notifications">消息设置</button>
+              <button type="button" data-account-action="logout">退出登录</button>
+            </div>
+          </div>
+        </div>
         <button class="publish-button" id="openComposer" type="button">发布</button>
       </div>
     </header>

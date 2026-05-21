@@ -5,6 +5,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UserAccountDTO;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
 import com.hmdp.entity.UserInfo;
@@ -78,6 +79,21 @@ public class UserController {
         return Result.ok(user);
     }
 
+    @GetMapping("/account")
+    public Result account() {
+        UserDTO current = UserHolder.getUser();
+        if (current == null) {
+            return Result.ok();
+        }
+        User user = userService.getById(current.getId());
+        if (user == null) {
+            return Result.ok();
+        }
+        UserAccountDTO account = BeanUtil.copyProperties(user, UserAccountDTO.class);
+        account.setMaskedPhone(maskPhone(user.getPhone()));
+        return Result.ok(account);
+    }
+
     @GetMapping("/info/{id}")
     public Result info(@PathVariable("id") Long userId){
         // 查询详情
@@ -109,5 +125,12 @@ public class UserController {
     @GetMapping("/sign/count")
     public Result signCount(){
         return userService.signCount();
+    }
+
+    private String maskPhone(String phone) {
+        if (StrUtil.isBlank(phone) || phone.length() < 7) {
+            return "";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 }

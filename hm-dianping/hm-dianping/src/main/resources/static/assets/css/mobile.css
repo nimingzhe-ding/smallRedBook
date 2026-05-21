@@ -92,6 +92,26 @@
     font-size: 13px;
   }
 
+  .account-button.is-logged-in {
+    grid-template-columns: 22px;
+    width: 34px;
+    padding: 0;
+  }
+
+  .account-button.is-logged-in span {
+    display: none;
+  }
+
+  .account-button img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .account-popover {
+    right: -42px;
+    width: min(236px, calc(100vw - 24px));
+  }
+
   .main-layout {
     padding: 10px 10px 72px;
   }

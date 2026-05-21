@@ -352,7 +352,7 @@
   // Composer open / edit / delete
   // ------------------------------
   function openComposer() {
-    if (!requireLogin()) return;
+    if (!requireLoginThen("compose")) return;
     resetComposerMode();
     if (!restoreComposerDraft()) {
       els.composerForm.reset();

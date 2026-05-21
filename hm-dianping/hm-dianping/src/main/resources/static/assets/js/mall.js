@@ -175,7 +175,7 @@ async function createMallOrder(payload) {
 }
 
 async function openCartDialog() {
-  if (!requireLogin()) return;
+  if (!requireLoginThen("cart")) return;
   document.querySelector("#cartDialogTitle").textContent = "购物车";
   els.cartList.innerHTML = `<p class="empty-text">正在加载购物车...</p>`;
   els.cartDialog.showModal();
@@ -225,7 +225,7 @@ async function removeCartItem(cartItemId) {
 }
 
 async function openOrdersDialog(focusOrderId = null) {
-  if (!requireLogin()) return;
+  if (!requireLoginThen("orders")) return;
   document.querySelector("#cartDialogTitle").textContent = "我的订单";
   els.cartList.innerHTML = `<p class="empty-text">正在加载订单...</p>`;
   els.cartDialog.showModal();
