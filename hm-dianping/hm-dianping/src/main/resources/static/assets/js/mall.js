@@ -131,7 +131,10 @@ async function askProductGuide() {
   try {
     const data = await aiFlow("/ai/flow/shopping-guide", {
       productId: state.currentProduct.id,
+      merchantId: state.currentProduct.merchant?.id || state.currentProduct.merchantId || null,
+      voucherId: state.selectedVoucherId || state.productVouchers?.[0]?.id || null,
       query: question,
+      scenario: "product",
       content: `${state.currentProduct.title} ${state.currentProduct.subTitle}`
     });
     answer.textContent = data.answer || "暂时没有生成有效建议。";
@@ -259,7 +262,7 @@ function renderOrders(orders) {
         <span>订单号 ${order.id}</span>
         <small>¥${formatMoney(order.totalAmount)} · ${mallOrderStatus(order.status)}</small>
         <div class="order-ai-service">
-          <input data-order-ai-input="${order.id}" placeholder="问订单、退款、物流问题">
+          <input data-order-ai-input="${order.id}" data-order-product="${order.productId || ""}" placeholder="问订单、退款、物流问题">
           <p data-order-ai-answer="${order.id}"></p>
         </div>
       </div>
@@ -286,9 +289,14 @@ function renderOrders(orders) {
 async function askOrderService(orderId, question) {
   const answer = document.querySelector(`[data-order-ai-answer="${orderId}"]`);
   if (!question?.trim() || !answer) return;
+  const input = document.querySelector(`[data-order-ai-input="${orderId}"]`);
   answer.textContent = "正在查询订单并生成客服回复...";
   try {
-    answer.textContent = await fetchCustomerServiceAnswer(question, { orderId: Number(orderId), scenario: "order" });
+    answer.textContent = await fetchCustomerServiceAnswer(question, {
+      orderId: Number(orderId),
+      productId: Number(input?.dataset.orderProduct || 0) || null,
+      scenario: "order"
+    });
   } catch {
     answer.textContent = "客服助手暂时不可用，可以稍后再试。";
   }
@@ -325,6 +333,12 @@ async function openProduct(productId) {
   }
   if (!product) return;
   state.currentProduct = product;
+  state.customerServiceContext = buildCustomerServiceContext({
+    scenario: "product",
+    productId: product.id,
+    merchantId: product.merchant?.id || product.merchantId || null,
+    voucherId: state.selectedVoucherId || product.coupons?.[0]?.id || null
+  });
   state.selectedSkuId = product.skus?.[0]?.id ? String(product.skus[0].id) : null;
   state.checkoutQuantity = 1;
   state.selectedVoucherId = null;

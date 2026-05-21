@@ -12,10 +12,12 @@ import com.hmdp.exception.BusinessException;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.MallOrder;
 import com.hmdp.entity.MallProduct;
+import com.hmdp.entity.Voucher;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.service.IMallOrderService;
 import com.hmdp.service.IMallProductService;
 import com.hmdp.service.NoteService;
+import com.hmdp.service.IVoucherService;
 import com.hmdp.service.impl.MallOrderServiceImpl;
 import com.hmdp.utils.UserHolder;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class AiAssistantController {
     private final NoteService noteService;
     private final IMallProductService productService;
     private final IMallOrderService orderService;
+    private final IVoucherService voucherService;
 
     @PostMapping("/customer-service/chat")
     public Result customerService(@RequestBody AiChatRequest request) {
@@ -43,7 +46,7 @@ public class AiAssistantController {
         } catch (RuntimeException e) {
             String sessionId = StrUtil.blankToDefault(request == null ? null : request.getSessionId(), "customer-service");
             String answer = customerServiceFallback(text(request == null ? null : request.getMessage()), null,
-                    UserHolder.getUser(), null, null);
+                    UserHolder.getUser(), null, null, null);
             return Result.ok(new AiChatResponse(AiScene.CUSTOMER_SERVICE.getCode(), sessionId,
                     answer, java.util.List.of(), null, java.time.LocalDateTime.now()));
         }
@@ -120,15 +123,19 @@ public class AiAssistantController {
         UserDTO user = UserHolder.getUser();
         MallOrder order = loadOwnedMallOrder(request, user);
         MallProduct product = loadCustomerServiceProduct(request, order);
+        Voucher voucher = loadCustomerServiceVoucher(request, product);
         String question = text(request == null ? null : request.getQuery());
         return safeFlow("AI 客服", request, """
                 用户咨询：%s
                 当前登录用户：%s
+                当前页面场景：%s
                 订单信息：%s
                 商品信息：%s
+                优惠券信息：%s
                 请按客服口吻回答，涉及退款、物流、库存、支付、取消时说明当前系统状态、可操作按钮和下一步建议。
-                """.formatted(question, user == null ? "未登录" : user.getId(), orderText(order), productText(product)),
-                customerServiceFallback(question, request, user, order, product));
+                """.formatted(question, user == null ? "未登录" : user.getId(), text(request == null ? null : request.getScenario()),
+                orderText(order), productText(product), voucherText(voucher)),
+                customerServiceFallback(question, request, user, order, product, voucher));
     }
 
     @PostMapping("/flow/recommend-reason")
@@ -199,7 +206,24 @@ public class AiAssistantController {
         return productId == null ? null : productService.getById(productId);
     }
 
-    private String customerServiceFallback(String question, AiFlowRequest request, UserDTO user, MallOrder order, MallProduct product) {
+    private Voucher loadCustomerServiceVoucher(AiFlowRequest request, MallProduct product) {
+        if (request != null && request.getVoucherId() != null) {
+            return voucherService.getById(request.getVoucherId());
+        }
+        if (product == null) {
+            return null;
+        }
+        return voucherService.query()
+                .eq("status", 1)
+                .and(wrapper -> wrapper.eq("product_id", product.getId())
+                        .or()
+                        .eq(product.getMerchantId() != null, "merchant_id", product.getMerchantId()))
+                .orderByDesc("actual_value")
+                .last("limit 1")
+                .one();
+    }
+
+    private String customerServiceFallback(String question, AiFlowRequest request, UserDTO user, MallOrder order, MallProduct product, Voucher voucher) {
         String normalizedQuestion = StrUtil.blankToDefault(question, "").toLowerCase();
         if (request != null && request.getOrderId() != null && user == null) {
             return "我可以帮你查订单，但需要先登录当前账号。登录后打开“我的订单”，再输入订单问题，我会结合订单状态、物流和售后信息回答。";
@@ -208,10 +232,10 @@ public class AiAssistantController {
             return "没有查到这个订单，或该订单不属于当前登录账号。请确认订单号后，在“我的订单”里重新发起咨询。";
         }
         if (order != null) {
-            return orderServiceFallback(normalizedQuestion, order, product);
+            return orderServiceFallback(normalizedQuestion, order, product, voucher);
         }
         if (product != null) {
-            return productServiceFallback(normalizedQuestion, product);
+            return productServiceFallback(normalizedQuestion, product, voucher);
         }
         if (containsAny(normalizedQuestion, "登录", "验证码", "手机")) {
             return "登录方式是手机号验证码登录：先点“登录”，输入手机号获取验证码；验证码会打印在后端日志里，本地调试时复制验证码完成登录。";
@@ -229,6 +253,9 @@ public class AiAssistantController {
             return "收货地址在提交订单页维护。下单前可以新增或选择默认地址；订单支付后如需修改地址，建议在商家发货前尽快取消重下或联系商家处理。";
         }
         if (containsAny(normalizedQuestion, "优惠券", "券", "秒杀")) {
+            if (voucher != null) {
+                return "当前可参考优惠券：" + voucherText(voucher) + "。结算页会按商品、店铺、平台范围校验门槛，满足条件后抵扣。";
+            }
             return "平台支持店铺优惠券、商城商品券和秒杀券。秒杀券需要在活动时间内且库存充足时下单，同一用户不能重复抢同一张券。";
         }
         if (containsAny(normalizedQuestion, "投诉", "举报", "违规")) {
@@ -237,7 +264,7 @@ public class AiAssistantController {
         return "我可以回答登录、订单、支付、退款、物流、优惠券、商品库存等问题。你可以这样问：我的订单怎么退款、物流到哪了、这个商品还有库存吗。";
     }
 
-    private String orderServiceFallback(String question, MallOrder order, MallProduct product) {
+    private String orderServiceFallback(String question, MallOrder order, MallProduct product, Voucher voucher) {
         String status = mallOrderStatus(order.getStatus());
         StringBuilder answer = new StringBuilder();
         answer.append("这笔订单当前状态是：").append(status).append("。");
@@ -281,6 +308,15 @@ public class AiAssistantController {
             }
             return "这笔订单没有保存到完整收货地址，请在订单详情确认是否是旧订单或重新下单。";
         }
+        if (containsAny(question, "优惠", "优惠券", "券")) {
+            if (voucher != null) {
+                return "这笔订单相关优惠可参考：" + voucherText(voucher) + "。实际是否可用以订单结算时的商品、店铺、类目和门槛校验为准。";
+            }
+            Long discount = order.getDiscountAmount() == null ? 0L : order.getDiscountAmount();
+            return discount > 0
+                    ? "这笔订单已优惠 ¥" + money(discount) + "。如果还想使用其他优惠，需要取消后重新下单并在结算页选择可用券。"
+                    : "这笔订单没有记录优惠抵扣。优惠券通常只能在下单结算前选择，支付后不能补用。";
+        }
         if (containsAny(question, "取消")) {
             if (isStatus(order, MallOrderServiceImpl.STATUS_PENDING_PAY)) {
                 return "这笔订单还未支付，可以直接取消。";
@@ -297,7 +333,7 @@ public class AiAssistantController {
         return answer.toString();
     }
 
-    private String productServiceFallback(String question, MallProduct product) {
+    private String productServiceFallback(String question, MallProduct product, Voucher voucher) {
         StringBuilder answer = new StringBuilder();
         answer.append("商品《").append(StrUtil.blankToDefault(product.getTitle(), "未命名商品")).append("》");
         answer.append("当前价格 ¥").append(money(product.getPrice())).append("，库存 ")
@@ -305,7 +341,11 @@ public class AiAssistantController {
         if (containsAny(question, "库存", "还有", "能买")) {
             answer.append(product.getStock() != null && product.getStock() > 0 ? "目前可以购买。" : "当前库存不足，建议稍后再看。");
         } else if (containsAny(question, "优惠", "券", "便宜")) {
-            answer.append("可用优惠券会在商品详情和结算页展示，结算时也支持自动选择最优优惠。");
+            if (voucher != null) {
+                answer.append("当前可参考优惠：").append(voucherText(voucher)).append("。");
+            } else {
+                answer.append("可用优惠券会在商品详情和结算页展示，结算时也支持自动选择最优优惠。");
+            }
         } else {
             answer.append("可以结合预算、送礼对象和使用场景继续问我。");
         }
@@ -381,6 +421,16 @@ public class AiAssistantController {
         if (product == null) return "未提供";
         return "标题：" + product.getTitle() + "；副标题：" + product.getSubTitle() + "；价格：" + product.getPrice()
                 + "；库存：" + product.getStock() + "；销量：" + product.getSold();
+    }
+
+    private String voucherText(Voucher voucher) {
+        if (voucher == null) return "未提供";
+        return "券：" + StrUtil.blankToDefault(voucher.getTitle(), "未命名优惠券")
+                + "；门槛：" + money(voucher.getPayValue())
+                + "；优惠：" + money(voucher.getActualValue())
+                + "；范围：" + StrUtil.blankToDefault(voucher.getScopeType(), "未指定")
+                + "；商品ID：" + voucher.getProductId()
+                + "；商家ID：" + voucher.getMerchantId();
     }
 
     private String orderText(MallOrder order) {

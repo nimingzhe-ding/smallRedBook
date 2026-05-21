@@ -2,6 +2,7 @@
 (function() {
 
 function openCustomerServiceDialog(question = "") {
+  state.customerServiceContext = buildCustomerServiceContext(state.customerServiceContext || {});
   renderCustomerWelcome();
   els.customerServiceInput.value = question || "";
   els.customerServiceDialog.showModal();
@@ -50,6 +51,8 @@ async function fetchCustomerServiceAnswer(question, context = {}) {
     query: question,
     orderId: mergedContext.orderId || null,
     productId: mergedContext.productId || null,
+    merchantId: mergedContext.merchantId || null,
+    voucherId: mergedContext.voucherId || null,
     scenario: mergedContext.scenario || "customer-service"
   });
   return data.answer || "暂时没有生成有效回复。";
@@ -57,11 +60,15 @@ async function fetchCustomerServiceAnswer(question, context = {}) {
 window.fetchCustomerServiceAnswer = fetchCustomerServiceAnswer;
 
 function buildCustomerServiceContext(context = {}) {
-  const currentProductId = state.currentProduct?.id;
+  const product = state.currentProduct || null;
+  const currentProductId = product?.id;
+  const selectedVoucherId = state.selectedVoucherId || state.productVouchers?.[0]?.id;
   return {
     scenario: context.scenario || (currentProductId ? "product" : "customer-service"),
     orderId: context.orderId || null,
-    productId: context.productId || currentProductId || null
+    productId: context.productId || currentProductId || null,
+    merchantId: context.merchantId || product?.merchant?.id || product?.merchantId || null,
+    voucherId: context.voucherId || selectedVoucherId || null
   };
 }
 window.buildCustomerServiceContext = buildCustomerServiceContext;

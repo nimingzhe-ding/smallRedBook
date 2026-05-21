@@ -113,8 +113,8 @@ public class NoteEventServiceImpl implements INoteEventService {
         }
     }
 
-    private NoteEvent fromStreamRecord(MapRecord<String, String, String> record) {
-        Map<String, String> values = record.getValue();
+    private NoteEvent fromStreamRecord(MapRecord<String, Object, Object> record) {
+        Map<Object, Object> values = record.getValue();
         NoteEvent event = new NoteEvent();
         event.setUserId(toLong(values.get("userId")));
         event.setBlogId(toLong(values.get("blogId")));
@@ -165,11 +165,11 @@ public class NoteEventServiceImpl implements INoteEventService {
         return false;
     }
 
-    private void ack(MapRecord<String, String, String> record) {
+    private void ack(MapRecord<String, Object, Object> record) {
         stringRedisTemplate.opsForStream().acknowledge(RedisConstants.NOTE_EVENT_STREAM_KEY, EVENT_GROUP, record.getId());
     }
 
-    private void handleRecord(MapRecord<String, String, String> record) {
+    private void handleRecord(MapRecord<String, Object, Object> record) {
         if (record.getValue().containsKey("init")) {
             ack(record);
             return;
@@ -183,7 +183,7 @@ public class NoteEventServiceImpl implements INoteEventService {
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    List<MapRecord<String, String, String>> records = stringRedisTemplate.opsForStream().read(
+                    List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
                             Consumer.from(EVENT_GROUP, EVENT_CONSUMER),
                             StreamReadOptions.empty().count(10).block(Duration.ofSeconds(2)),
                             StreamOffset.create(RedisConstants.NOTE_EVENT_STREAM_KEY, ReadOffset.lastConsumed())
@@ -203,7 +203,7 @@ public class NoteEventServiceImpl implements INoteEventService {
         private void handlePending() {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    List<MapRecord<String, String, String>> records = stringRedisTemplate.opsForStream().read(
+                    List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
                             Consumer.from(EVENT_GROUP, EVENT_CONSUMER),
                             StreamReadOptions.empty().count(10),
                             StreamOffset.create(RedisConstants.NOTE_EVENT_STREAM_KEY, ReadOffset.from("0"))

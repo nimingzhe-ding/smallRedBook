@@ -16,6 +16,7 @@ public class AiFlowRequest {
     private Long productId;
     private Long orderId;
     private Long merchantId;
+    private Long voucherId;
     private String title;
     private String content;
     private String scenario;
