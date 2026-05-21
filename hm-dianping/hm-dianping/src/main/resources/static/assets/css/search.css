@@ -13,6 +13,30 @@
   margin-bottom: 4px;
 }
 
+.search-refinements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-refinements button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--text-secondary);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-refinements button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .trend-list {
   position: absolute;
   top: calc(100% + 10px);

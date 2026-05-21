@@ -164,6 +164,8 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         result.setProducts(searchProducts(keyword, pageNo));
         result.setShops(searchShops(keyword, pageNo));
         result.setTopics(searchTopics(keyword));
+        result.setRelatedQueries(buildRelatedQueries(keyword, notes, result.getProducts(), result.getShops(), result.getTopics()));
+        result.setSummary(buildSearchSummary(keyword, notes, videos, result.getProducts(), result.getShops(), result.getTopics()));
         return Result.ok(result);
     }
 
@@ -556,6 +558,10 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (StrUtil.isNotBlank(query)) {
             wrapper.and(w -> w.like("title", query).or().like("content", query).or().like("tags", query));
         }
+        if (StrUtil.isNotBlank(query) && "hot".equals(normalizedChannel)) {
+            wrapper.last(orderBySearchScore(query, 72));
+            return wrapper.page(page);
+        }
         // 个性化推荐：基于用户兴趣画像
         if ("recommend".equals(normalizedChannel)) {
             wrapper.last(orderByPersonalRecommendScore(72));
@@ -621,6 +627,17 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     private String orderByRecommendScore(int freshHours) {
         return "ORDER BY (" + recommendScoreSql(freshHours) + ") DESC, create_time DESC";
+    }
+
+    private String orderBySearchScore(String keyword, int freshHours) {
+        String escaped = keyword.replace("'", "''").replace("%", "\\%").replace("_", "\\_");
+        return "ORDER BY (" + recommendScoreSql(freshHours)
+                + " + CASE WHEN title = '" + escaped + "' THEN 80 ELSE 0 END"
+                + " + CASE WHEN title LIKE '" + escaped + "%' THEN 45 ELSE 0 END"
+                + " + CASE WHEN title LIKE '%" + escaped + "%' THEN 30 ELSE 0 END"
+                + " + CASE WHEN tags LIKE '%" + escaped + "%' THEN 24 ELSE 0 END"
+                + " + CASE WHEN content LIKE '%" + escaped + "%' THEN 12 ELSE 0 END"
+                + ") DESC, create_time DESC";
     }
 
     private String orderByPersonalRecommendScore(int freshHours) {
@@ -791,6 +808,82 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             return matched;
         }
         return List.of(new ContentTrendDTO(keyword, 1L));
+    }
+
+    private String buildSearchSummary(String keyword,
+                                      List<ContentNoteDTO> notes,
+                                      List<ContentNoteDTO> videos,
+                                      List<MallProduct> products,
+                                      List<Shop> shops,
+                                      List<ContentTrendDTO> topics) {
+        int noteCount = notes == null ? 0 : notes.size();
+        int videoCount = videos == null ? 0 : videos.size();
+        int productCount = products == null ? 0 : products.size();
+        int shopCount = shops == null ? 0 : shops.size();
+        int topicCount = topics == null ? 0 : topics.size();
+        String strongest = "笔记";
+        int max = noteCount;
+        if (productCount > max) {
+            strongest = "商品";
+            max = productCount;
+        }
+        if (shopCount > max) {
+            strongest = "商家";
+            max = shopCount;
+        }
+        if (topicCount > max) {
+            strongest = "话题";
+        }
+        return "已按标题、标签、正文和互动热度综合排序。" +
+                "「" + keyword + "」当前更集中在" + strongest + "结果，" +
+                "包含 " + noteCount + " 条笔记、" + videoCount + " 条视频、" +
+                productCount + " 个商品和 " + shopCount + " 个商家。";
+    }
+
+    private List<String> buildRelatedQueries(String keyword,
+                                             List<ContentNoteDTO> notes,
+                                             List<MallProduct> products,
+                                             List<Shop> shops,
+                                             List<ContentTrendDTO> topics) {
+        java.util.LinkedHashSet<String> related = new java.util.LinkedHashSet<>();
+        if (topics != null) {
+            topics.stream()
+                    .map(ContentTrendDTO::getKeyword)
+                    .filter(StrUtil::isNotBlank)
+                    .filter(item -> !item.equals(keyword))
+                    .limit(4)
+                    .forEach(related::add);
+        }
+        if (notes != null) {
+            for (ContentNoteDTO note : notes) {
+                for (String tag : StrUtil.split(StrUtil.blankToDefault(note.getTags(), ""), ',')) {
+                    String trimmed = StrUtil.trim(tag);
+                    if (StrUtil.isNotBlank(trimmed) && !trimmed.equals(keyword)) {
+                        related.add(trimmed);
+                    }
+                    if (related.size() >= 8) return List.copyOf(related);
+                }
+            }
+        }
+        if (products != null) {
+            products.stream()
+                    .map(MallProduct::getCategory)
+                    .filter(StrUtil::isNotBlank)
+                    .filter(item -> !item.equals(keyword))
+                    .limit(3)
+                    .forEach(related::add);
+        }
+        if (shops != null) {
+            shops.stream()
+                    .map(Shop::getArea)
+                    .filter(StrUtil::isNotBlank)
+                    .map(area -> keyword + " " + area)
+                    .limit(2)
+                    .forEach(related::add);
+        }
+        related.add(keyword + " 推荐");
+        related.add(keyword + " 避雷");
+        return related.stream().limit(8).toList();
     }
 
     private int normalizePage(Integer current) {

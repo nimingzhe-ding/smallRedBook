@@ -13,9 +13,11 @@ import java.util.List;
 @Data
 public class ContentSearchResult {
     private String query;
+    private String summary;
     private List<ContentNoteDTO> notes;
     private List<ContentNoteDTO> videos;
     private List<MallProduct> products;
     private List<Shop> shops;
     private List<ContentTrendDTO> topics;
+    private List<String> relatedQueries;
 }

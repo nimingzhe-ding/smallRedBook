@@ -35,6 +35,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
     return;
   }
   state.searchResults = results;
+  state.searchMeta = results.meta || { summary: "", relatedQueries: [] };
   if (!state.searchResults[state.searchTab]?.length) {
     state.searchTab = ["notes", "videos", "products", "shops", "topics"].find(tab => state.searchResults[tab].length) || "notes";
   }
@@ -51,7 +52,11 @@ async function searchUnified(keyword) {
       videos: Array.isArray(data?.videos) ? data.videos.map(normalizeNote) : [],
       products: Array.isArray(data?.products) ? data.products.map(normalizeProduct) : [],
       shops: Array.isArray(data?.shops) ? data.shops.map(normalizeShop) : [],
-      topics: Array.isArray(data?.topics) ? data.topics : []
+      topics: Array.isArray(data?.topics) ? data.topics : [],
+      meta: {
+        summary: data?.summary || "",
+        relatedQueries: Array.isArray(data?.relatedQueries) ? data.relatedQueries : []
+      }
     };
   } catch {
     return {
@@ -59,7 +64,8 @@ async function searchUnified(keyword) {
       videos: [],
       products: [],
       shops: [],
-      topics: []
+      topics: [],
+      meta: { summary: "", relatedQueries: [] }
     };
   }
 }
@@ -73,7 +79,7 @@ function renderUnifiedSearch() {
     { key: "topics", label: "话题" }
   ];
   const total = tabs.reduce((sum, tab) => sum + state.searchResults[tab.key].length, 0);
-  els.unifiedSearchSummary.textContent = `共找到 ${total} 条结果`;
+  els.unifiedSearchSummary.textContent = state.searchMeta?.summary || `共找到 ${total} 条结果`;
   els.unifiedSearchTabs.innerHTML = tabs.map(tab => `
     <button type="button" class="${state.searchTab === tab.key ? "is-active" : ""}" data-search-tab="${tab.key}">
       ${tab.label}<small>${state.searchResults[tab.key].length}</small>
@@ -91,14 +97,16 @@ function renderUnifiedSearch() {
 function renderUnifiedSearchResults() {
   const list = state.searchResults[state.searchTab] || [];
   if (!list.length) {
-    els.unifiedSearchResults.innerHTML = `${renderAiSearchInsight()}<p class="empty-text">这个分类暂时没有匹配结果。</p>`;
+    els.unifiedSearchResults.innerHTML = `${renderSearchRefinements()}${renderAiSearchInsight()}<p class="empty-text">这个分类暂时没有匹配结果。</p>`;
+    bindSearchRefinements();
     return;
   }
   if (state.searchTab === "notes" || state.searchTab === "videos") {
     const grid = document.createElement("div");
     grid.className = "masonry-feed unified-note-results";
     list.forEach(note => grid.appendChild(createNoteCard(note)));
-    els.unifiedSearchResults.innerHTML = renderAiSearchInsight();
+    els.unifiedSearchResults.innerHTML = renderSearchRefinements() + renderAiSearchInsight();
+    bindSearchRefinements();
     els.unifiedSearchResults.appendChild(grid);
     return;
   }
@@ -115,6 +123,7 @@ function renderUnifiedSearchResults() {
 
 function renderUnifiedProducts(products) {
   els.unifiedSearchResults.innerHTML = `
+    ${renderSearchRefinements()}
     ${renderAiSearchInsight()}
     <div class="unified-product-grid">
       ${products.map(product => `
@@ -136,6 +145,7 @@ function renderUnifiedProducts(products) {
         </article>
       `).join("")}
     </div>`;
+  bindSearchRefinements();
   els.unifiedSearchResults.querySelectorAll("[data-unified-product]").forEach(button => {
     button.addEventListener("click", () => openProduct(button.dataset.unifiedProduct));
   });
@@ -143,6 +153,7 @@ function renderUnifiedProducts(products) {
 
 function renderUnifiedShops(shops) {
   els.unifiedSearchResults.innerHTML = `
+    ${renderSearchRefinements()}
     ${renderAiSearchInsight()}
     <div class="unified-list">
       ${shops.map(shop => `
@@ -158,6 +169,7 @@ function renderUnifiedShops(shops) {
         </article>
       `).join("")}
     </div>`;
+  bindSearchRefinements();
   els.unifiedSearchResults.querySelectorAll("[data-unified-shop]").forEach(button => {
     const shop = shops.find(item => String(item.id) === String(button.dataset.unifiedShop));
     button.addEventListener("click", () => openShopDialog(shop));
@@ -166,6 +178,7 @@ function renderUnifiedShops(shops) {
 
 function renderUnifiedTopics(topics) {
   els.unifiedSearchResults.innerHTML = `
+    ${renderSearchRefinements()}
     ${renderAiSearchInsight()}
     <div class="unified-topic-grid">
       ${topics.map(topic => `
@@ -175,6 +188,7 @@ function renderUnifiedTopics(topics) {
         </button>
       `).join("")}
     </div>`;
+  bindSearchRefinements();
   els.unifiedSearchResults.querySelectorAll("[data-unified-topic]").forEach(button => {
     button.addEventListener("click", () => enterUnifiedSearch(button.dataset.unifiedTopic, "notes"));
   });
@@ -248,6 +262,21 @@ async function loadTrends() {
   renderTrends();
 }
 
+function renderSearchRefinements() {
+  const related = state.searchMeta?.relatedQueries || [];
+  if (!related.length) return "";
+  return `
+    <section class="search-refinements">
+      ${related.map(item => `<button type="button" data-search-refine="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}
+    </section>`;
+}
+
+function bindSearchRefinements() {
+  els.unifiedSearchResults.querySelectorAll("[data-search-refine]").forEach(button => {
+    button.addEventListener("click", () => enterUnifiedSearch(button.dataset.searchRefine, "notes"));
+  });
+}
+
 function renderTrends() {
   if (!els.trendList) return;
   var hasTrends = state.trends && state.trends.length > 0;
@@ -279,6 +308,8 @@ window.renderUnifiedProducts = renderUnifiedProducts;
 window.renderUnifiedShops = renderUnifiedShops;
 window.renderUnifiedTopics = renderUnifiedTopics;
 window.renderAiSearchInsight = renderAiSearchInsight;
+window.renderSearchRefinements = renderSearchRefinements;
+window.bindSearchRefinements = bindSearchRefinements;
 window.loadSmartRecommendation = loadSmartRecommendation;
 window.analyzeCurrentNote = analyzeCurrentNote;
 window.renderSuggestions = renderSuggestions;
