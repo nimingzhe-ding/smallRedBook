@@ -5,11 +5,11 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Frontend note write request. The persistence layer can still reuse tb_blog,
- * but controllers should expose note semantics instead of Blog entities.
+ * Update note request. Kept separate from create so later edit-only rules
+ * can evolve without changing the publish API contract.
  */
 @Data
-public class NoteRequest {
+public class NoteUpdateRequest {
     private Long shopId;
     private String title;
     private String images;

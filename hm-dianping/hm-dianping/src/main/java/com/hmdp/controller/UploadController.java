@@ -110,7 +110,7 @@ public class UploadController {
     }
 
     private String createNewFileName(String suffix) {
-        return createNewMediaFileName("blogs", suffix);
+        return createNewMediaFileName("notes", suffix);
     }
 
     private String createNewMediaFileName(String folder, String suffix) {

@@ -102,6 +102,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         }
         List<Long> productIds = normalizeProductIds(blog.getProductIds());
         String contentType = ContentType.resolve(blog.getContentType(), blog.getVideoUrl());
+        validateWritePayload(blog, contentType, productIds);
         if (ContentType.PRODUCT_NOTE.name().equals(contentType) && productIds.isEmpty()) {
             throw new BusinessException(ErrorCode.NEED_MOUNT_PRODUCT);
         }
@@ -111,7 +112,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         blog.setContentType(contentType);
         blog.setTags(normalizeTags(blog.getTags()));
         //获取登录用户
-        Long id = UserHolder.getUser().getId();
+        UserDTO currentUser = UserHolder.getUser();
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        }
+        Long id = currentUser.getId();
         //保存博文
         blog.setUserId(id);
         boolean isSuccess = save(blog);
@@ -149,11 +154,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (!Objects.equals(existing.getUserId(), user.getId())) {
             throw new BusinessException(ErrorCode.NO_PERMISSION, "只能编辑自己的笔记");
         }
-        if (StrUtil.isBlank(blog.getTitle()) || StrUtil.isBlank(blog.getContent())) {
-            throw new BusinessException(ErrorCode.TITLE_CONTENT_REQUIRED);
-        }
         List<Long> productIds = normalizeProductIds(blog.getProductIds());
         String contentType = ContentType.resolve(blog.getContentType(), blog.getVideoUrl());
+        validateWritePayload(blog, contentType, productIds);
         if (ContentType.PRODUCT_NOTE.name().equals(contentType) && productIds.isEmpty()) {
             throw new BusinessException(ErrorCode.NEED_MOUNT_PRODUCT);
         }
@@ -215,6 +218,31 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .distinct()
                 .limit(6)
                 .toList();
+    }
+
+    private void validateWritePayload(Blog blog, String contentType, List<Long> productIds) {
+        if (StrUtil.isBlank(blog.getTitle()) || StrUtil.isBlank(blog.getContent())) {
+            throw new BusinessException(ErrorCode.TITLE_CONTENT_REQUIRED);
+        }
+        if (StrUtil.trim(blog.getTitle()).length() > 80) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "标题不能超过80个字");
+        }
+        if (blog.getContent().trim().length() > 5000) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "正文不能超过5000个字");
+        }
+        boolean videoNote = ContentType.VIDEO.name().equals(contentType) || ContentType.LIVE.name().equals(contentType);
+        if (videoNote && StrUtil.isBlank(blog.getVideoUrl())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频笔记需要上传视频或填写视频地址");
+        }
+        if (!videoNote && StrUtil.isBlank(blog.getImages())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图文笔记至少需要一张图片");
+        }
+        if (ContentType.PRODUCT_NOTE.name().equals(contentType) && blog.getShopId() == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "商品种草需要关联店铺");
+        }
+        if (ContentType.PRODUCT_NOTE.name().equals(contentType) && (productIds == null || productIds.isEmpty())) {
+            throw new BusinessException(ErrorCode.NEED_MOUNT_PRODUCT);
+        }
     }
 
     private String normalizeTags(String tags) {

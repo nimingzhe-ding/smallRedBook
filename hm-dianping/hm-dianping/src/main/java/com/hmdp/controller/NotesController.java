@@ -2,7 +2,8 @@ package com.hmdp.controller;
 
 import com.hmdp.annotation.RequireRole;
 import com.hmdp.dto.ContentAiRequest;
-import com.hmdp.dto.NoteRequest;
+import com.hmdp.dto.NoteCreateRequest;
+import com.hmdp.dto.NoteUpdateRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
 import com.hmdp.enums.UserRole;
@@ -80,7 +81,7 @@ public class NotesController {
      */
     @PostMapping
     @RequireRole(UserRole.USER)
-    public Result publish(@RequestBody NoteRequest request) {
+    public Result publish(@RequestBody NoteCreateRequest request) {
         return blogService.saveBlog(toBlog(request));
     }
 
@@ -88,7 +89,7 @@ public class NotesController {
      * 编辑自己的笔记。
      */
     @PutMapping("/{id}")
-    public Result update(@PathVariable("id") Long noteId, @RequestBody NoteRequest request) {
+    public Result update(@PathVariable("id") Long noteId, @RequestBody NoteUpdateRequest request) {
         return blogService.updateOwnBlog(noteId, toBlog(request));
     }
 
@@ -282,8 +283,22 @@ public class NotesController {
         return contentService.aiNoteSummary(request);
     }
 
-    private Blog toBlog(NoteRequest request) {
-        NoteRequest source = request == null ? new NoteRequest() : request;
+    private Blog toBlog(NoteCreateRequest request) {
+        NoteCreateRequest source = request == null ? new NoteCreateRequest() : request;
+        Blog note = new Blog();
+        note.setShopId(source.getShopId());
+        note.setTitle(source.getTitle());
+        note.setImages(source.getImages());
+        note.setVideoUrl(source.getVideoUrl());
+        note.setContentType(source.getContentType());
+        note.setTags(source.getTags());
+        note.setContent(source.getContent());
+        note.setProductIds(source.getProductIds());
+        return note;
+    }
+
+    private Blog toBlog(NoteUpdateRequest request) {
+        NoteUpdateRequest source = request == null ? new NoteUpdateRequest() : request;
         Blog note = new Blog();
         note.setShopId(source.getShopId());
         note.setTitle(source.getTitle());
