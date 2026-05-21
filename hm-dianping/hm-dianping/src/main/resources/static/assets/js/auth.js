@@ -23,11 +23,14 @@ async function initUser() {
 window.initUser = initUser;
 
 function renderUser(user) {
+  const adminButton = document.querySelector("#openAdminCenter");
   if (!user) {
     document.querySelector("#loginButton").textContent = "登录";
+    if (adminButton) adminButton.hidden = true;
     return;
   }
   document.querySelector("#loginButton").textContent = "已登录";
+  if (adminButton) adminButton.hidden = Number(user.role || 1) < 3;
 }
 window.renderUser = renderUser;
 

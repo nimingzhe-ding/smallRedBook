@@ -106,6 +106,7 @@
   document.querySelector("#openCart").addEventListener("click", openCartDialog);
   document.querySelector("#openOrders").addEventListener("click", openOrdersDialog);
   document.querySelector("#openMerchantCenter").addEventListener("click", openMerchantCenter);
+  document.querySelector("#openAdminCenter")?.addEventListener("click", openAdminCenter);
   document.querySelector("#closeProductDialog").addEventListener("click", function() { els.productDialog.close(); });
   document.querySelector("#closeCheckoutDialog").addEventListener("click", function() { els.checkoutDialog.close(); });
   document.querySelector("#closeCartDialog").addEventListener("click", function() { els.cartDialog.close(); });
