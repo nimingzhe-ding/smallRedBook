@@ -7,6 +7,7 @@
 // ------------------------------
 async function initUser() {
   if (!token()) {
+    stopNotificationStream?.();
     renderUser(null);
     return;
   }
@@ -15,8 +16,11 @@ async function initUser() {
     state.currentUser = user;
     renderUser(user);
     loadProfileStats();
+    loadNotificationSettings?.();
+    refreshNotificationBadge?.();
   } catch {
     localStorage.removeItem("hmdp_token");
+    stopNotificationStream?.();
     renderUser(null);
   }
 }

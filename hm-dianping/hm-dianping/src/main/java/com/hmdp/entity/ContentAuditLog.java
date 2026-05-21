@@ -11,30 +11,25 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 视频弹幕。
- * 弹幕对外匿名展示，只绑定笔记和视频播放秒数。
+ * 内容审核操作日志。
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_video_danmaku")
-public class VideoDanmaku implements Serializable {
+@TableName("tb_content_audit_log")
+public class ContentAuditLog implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
-    private Long blogId;
-    private Long userId;
-    private String content;
-    private Integer videoSecond;
-    private Integer lane;
-    private Integer status;
-    private String reportReason;
-    private Integer reportCount;
+    private String targetType;
+    private Long targetId;
+    private Long noteId;
     private Long reporterId;
-    private String auditRemark;
+    private Long targetUserId;
     private Long auditorId;
-    private LocalDateTime auditTime;
+    private String action;
+    private String reason;
+    private String remark;
     private LocalDateTime createTime;
-    private LocalDateTime updateTime;
 }

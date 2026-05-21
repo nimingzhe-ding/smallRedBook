@@ -29,9 +29,15 @@ async function openNotificationDialog() {
   setMobileTabActive("messages");
   els.notificationList.innerHTML = `<p class="empty-text">正在加载消息...</p>`;
   els.notificationDialog.showModal();
+  if (!state.notificationSettings) {
+    loadNotificationSettings();
+  }
   const unreadOnly = state.notificationFilter === "unread";
+  const category = ["interaction", "order", "audit", "system"].includes(state.notificationFilter)
+    ? state.notificationFilter
+    : "all";
   try {
-    const list = await request(`/notifications?unreadOnly=${unreadOnly}`);
+    const list = await request(`/notifications?unreadOnly=${unreadOnly}&category=${category}`);
     renderNotifications(Array.isArray(list) ? list : []);
   } catch {
     els.notificationList.innerHTML = `<p class="empty-text">消息加载失败，请稍后再试。</p>`;
@@ -112,6 +118,107 @@ function notificationTypeLabel(type) {
   }[type] || "通知";
 }
 window.notificationTypeLabel = notificationTypeLabel;
+
+function notificationCategoryLabel(type) {
+  const value = String(type || "").toUpperCase();
+  if (value.startsWith("ORDER_")) return "订单";
+  if (value.startsWith("AUDIT_")) return "审核";
+  if (["LIKE", "COLLECT", "COMMENT", "REPLY", "FOLLOW"].includes(value)) return "互动";
+  return "系统";
+}
+window.notificationCategoryLabel = notificationCategoryLabel;
+
+async function loadNotificationSettings() {
+  if (!token() || !els.notificationSettings) return;
+  try {
+    state.notificationSettings = await request("/notifications/settings");
+    renderNotificationSettings();
+    startNotificationStream();
+  } catch {
+    // 设置加载失败不影响通知列表浏览。
+  }
+}
+window.loadNotificationSettings = loadNotificationSettings;
+
+function renderNotificationSettings() {
+  if (!els.notificationSettings || !state.notificationSettings) return;
+  const setting = state.notificationSettings;
+  const options = [
+    ["interactionEnabled", "互动"],
+    ["orderEnabled", "订单"],
+    ["auditEnabled", "审核"],
+    ["systemEnabled", "系统"],
+    ["realtimeEnabled", "实时"]
+  ];
+  els.notificationSettings.innerHTML = options.map(([key, label]) => `
+    <label class="notification-setting-toggle">
+      <input type="checkbox" data-notification-setting="${key}" ${setting[key] ? "checked" : ""}>
+      <span>${label}</span>
+    </label>
+  `).join("");
+}
+window.renderNotificationSettings = renderNotificationSettings;
+
+async function updateNotificationSetting(key, value) {
+  if (!key || !requireLogin()) return;
+  try {
+    state.notificationSettings = await request("/notifications/settings", {
+      method: "PUT",
+      body: JSON.stringify({ [key]: value })
+    });
+    renderNotificationSettings();
+    if (key === "realtimeEnabled") {
+      if (value) startNotificationStream(true);
+      else stopNotificationStream();
+    }
+  } catch (error) {
+    showStatus(error.message || "通知设置保存失败。");
+    loadNotificationSettings();
+  }
+}
+window.updateNotificationSetting = updateNotificationSetting;
+
+function startNotificationStream(force = false) {
+  if (!token() || !state.notificationSettings?.realtimeEnabled || !window.EventSource) return;
+  if (!force && state.notificationStream && state.notificationStreamToken === token()) return;
+  stopNotificationStream();
+  state.notificationStreamToken = token();
+  const stream = new EventSource(apiUrl(`/notifications/stream?token=${encodeURIComponent(token())}`));
+  stream.addEventListener("notification", event => {
+    try {
+      const data = JSON.parse(event.data || "{}");
+      applyRealtimeNotification(data);
+    } catch {
+      refreshNotificationBadge();
+    }
+  });
+  stream.onerror = () => {
+    stopNotificationStream();
+  };
+  state.notificationStream = stream;
+}
+window.startNotificationStream = startNotificationStream;
+
+function stopNotificationStream() {
+  if (state.notificationStream) {
+    state.notificationStream.close();
+  }
+  state.notificationStream = null;
+  state.notificationStreamToken = null;
+}
+window.stopNotificationStream = stopNotificationStream;
+
+function applyRealtimeNotification(data) {
+  const count = Number(data?.unreadCount || 0);
+  if (els.notificationBadge) {
+    els.notificationBadge.textContent = count > 99 ? "99+" : String(count);
+    els.notificationBadge.hidden = count <= 0;
+  }
+  if (els.notificationDialog?.open) {
+    openNotificationDialog();
+  }
+}
+window.applyRealtimeNotification = applyRealtimeNotification;
 
 async function markNotificationsRead() {
   if (!requireLogin()) return;

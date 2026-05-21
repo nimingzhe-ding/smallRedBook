@@ -2,9 +2,11 @@ package com.hmdp.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.hmdp.annotation.RequireRole;
+import com.hmdp.dto.ContentReviewRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.BlogComments;
+import com.hmdp.entity.ContentAuditLog;
 import com.hmdp.entity.MallOrder;
 import com.hmdp.entity.MallProduct;
 import com.hmdp.entity.NoteEvent;
@@ -15,16 +17,19 @@ import com.hmdp.enums.UserRole;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.mapper.BlogCommentsMapper;
 import com.hmdp.mapper.BlogMapper;
+import com.hmdp.mapper.ContentAuditLogMapper;
 import com.hmdp.mapper.MallOrderMapper;
 import com.hmdp.mapper.MallProductMapper;
 import com.hmdp.mapper.NoteEventMapper;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.mapper.VideoDanmakuMapper;
 import com.hmdp.service.IUserNotificationService;
+import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -61,6 +66,8 @@ public class AdminController {
     private VideoDanmakuMapper videoDanmakuMapper;
     @Resource
     private IUserNotificationService notificationService;
+    @Resource
+    private ContentAuditLogMapper auditLogMapper;
 
     @GetMapping("/dashboard")
     public Result dashboard() {
@@ -164,73 +171,115 @@ public class AdminController {
     }
 
     @PostMapping("/comments/{id}/restore")
-    public Result restoreComment(@PathVariable("id") Long commentId) {
+    public Result restoreComment(@PathVariable("id") Long commentId,
+                                 @RequestBody(required = false) ContentReviewRequest request) {
         BlogComments comment = requireComment(commentId);
         if (comment.getStatus() == null || comment.getStatus() == 0) {
             return Result.ok(commentId);
         }
+        String remark = reviewRemark(request, "恢复展示");
         blogCommentsMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<BlogComments>()
                 .set("status", 0)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", commentId));
+        saveAuditLog("COMMENT", comment.getId(), comment.getBlogId(), comment.getReporterId(), comment.getUserId(), "RESTORE",
+                comment.getReportReason(), remark);
         notifyCommentAudit(comment, true);
         return Result.ok(commentId);
     }
 
     @PostMapping("/comments/{id}/hide")
-    public Result hideComment(@PathVariable("id") Long commentId) {
+    public Result hideComment(@PathVariable("id") Long commentId,
+                              @RequestBody(required = false) ContentReviewRequest request) {
         BlogComments comment = requireComment(commentId);
         if (comment.getStatus() != null && comment.getStatus() == 2) {
             return Result.ok(commentId);
         }
+        String remark = reviewRemark(request, "违反社区规范");
         blogCommentsMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<BlogComments>()
                 .set("status", 2)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", commentId));
+        saveAuditLog("COMMENT", comment.getId(), comment.getBlogId(), comment.getReporterId(), comment.getUserId(), "HIDE",
+                comment.getReportReason(), remark);
         notifyCommentAudit(comment, false);
         return Result.ok(commentId);
     }
 
     @PostMapping("/notes/{id}/restore")
-    public Result restoreNote(@PathVariable("id") Long noteId) {
+    public Result restoreNote(@PathVariable("id") Long noteId,
+                              @RequestBody(required = false) ContentReviewRequest request) {
         Blog note = requireNote(noteId);
+        String remark = reviewRemark(request, "恢复展示");
         blogMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Blog>()
                 .set("status", 0)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", noteId));
+        saveAuditLog("NOTE", note.getId(), note.getId(), note.getReporterId(), note.getUserId(), "RESTORE",
+                note.getReportReason(), remark);
         notifyNoteAudit(note, true);
         return Result.ok(noteId);
     }
 
     @PostMapping("/notes/{id}/hide")
-    public Result hideNote(@PathVariable("id") Long noteId) {
+    public Result hideNote(@PathVariable("id") Long noteId,
+                           @RequestBody(required = false) ContentReviewRequest request) {
         Blog note = requireNote(noteId);
+        String remark = reviewRemark(request, "违反社区规范");
         blogMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Blog>()
                 .set("status", 2)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", noteId));
+        saveAuditLog("NOTE", note.getId(), note.getId(), note.getReporterId(), note.getUserId(), "HIDE",
+                note.getReportReason(), remark);
         notifyNoteAudit(note, false);
         return Result.ok(noteId);
     }
 
     @PostMapping("/danmaku/{id}/restore")
-    public Result restoreDanmaku(@PathVariable("id") Long danmakuId) {
+    public Result restoreDanmaku(@PathVariable("id") Long danmakuId,
+                                 @RequestBody(required = false) ContentReviewRequest request) {
         VideoDanmaku danmaku = requireDanmaku(danmakuId);
+        String remark = reviewRemark(request, "恢复展示");
         videoDanmakuMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<VideoDanmaku>()
                 .set("status", 0)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", danmakuId));
+        saveAuditLog("DANMAKU", danmaku.getId(), danmaku.getBlogId(), danmaku.getReporterId(), danmaku.getUserId(), "RESTORE",
+                danmaku.getReportReason(), remark);
         notifyDanmakuAudit(danmaku, true);
         return Result.ok(danmakuId);
     }
 
     @PostMapping("/danmaku/{id}/hide")
-    public Result hideDanmaku(@PathVariable("id") Long danmakuId) {
+    public Result hideDanmaku(@PathVariable("id") Long danmakuId,
+                              @RequestBody(required = false) ContentReviewRequest request) {
         VideoDanmaku danmaku = requireDanmaku(danmakuId);
+        String remark = reviewRemark(request, "违反社区规范");
         videoDanmakuMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<VideoDanmaku>()
                 .set("status", 2)
+                .set("audit_remark", remark)
+                .set("auditor_id", currentAdminId())
+                .set("audit_time", LocalDateTime.now())
                 .set("update_time", LocalDateTime.now())
                 .eq("id", danmakuId));
+        saveAuditLog("DANMAKU", danmaku.getId(), danmaku.getBlogId(), danmaku.getReporterId(), danmaku.getUserId(), "HIDE",
+                danmaku.getReportReason(), remark);
         notifyDanmakuAudit(danmaku, false);
         return Result.ok(danmakuId);
     }
@@ -280,6 +329,10 @@ public class AdminController {
         item.put("content", comment.getContent());
         item.put("liked", comment.getLiked() == null ? 0 : comment.getLiked());
         item.put("status", comment.getStatus());
+        item.put("reportReason", comment.getReportReason());
+        item.put("reportCount", comment.getReportCount() == null ? 0 : comment.getReportCount());
+        item.put("auditRemark", comment.getAuditRemark());
+        item.put("auditTime", comment.getAuditTime());
         item.put("createTime", comment.getCreateTime());
         item.put("updateTime", comment.getUpdateTime());
         return item;
@@ -297,6 +350,10 @@ public class AdminController {
         item.put("liked", note.getLiked() == null ? 0 : note.getLiked());
         item.put("comments", note.getComments() == null ? 0 : note.getComments());
         item.put("status", note.getStatus());
+        item.put("reportReason", note.getReportReason());
+        item.put("reportCount", note.getReportCount() == null ? 0 : note.getReportCount());
+        item.put("auditRemark", note.getAuditRemark());
+        item.put("auditTime", note.getAuditTime());
         item.put("createTime", note.getCreateTime());
         item.put("updateTime", note.getUpdateTime());
         return item;
@@ -315,9 +372,40 @@ public class AdminController {
         item.put("videoSecond", danmaku.getVideoSecond() == null ? 0 : danmaku.getVideoSecond());
         item.put("lane", danmaku.getLane() == null ? 0 : danmaku.getLane());
         item.put("status", danmaku.getStatus());
+        item.put("reportReason", danmaku.getReportReason());
+        item.put("reportCount", danmaku.getReportCount() == null ? 0 : danmaku.getReportCount());
+        item.put("auditRemark", danmaku.getAuditRemark());
+        item.put("auditTime", danmaku.getAuditTime());
         item.put("createTime", danmaku.getCreateTime());
         item.put("updateTime", danmaku.getUpdateTime());
         return item;
+    }
+
+    private String reviewRemark(ContentReviewRequest request, String fallback) {
+        String remark = request == null ? null : request.getRemark();
+        if (remark == null || remark.isBlank()) {
+            return fallback;
+        }
+        return remark.trim().length() > 255 ? remark.trim().substring(0, 255) : remark.trim();
+    }
+
+    private Long currentAdminId() {
+        return UserHolder.getUser() == null ? null : UserHolder.getUser().getId();
+    }
+
+    private void saveAuditLog(String targetType, Long targetId, Long noteId, Long reporterId, Long targetUserId,
+                              String action, String reason, String remark) {
+        auditLogMapper.insert(new ContentAuditLog()
+                .setTargetType(targetType)
+                .setTargetId(targetId)
+                .setNoteId(noteId)
+                .setReporterId(reporterId)
+                .setTargetUserId(targetUserId)
+                .setAuditorId(currentAdminId())
+                .setAction(action)
+                .setReason(reason)
+                .setRemark(remark)
+                .setCreateTime(LocalDateTime.now()));
     }
 
     private void notifyNoteAudit(Blog note, boolean restored) {

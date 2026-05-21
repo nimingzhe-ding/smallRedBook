@@ -228,6 +228,10 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         }
         blogService.update()
                 .set("status", CONTENT_STATUS_REPORTED)
+                .set("report_reason", "用户举报")
+                .set("reporter_id", user.getId())
+                .setSql("report_count = IFNULL(report_count, 0) + 1")
+                .set("update_time", java.time.LocalDateTime.now())
                 .eq("id", noteId)
                 .ne("status", CONTENT_STATUS_HIDDEN)
                 .update();

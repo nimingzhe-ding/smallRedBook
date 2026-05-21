@@ -235,7 +235,7 @@ public class NoteCommentsController {
         if (comment.getUserId().equals(user.getId())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "不能举报自己的评论");
         }
-        long affected = updateCommentThreadStatus(comment, 1);
+        long affected = updateCommentThreadStatus(comment, 1, "用户举报", user.getId());
         decreaseBlogCommentCount(comment.getBlogId(), affected);
         return Result.ok(commentResult(commentId, comment.getBlogId()));
     }
@@ -287,6 +287,10 @@ public class NoteCommentsController {
     }
 
     private long updateCommentThreadStatus(BlogComments comment, int status) {
+        return updateCommentThreadStatus(comment, status, null, null);
+    }
+
+    private long updateCommentThreadStatus(BlogComments comment, int status, String reportReason, Long reporterId) {
         List<Long> ids = new ArrayList<>();
         ids.add(comment.getId());
         if (comment.getParentId() != null && comment.getParentId() == 0) {
@@ -301,10 +305,15 @@ public class NoteCommentsController {
                     .toList();
             ids.addAll(replyIds);
         }
-        commentsService.update()
+        var updater = commentsService.update()
                 .set("status", status)
-                .set("update_time", LocalDateTime.now())
-                .in("id", ids)
+                .set("update_time", LocalDateTime.now());
+        if (reportReason != null) {
+            updater.set("report_reason", reportReason)
+                    .set("reporter_id", reporterId)
+                    .setSql("report_count = IFNULL(report_count, 0) + 1");
+        }
+        updater.in("id", ids)
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"))
                 .update();
         return ids.size();

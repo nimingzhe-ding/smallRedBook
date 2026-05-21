@@ -2,10 +2,12 @@ package com.hmdp.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UploadResult;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
+import com.hmdp.service.storage.FileStorageService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,9 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -30,8 +29,8 @@ public class UploadController {
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
 
-    @Value("${hmdp.upload.image-dir}")
-    private String imageUploadDir;
+    @Resource
+    private FileStorageService fileStorageService;
 
     @PostMapping("note")
     public Result uploadImage(@RequestParam("file") MultipartFile image) {
@@ -49,11 +48,10 @@ public class UploadController {
 
         try {
             String fileName = createNewFileName(suffix);
-            Path target = resolveUploadPath(fileName);
-            Files.createDirectories(target.getParent());
-            image.transferTo(target.toFile());
-            log.debug("文件上传成功: {}", fileName);
-            return Result.ok(fileName);
+            String objectName = fileStorageService.upload(fileName, image.getInputStream(), image.getSize());
+            String url = normalizeAccessUrl(fileStorageService.getUrl(objectName));
+            log.debug("图片上传成功: {}", objectName);
+            return Result.ok(new UploadResult(objectName, url, image.getContentType(), image.getSize()));
         } catch (IOException e) {
             throw new RuntimeException("文件上传失败", e);
         }
@@ -73,11 +71,10 @@ public class UploadController {
         }
         try {
             String fileName = createNewMediaFileName("videos", suffix);
-            Path target = resolveUploadPath(fileName);
-            Files.createDirectories(target.getParent());
-            video.transferTo(target.toFile());
-            log.debug("视频上传成功: {}", fileName);
-            return Result.ok(fileName);
+            String objectName = fileStorageService.upload(fileName, video.getInputStream(), video.getSize());
+            String url = normalizeAccessUrl(fileStorageService.getUrl(objectName));
+            log.debug("视频上传成功: {}", objectName);
+            return Result.ok(new UploadResult(objectName, url, video.getContentType(), video.getSize()));
         } catch (IOException e) {
             throw new RuntimeException("视频上传失败", e);
         }
@@ -121,20 +118,10 @@ public class UploadController {
         return StrUtil.format("/{}/{}/{}/{}.{}", folder, d1, d2, name, suffix);
     }
 
-    private Path resolveUploadPath(String filename) {
-        String normalizedName = filename.replace("\\", "/");
-        while (normalizedName.startsWith("/")) {
-            normalizedName = normalizedName.substring(1);
+    private String normalizeAccessUrl(String objectName) {
+        if (StrUtil.isBlank(objectName) || objectName.startsWith("http://") || objectName.startsWith("https://")) {
+            return objectName;
         }
-        Path root = uploadRoot();
-        Path target = root.resolve(normalizedName).normalize();
-        if (!target.startsWith(root)) {
-            throw new IllegalArgumentException("错误的文件路径");
-        }
-        return target;
-    }
-
-    private Path uploadRoot() {
-        return Paths.get(imageUploadDir).toAbsolutePath().normalize();
+        return "/imgs" + (objectName.startsWith("/") ? objectName : "/" + objectName);
     }
 }

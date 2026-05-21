@@ -56,7 +56,10 @@ window.state = {
   aiSearchInsight: "",
   aiComposerTimer: null,
   aiCommentLoadedFor: null,
-  afterLoginAction: null
+  afterLoginAction: null,
+  notificationSettings: null,
+  notificationStream: null,
+  notificationStreamToken: null
 };
 
 localStorage.setItem("hmdp_ai_session", state.aiSessionId);
@@ -107,6 +110,7 @@ window.els = {
   notificationDialog: document.querySelector("#notificationDialog"),
   notificationList: document.querySelector("#notificationList"),
   notificationBadge: document.querySelector("#notificationBadge"),
+  notificationSettings: document.querySelector("#notificationSettings"),
   customerServiceDialog: document.querySelector("#customerServiceDialog"),
   customerServiceMessages: document.querySelector("#customerServiceMessages"),
   customerServiceForm: document.querySelector("#customerServiceForm"),

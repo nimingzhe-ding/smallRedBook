@@ -313,9 +313,16 @@
         <div class="notification-tabs">
           <button class="notification-tab is-active" data-filter="all" type="button">全部</button>
           <button class="notification-tab" data-filter="unread" type="button">未读</button>
+          <button class="notification-tab" data-filter="interaction" type="button">互动</button>
+          <button class="notification-tab" data-filter="order" type="button">订单</button>
+          <button class="notification-tab" data-filter="audit" type="button">审核</button>
         </div>
-        <button class="soft-button" id="markNotificationsRead" type="button">全部已读</button>
+        <div class="notification-toolbar">
+          <button class="soft-button" id="toggleNotificationSettings" type="button">设置</button>
+          <button class="soft-button" id="markNotificationsRead" type="button">全部已读</button>
+        </div>
       </div>
+      <div class="notification-settings" id="notificationSettings" hidden></div>
       <div class="notification-list" id="notificationList"></div>
     </div>
   </dialog>

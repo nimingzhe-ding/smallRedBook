@@ -68,7 +68,9 @@ function renderReportedNote(note, type) {
     id: note.id,
     type,
     title: note.title || "未命名笔记",
-    meta: `${note.userName || "探店用户"} · 笔记 #${note.id} · ${formatTime(note.updateTime || note.createTime)}`,
+    meta: `${note.userName || "探店用户"} · 笔记 #${note.id} · 举报 ${note.reportCount || 0} 次 · ${formatTime(note.updateTime || note.createTime)}`,
+    reason: note.reportReason || "用户举报",
+    remark: note.auditRemark || "",
     content: note.content || ""
   });
 }
@@ -78,7 +80,9 @@ function renderReportedComment(comment, type) {
     id: comment.id,
     type,
     title: comment.content || "",
-    meta: `${comment.userName || "探店用户"} · ${comment.noteTitle || "未命名笔记"} · 评论 #${comment.id} · ${formatTime(comment.updateTime || comment.createTime)}`,
+    meta: `${comment.userName || "探店用户"} · ${comment.noteTitle || "未命名笔记"} · 评论 #${comment.id} · 举报 ${comment.reportCount || 0} 次`,
+    reason: comment.reportReason || "用户举报",
+    remark: comment.auditRemark || "",
     content: `笔记 #${comment.noteId}`
   });
 }
@@ -88,7 +92,9 @@ function renderReportedDanmaku(danmaku, type) {
     id: danmaku.id,
     type,
     title: danmaku.content || "",
-    meta: `${danmaku.userName || "探店用户"} · ${danmaku.noteTitle || "未命名笔记"} · ${danmaku.videoSecond || 0}s`,
+    meta: `${danmaku.userName || "探店用户"} · ${danmaku.noteTitle || "未命名笔记"} · ${danmaku.videoSecond || 0}s · 举报 ${danmaku.reportCount || 0} 次`,
+    reason: danmaku.reportReason || "用户举报",
+    remark: danmaku.auditRemark || "",
     content: `弹幕 #${danmaku.id} · 笔记 #${danmaku.noteId}`
   });
 }
@@ -99,6 +105,8 @@ function renderReviewItem(item) {
       <div>
         <strong>${escapeHtml(item.title)}</strong>
         <span>${escapeHtml(item.meta)}</span>
+        <small>举报原因：${escapeHtml(item.reason || "用户举报")}</small>
+        ${item.remark ? `<small>上次审核：${escapeHtml(item.remark)}</small>` : ""}
         <small>${escapeHtml(item.content)}</small>
       </div>
       <div class="cart-actions">
@@ -111,8 +119,14 @@ function renderReviewItem(item) {
 
 async function handleReviewAction(type, action, id) {
   if (!type || !action || !id) return;
+  var defaultRemark = action === "restore" ? "恢复展示" : "违反社区规范";
+  var remark = window.prompt(action === "restore" ? "填写恢复原因" : "填写隐藏原因", defaultRemark);
+  if (remark === null) return;
   try {
-    await request(`/admin/${type}/${id}/${action}`, { method: "POST" });
+    await request(`/admin/${type}/${id}/${action}`, {
+      method: "POST",
+      body: JSON.stringify({ remark: remark || defaultRemark })
+    });
     showStatus(action === "restore" ? "内容已恢复。" : "内容已隐藏。");
     openAdminCenter();
   } catch (error) {

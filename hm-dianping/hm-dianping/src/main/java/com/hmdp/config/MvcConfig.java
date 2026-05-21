@@ -75,7 +75,9 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/note-event",
                         // 视频弹幕公开接口
                         "/video-danmaku/public/**",
-                        "/video-danmaku/stream/**"
+                        "/video-danmaku/stream/**",
+                        // 通知 SSE 通过 token query 参数单独鉴权
+                        "/notifications/stream"
                 ).addPathPatterns("/**").order(1);
         // Token 刷新拦截器：自动续期登录态
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))

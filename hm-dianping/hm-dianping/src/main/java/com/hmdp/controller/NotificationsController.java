@@ -1,15 +1,19 @@
 package com.hmdp.controller;
 
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UserNotificationSettingRequest;
 import com.hmdp.service.IUserNotificationService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * 笔记社区消息通知接口。
@@ -21,13 +25,29 @@ public class NotificationsController {
     private IUserNotificationService notificationService;
 
     @GetMapping
-    public Result list(@RequestParam(value = "unreadOnly", defaultValue = "false") Boolean unreadOnly) {
-        return notificationService.listMine(unreadOnly);
+    public Result list(@RequestParam(value = "unreadOnly", defaultValue = "false") Boolean unreadOnly,
+                       @RequestParam(value = "category", required = false) String category) {
+        return notificationService.listMine(unreadOnly, category);
     }
 
     @GetMapping("/unread-count")
     public Result unreadCount() {
         return notificationService.unreadCount();
+    }
+
+    @GetMapping("/settings")
+    public Result settings() {
+        return notificationService.settings();
+    }
+
+    @PutMapping("/settings")
+    public Result updateSettings(@RequestBody UserNotificationSettingRequest request) {
+        return notificationService.updateSettings(request);
+    }
+
+    @GetMapping("/stream")
+    public SseEmitter stream(@RequestParam("token") String token) {
+        return notificationService.stream(token);
     }
 
     @PostMapping("/read")

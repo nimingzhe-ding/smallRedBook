@@ -97,6 +97,18 @@ public class Blog implements Serializable {
 
     private Integer status;
 
+    private String reportReason;
+
+    private Integer reportCount;
+
+    private Long reporterId;
+
+    private String auditRemark;
+
+    private Long auditorId;
+
+    private LocalDateTime auditTime;
+
     /**
      * 创建时间
      */

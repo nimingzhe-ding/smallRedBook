@@ -106,6 +106,19 @@ CREATE TABLE IF NOT EXISTS `tb_user_notification` (
   KEY `idx_order_id` (`order_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户消息通知表';
 
+CREATE TABLE IF NOT EXISTS `tb_user_notification_setting` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` bigint UNSIGNED NOT NULL COMMENT '用户id',
+  `interaction_enabled` bit(1) NOT NULL DEFAULT b'1' COMMENT '互动通知开关',
+  `order_enabled` bit(1) NOT NULL DEFAULT b'1' COMMENT '订单通知开关',
+  `audit_enabled` bit(1) NOT NULL DEFAULT b'1' COMMENT '审核通知开关',
+  `system_enabled` bit(1) NOT NULL DEFAULT b'1' COMMENT '系统通知开关',
+  `realtime_enabled` bit(1) NOT NULL DEFAULT b'1' COMMENT '实时推送开关',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_notification_setting_user` (`user_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户消息通知设置表';
+
 CALL add_column_if_missing('tb_blog', 'content_type', 'varchar(32) NOT NULL DEFAULT ''IMAGE'' COMMENT ''内容类型：IMAGE/VIDEO/LIVE/PRODUCT_NOTE'' AFTER `video_url`');
 CALL add_column_if_missing('tb_blog', 'tags', 'varchar(128) NULL COMMENT ''内容标签，多个标签用英文逗号分隔'' AFTER `content_type`');
 
@@ -382,8 +395,47 @@ ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `status` = VALUES(`status`);
 CALL add_column_if_missing('tb_blog', 'status', 'tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT ''content governance status'' AFTER `comments`');
 UPDATE `tb_blog` SET `status` = 0 WHERE `status` IS NULL;
 CALL add_index_if_missing('tb_blog', 'idx_blog_status_time', 'ADD INDEX `idx_blog_status_time` (`status`, `create_time`)');
+CALL add_column_if_missing('tb_blog', 'report_reason', 'varchar(255) NULL COMMENT ''举报原因'' AFTER `status`');
+CALL add_column_if_missing('tb_blog', 'report_count', 'int UNSIGNED NOT NULL DEFAULT 0 COMMENT ''举报次数'' AFTER `report_reason`');
+CALL add_column_if_missing('tb_blog', 'reporter_id', 'bigint UNSIGNED NULL COMMENT ''最近举报人id'' AFTER `report_count`');
+CALL add_column_if_missing('tb_blog', 'audit_remark', 'varchar(255) NULL COMMENT ''审核备注'' AFTER `reporter_id`');
+CALL add_column_if_missing('tb_blog', 'auditor_id', 'bigint UNSIGNED NULL COMMENT ''审核人id'' AFTER `audit_remark`');
+CALL add_column_if_missing('tb_blog', 'audit_time', 'timestamp NULL COMMENT ''审核时间'' AFTER `auditor_id`');
+CALL add_index_if_missing('tb_blog', 'idx_blog_reporter', 'ADD INDEX `idx_blog_reporter` (`reporter_id`, `update_time`)');
+
+CALL add_column_if_missing('tb_blog_comments', 'report_reason', 'varchar(255) NULL COMMENT ''举报原因'' AFTER `status`');
+CALL add_column_if_missing('tb_blog_comments', 'report_count', 'int UNSIGNED NOT NULL DEFAULT 0 COMMENT ''举报次数'' AFTER `report_reason`');
+CALL add_column_if_missing('tb_blog_comments', 'reporter_id', 'bigint UNSIGNED NULL COMMENT ''最近举报人id'' AFTER `report_count`');
+CALL add_column_if_missing('tb_blog_comments', 'audit_remark', 'varchar(255) NULL COMMENT ''审核备注'' AFTER `reporter_id`');
+CALL add_column_if_missing('tb_blog_comments', 'auditor_id', 'bigint UNSIGNED NULL COMMENT ''审核人id'' AFTER `audit_remark`');
+CALL add_column_if_missing('tb_blog_comments', 'audit_time', 'timestamp NULL COMMENT ''审核时间'' AFTER `auditor_id`');
+CALL add_index_if_missing('tb_blog_comments', 'idx_comment_reporter', 'ADD INDEX `idx_comment_reporter` (`reporter_id`, `update_time`)');
 
 UPDATE `tb_video_danmaku` SET `status` = 0 WHERE `status` IS NULL;
 ALTER TABLE `tb_video_danmaku`
   MODIFY COLUMN `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT 'content governance status';
 CALL add_index_if_missing('tb_video_danmaku', 'idx_danmaku_status_time', 'ADD INDEX `idx_danmaku_status_time` (`status`, `update_time`, `create_time`)');
+CALL add_column_if_missing('tb_video_danmaku', 'report_reason', 'varchar(255) NULL COMMENT ''举报原因'' AFTER `status`');
+CALL add_column_if_missing('tb_video_danmaku', 'report_count', 'int UNSIGNED NOT NULL DEFAULT 0 COMMENT ''举报次数'' AFTER `report_reason`');
+CALL add_column_if_missing('tb_video_danmaku', 'reporter_id', 'bigint UNSIGNED NULL COMMENT ''最近举报人id'' AFTER `report_count`');
+CALL add_column_if_missing('tb_video_danmaku', 'audit_remark', 'varchar(255) NULL COMMENT ''审核备注'' AFTER `reporter_id`');
+CALL add_column_if_missing('tb_video_danmaku', 'auditor_id', 'bigint UNSIGNED NULL COMMENT ''审核人id'' AFTER `audit_remark`');
+CALL add_column_if_missing('tb_video_danmaku', 'audit_time', 'timestamp NULL COMMENT ''审核时间'' AFTER `auditor_id`');
+CALL add_index_if_missing('tb_video_danmaku', 'idx_danmaku_reporter', 'ADD INDEX `idx_danmaku_reporter` (`reporter_id`, `update_time`)');
+
+CREATE TABLE IF NOT EXISTS `tb_content_audit_log` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `target_type` varchar(32) NOT NULL COMMENT '审核对象：NOTE/COMMENT/DANMAKU',
+  `target_id` bigint UNSIGNED NOT NULL COMMENT '审核对象id',
+  `note_id` bigint UNSIGNED NULL COMMENT '关联笔记id',
+  `reporter_id` bigint UNSIGNED NULL COMMENT '举报人id',
+  `target_user_id` bigint UNSIGNED NULL COMMENT '内容作者id',
+  `auditor_id` bigint UNSIGNED NULL COMMENT '审核人id',
+  `action` varchar(32) NOT NULL COMMENT '动作：RESTORE/HIDE',
+  `reason` varchar(255) NULL COMMENT '举报原因',
+  `remark` varchar(255) NULL COMMENT '审核备注',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_audit_target` (`target_type`, `target_id`, `create_time`) USING BTREE,
+  KEY `idx_audit_auditor` (`auditor_id`, `create_time`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='内容审核操作日志表';

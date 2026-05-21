@@ -118,6 +118,16 @@
   });
   document.querySelector("#closeNotificationDialog").addEventListener("click", function() { els.notificationDialog.close(); });
   document.querySelector("#markNotificationsRead").addEventListener("click", markNotificationsRead);
+  document.querySelector("#toggleNotificationSettings")?.addEventListener("click", function() {
+    if (!els.notificationSettings) return;
+    els.notificationSettings.hidden = !els.notificationSettings.hidden;
+    if (!els.notificationSettings.hidden) loadNotificationSettings();
+  });
+  els.notificationSettings?.addEventListener("change", function(event) {
+    var input = event.target.closest("[data-notification-setting]");
+    if (!input) return;
+    updateNotificationSetting(input.dataset.notificationSetting, input.checked);
+  });
   document.querySelector("#openCustomerService").addEventListener("click", function() { openCustomerServiceDialog(); });
   document.querySelector("#closeCustomerService").addEventListener("click", function() { els.customerServiceDialog.close(); });
   els.customerServiceForm.addEventListener("submit", submitCustomerService);

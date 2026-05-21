@@ -237,8 +237,8 @@
     for (var i = 0; i < files.length; i++) {
       var formData = new FormData();
       formData.append("file", files[i]);
-      var name = await request("/upload/note", { method: "POST", body: formData });
-      uploaded.push("/imgs" + name);
+      var result = await request("/upload/note", { method: "POST", body: formData });
+      uploaded.push(uploadResultUrl(result));
     }
     return uploaded;
   }
@@ -248,8 +248,13 @@
     if (!file) return "";
     var formData = new FormData();
     formData.append("file", file);
-    var name = await request("/upload/video", { method: "POST", body: formData });
-    return "/imgs" + name;
+    var result = await request("/upload/video", { method: "POST", body: formData });
+    return uploadResultUrl(result);
+  }
+
+  function uploadResultUrl(result) {
+    if (typeof result === "string") return "/imgs" + result;
+    return result?.url || (result?.objectName ? "/imgs" + result.objectName : "");
   }
 
   async function submitComposer(event) {
@@ -409,6 +414,7 @@
   window.parseProductIds = parseProductIds;
   window.uploadSelectedImages = uploadSelectedImages;
   window.uploadSelectedVideo = uploadSelectedVideo;
+  window.uploadResultUrl = uploadResultUrl;
   window.submitComposer = submitComposer;
   window.mergeTopics = mergeTopics;
   window.openComposer = openComposer;

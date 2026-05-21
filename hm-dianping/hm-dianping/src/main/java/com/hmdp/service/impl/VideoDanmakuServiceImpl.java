@@ -110,6 +110,10 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         }
         update()
                 .set("status", STATUS_REPORTED)
+                .set("report_reason", "用户举报")
+                .set("reporter_id", user.getId())
+                .setSql("report_count = IFNULL(report_count, 0) + 1")
+                .set("update_time", java.time.LocalDateTime.now())
                 .eq("id", danmakuId)
                 .ne("status", STATUS_HIDDEN)
                 .update();
