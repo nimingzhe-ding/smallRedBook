@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +33,7 @@ public class UploadController {
     @Value("${hmdp.upload.image-dir}")
     private String imageUploadDir;
 
-    @PostMapping({"blog", "note"})
+    @PostMapping("note")
     public Result uploadImage(@RequestParam("file") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
@@ -81,30 +80,6 @@ public class UploadController {
             return Result.ok(fileName);
         } catch (IOException e) {
             throw new RuntimeException("视频上传失败", e);
-        }
-    }
-
-    @RequestMapping(value = "/blog/delete", method = {RequestMethod.GET, RequestMethod.DELETE})
-    public Result deleteBlogImg(@RequestParam("name") String filename) {
-        if (StrUtil.isBlank(filename)) {
-            throw new BusinessException(ErrorCode.PARAM_EMPTY, "文件名不能为空");
-        }
-        try {
-            Path target = resolveUploadPath(filename);
-            Path root = uploadRoot();
-            String relativePath = root.relativize(target).toString().replace("\\", "/");
-            if (!relativePath.startsWith("blogs/")) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "错误的文件路径");
-            }
-            if (Files.isDirectory(target)) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "错误的文件名称");
-            }
-            Files.deleteIfExists(target);
-            return Result.ok();
-        } catch (IOException e) {
-            throw new RuntimeException("文件删除失败", e);
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, e.getMessage());
         }
     }
 

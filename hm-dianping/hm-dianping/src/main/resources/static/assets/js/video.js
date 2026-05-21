@@ -7,9 +7,7 @@ function pauseFeedVideos() {
 }
 
 function renderVideoFeed() {
-  const videos = state.videoNotes.length
-    ? state.videoNotes
-    : fallbackNotes.map(normalizeNote).filter(note => note.isVideo);
+  const videos = state.videoNotes;
   if (!videos.length) {
     els.videoFeed.innerHTML = `<p class="empty-text video-empty">还没有视频笔记，发布时上传视频就会出现在这里。</p>`;
     return;

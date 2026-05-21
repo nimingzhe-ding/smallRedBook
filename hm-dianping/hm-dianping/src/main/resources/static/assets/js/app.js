@@ -12,7 +12,7 @@
   //   saveComposerDraft, applyComposerType, renderComposerDraftState,
   //   clearComposerDraft, resetComposerMode, scheduleComposerAssistant,
   //   addCurrentProductToCart, buyCurrentProductNow, loadProducts,
-  //   initUser, refreshNotificationBadge, loadCategories, loadNotes,
+  //   initUser, refreshNotificationBadge, loadNotes,
   //   loadTrends, loadCollectState
   // ------------------------------
 
@@ -100,9 +100,7 @@
   document.querySelector("#openComposer").addEventListener("click", openComposer);
   document.querySelector("#mobilePublish").addEventListener("click", openComposer);
   document.querySelector("#closeShopDialog").addEventListener("click", function() { els.shopDialog.close(); });
-  document.querySelector("#mallTab").addEventListener("click", switchMall);
   document.querySelector("#mobileMall").addEventListener("click", switchMall);
-  document.querySelector("#videoTab").addEventListener("click", switchVideo);
   var mobileProfile = document.querySelector("#mobileProfile");
   if (mobileProfile) mobileProfile.addEventListener("click", function() { openMyProfile(); });
   document.querySelector("#openCart").addEventListener("click", openCartDialog);
@@ -214,7 +212,6 @@
   initUser();
   refreshNotificationBadge();
   setInterval(refreshNotificationBadge, 60000);
-  loadCategories();
   loadNotes();
   loadTrends();
 })();

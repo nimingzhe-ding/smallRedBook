@@ -4,7 +4,7 @@
   // creator growth, related notes, and like/collect/follow interactions
   // References: state, els, request, normalizeNote, normalizeProduct,
   //   normalizeImage, normalizeMedia, escapeHtml, formatTime, formatMoney,
-  //   showStatus, requireLogin, trackEvent, fallbackNotes, pauseFeedVideos,
+  //   showStatus, requireLogin, trackEvent, defaultNoteImage, pauseFeedVideos,
   //   loadComments, analyzeCurrentNote, loadRecommendReason,
   //   openComposerForEdit, deleteCurrentNote, openProduct, addToCart,
   //   buyProductNow, token
@@ -67,7 +67,7 @@
       els.shopBridge.hidden = true;
       return;
     }
-    const image = String(shop.images || "").split(",").map(item => item.trim()).filter(Boolean)[0] || fallbackNotes[0].images;
+    const image = String(shop.images || "").split(",").map(item => item.trim()).filter(Boolean)[0] || defaultNoteImage;
     document.querySelector("#shopImage").src = normalizeImage(image);
     document.querySelector("#shopName").textContent = shop.name || "关联店铺";
     const score = shop.score ? `${(shop.score / 10).toFixed(1)}分` : "暂无评分";
@@ -162,7 +162,7 @@
   async function openShopDialog(shop) {
     if (!shop?.id) return;
     document.querySelector("#shopDialogName").textContent = shop.name || "店铺详情";
-    document.querySelector("#shopDialogImage").src = normalizeImage(String(shop.images || "").split(",")[0] || fallbackNotes[0].images);
+    document.querySelector("#shopDialogImage").src = normalizeImage(String(shop.images || "").split(",")[0] || defaultNoteImage);
     const score = shop.score ? `${(shop.score / 10).toFixed(1)}分` : "暂无评分";
     const price = shop.avgPrice ? `人均 ¥${shop.avgPrice}` : "价格待补充";
     document.querySelector("#shopDialogMeta").textContent = `${score} · ${price} · ${shop.area || "本地生活"}`;

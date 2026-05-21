@@ -7,7 +7,7 @@
 // NOTE: normalizeProduct and normalizeShop are already in utils.js, skipped here to avoid duplication.
 
 function setMallActive(active) {
-  document.querySelectorAll("#mallTab, #mobileMall").forEach(item => item.classList.toggle("is-active", active));
+  document.querySelectorAll("#mobileMall").forEach(item => item.classList.toggle("is-active", active));
   if (active) {
     setMobileTabActive("mall");
     document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
@@ -15,7 +15,7 @@ function setMallActive(active) {
 }
 
 function setVideoActive(active) {
-  document.querySelectorAll("#videoTab, #mobileVideo").forEach(item => item.classList.toggle("is-active", active));
+  document.querySelectorAll("#mobileVideo").forEach(item => item.classList.toggle("is-active", active));
   if (active) {
     setMobileTabActive(null);
     document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));

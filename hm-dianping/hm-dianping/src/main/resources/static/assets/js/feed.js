@@ -1,43 +1,7 @@
-// feed.js — 笔记信息流：分类筛选、瀑布流加载、卡片渲染、频道切换
+// feed.js — 笔记信息流：瀑布流加载、卡片渲染、频道切换
 // 依赖 utils.js（state, els, token, request, requireLogin, showStatus, hideStatus 等）
 // 被引用函数：openDrawer, showContentArea, pauseFeedVideos, renderCreatorGrowth
 (function() {
-
-// ==================== 分类频道 ====================
-// 小红书式固定入口，后端 /notes/feed 根据 query 参数返回对应结果
-async function loadCategories() {
-  renderCategories([
-    { id: "all", name: "推荐" },
-    { id: "food", name: "美食" },
-    { id: "fashion", name: "穿搭" },
-    { id: "travel", name: "旅行" },
-    { id: "digital", name: "数码" },
-    { id: "goods", name: "好物" },
-    { id: "shop", name: "探店" }
-  ]);
-}
-window.loadCategories = loadCategories;
-
-function renderCategories(categories) {
-  els.categoryList.innerHTML = "";
-  categories.forEach(category => {
-    const button = document.createElement("button");
-    button.className = `category-pill${category.id === state.category ? " is-active" : ""}`;
-    button.type = "button";
-    button.textContent = category.name;
-    button.addEventListener("click", () => {
-      state.category = category.id;
-      document.querySelectorAll(".category-pill").forEach(item => {
-        item.classList.toggle("is-active", item.textContent === category.name);
-      });
-      state.query = category.id === "all" ? "" : category.name;
-      els.search.value = state.query;
-      resetAndLoad();
-    });
-    els.categoryList.appendChild(button);
-  });
-}
-window.renderCategories = renderCategories;
 
 // ==================== 笔记流加载与渲染 ====================
 // 核心数据流：fetch → normalizeNote → createNoteCard → appendNotes

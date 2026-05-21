@@ -67,20 +67,6 @@
   border-radius: 8px;
   padding: 0 9px;
 }
-.topic-strip {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  align-items: center;
-  overflow-x: auto;
-  padding: 10px 0 14px;
-  scrollbar-width: none;
-}
-
-.topic-strip::-webkit-scrollbar {
-  display: none;
-}
-
 .category-pill,
 .chip {
   flex: 0 0 auto;

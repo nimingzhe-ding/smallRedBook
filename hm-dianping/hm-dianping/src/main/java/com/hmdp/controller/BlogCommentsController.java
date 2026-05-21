@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * 评论控制器：负责笔记详情页评论流、二级回复、删除、举报和排序。
  */
 @RestController
-@RequestMapping({"/blog-comments", "/notes/comments"})
+@RequestMapping("/notes/comments")
 public class BlogCommentsController {
 
     @Resource
@@ -61,13 +61,13 @@ public class BlogCommentsController {
      * 查询笔记评论流。
      * sort 支持 hot/new/old：热门、最新、最早。
      */
-    @GetMapping("/of/blog")
+    @GetMapping("/of/note")
     public Result queryComments(
-            @RequestParam("blogId") Long blogId,
+            @RequestParam("noteId") Long noteId,
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "sort", defaultValue = "hot") String sort) {
         QueryChainWrapper<BlogComments> query = commentsService.query()
-                .eq("blog_id", blogId)
+                .eq("blog_id", noteId)
                 .eq("parent_id", 0)
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"));
         if ("new".equals(sort)) {
@@ -85,7 +85,7 @@ public class BlogCommentsController {
         List<BlogComments> replies = parentIds.isEmpty()
                 ? List.of()
                 : commentsService.query()
-                .eq("blog_id", blogId)
+                .eq("blog_id", noteId)
                 .in("parent_id", parentIds)
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"))
                 .orderByAsc("create_time")
@@ -108,7 +108,7 @@ public class BlogCommentsController {
         List<Map<String, Object>> records = comments.stream()
                 .map(comment -> toCommentMap(comment, userMap, replyMap.getOrDefault(comment.getId(), List.of())))
                 .toList();
-        return Result.ok(records, countVisibleComments(blogId));
+        return Result.ok(records, countVisibleComments(noteId));
     }
 
     /**

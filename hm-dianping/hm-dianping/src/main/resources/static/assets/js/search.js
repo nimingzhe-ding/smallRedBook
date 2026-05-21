@@ -54,65 +54,14 @@ async function searchUnified(keyword) {
       topics: Array.isArray(data?.topics) ? data.topics : []
     };
   } catch {
-    const [notes, products, shops] = await Promise.all([
-      searchNotes(keyword),
-      searchProducts(keyword),
-      searchShops(keyword)
-    ]);
     return {
-      notes,
-      videos: notes.filter(note => note.isVideo),
-      products,
-      shops,
-      topics: searchTopics(keyword)
+      notes: [],
+      videos: [],
+      products: [],
+      shops: [],
+      topics: []
     };
   }
-}
-
-async function searchNotes(keyword) {
-  try {
-    const params = new URLSearchParams({ current: "1", channel: "hot", query: keyword });
-    const data = await request(`/notes/feed?${params.toString()}`);
-    const notes = Array.isArray(data?.list) ? data.list.map(normalizeNote) : [];
-    return notes;
-  } catch {
-    const lower = keyword.toLowerCase();
-    return fallbackNotes
-      .map(normalizeNote)
-      .filter(note => `${note.title} ${note.content}`.toLowerCase().includes(lower));
-  }
-}
-
-async function searchProducts(keyword) {
-  try {
-    const params = new URLSearchParams({ current: "1", category: "all", query: keyword });
-    const data = await request(`/mall/products?${params.toString()}`);
-    return Array.isArray(data) ? data.map(normalizeProduct) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function searchShops(keyword) {
-  try {
-    const params = new URLSearchParams({ current: "1", name: keyword });
-    const data = await request(`/shop/of/name?${params.toString()}`);
-    return Array.isArray(data) ? data.map(normalizeShop) : [];
-  } catch {
-    return [];
-  }
-}
-
-function searchTopics(keyword) {
-  const source = [...new Set([
-    ...fallbackSuggestions,
-    ...state.trends.map(item => item.keyword).filter(Boolean),
-    keyword
-  ])];
-  return source
-    .filter(topic => topic && (!keyword || topic.includes(keyword) || keyword.includes(topic)))
-    .slice(0, 12)
-    .map(topic => ({ keyword: topic, heat: state.trends.find(item => item.keyword === topic)?.heat || "" }));
 }
 
 function renderUnifiedSearch() {
@@ -274,7 +223,7 @@ async function analyzeCurrentNote(note) {
 // ------------------------------
 function renderSuggestions(value = "") {
   const q = value.trim();
-  const source = state.trends.length ? state.trends.map(item => item.keyword) : fallbackSuggestions;
+  const source = state.trends.map(item => item.keyword).filter(Boolean);
   const list = q ? source.filter(item => item.includes(q)).slice(0, 6) : [];
   els.suggestPopover.innerHTML = list.map(item => `<button type="button" data-suggestion="${item}">${item}</button>`).join("");
   els.suggestPopover.classList.toggle("is-open", list.length > 0 && document.activeElement === els.search);
@@ -292,11 +241,9 @@ function renderSuggestions(value = "") {
 async function loadTrends() {
   try {
     const data = await request("/notes/trends");
-    state.trends = Array.isArray(data) && data.length
-      ? data
-      : fallbackSuggestions.map((keyword, index) => ({ keyword, heat: 80 - index * 5 }));
+    state.trends = Array.isArray(data) ? data : [];
   } catch {
-    state.trends = fallbackSuggestions.map((keyword, index) => ({ keyword, heat: 80 - index * 5 }));
+    state.trends = [];
   }
   renderTrends();
 }
@@ -326,10 +273,6 @@ function renderTrends() {
 // Export cross-module functions
 window.enterUnifiedSearch = enterUnifiedSearch;
 window.searchUnified = searchUnified;
-window.searchNotes = searchNotes;
-window.searchProducts = searchProducts;
-window.searchShops = searchShops;
-window.searchTopics = searchTopics;
 window.renderUnifiedSearch = renderUnifiedSearch;
 window.renderUnifiedSearchResults = renderUnifiedSearchResults;
 window.renderUnifiedProducts = renderUnifiedProducts;

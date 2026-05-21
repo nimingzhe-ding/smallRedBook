@@ -68,7 +68,6 @@ window.els = {
   searchForm: document.querySelector("#searchForm"),
   search: document.querySelector("#searchInput"),
   suggestPopover: document.querySelector("#suggestPopover"),
-  categoryList: document.querySelector("#categoryList"),
   unifiedSearch: document.querySelector("#unifiedSearch"),
   unifiedSearchTitle: document.querySelector("#unifiedSearchTitle"),
   unifiedSearchSummary: document.querySelector("#unifiedSearchSummary"),
@@ -192,9 +191,6 @@ window.fallbackAvatar = fallbackAvatar;
 
 var defaultNoteImage = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80";
 window.defaultNoteImage = defaultNoteImage;
-
-var defaultSuggestions = ["杭州周末", "港式茶餐厅", "咖啡拍照", "人均50", "约会餐厅", "新店打卡", "一个人吃饭", "生日聚餐"];
-window.defaultSuggestions = defaultSuggestions;
 
 // ==================== HTTP 请求与格式化工具 ====================
 // 自动处理 Token 注入、API 路径拼接、错误统一处理

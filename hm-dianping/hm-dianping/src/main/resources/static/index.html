@@ -47,28 +47,14 @@
 
     <!-- 二级频道导航 -->
     <nav class="feed-tabs" aria-label="内容频道">
-      <button class="tab is-active" data-feed="hot">发现</button>
       <button class="tab" data-feed="follow">关注</button>
-      <button class="tab" data-feed="nearby">附近</button>
-      <button class="tab" id="videoTab" type="button">视频</button>
-      <button class="tab" id="mallTab" type="button">商城</button>
+      <button class="tab is-active" data-feed="hot">推荐</button>
+      <button class="tab" data-feed="nearby">当前城市</button>
     </nav>
 
     <main class="main-layout">
       <!-- 中央内容区：频道筛选、AI 搜索推荐、瀑布流笔记 -->
       <section class="content-area" aria-label="笔记内容流">
-        <div class="topic-strip" id="categoryList">
-          <button class="category-pill is-active" data-category="">推荐</button>
-          <button class="category-pill" data-category="fashion">穿搭</button>
-          <button class="category-pill" data-category="beauty">美妆</button>
-          <button class="category-pill" data-category="travel">旅行</button>
-          <button class="category-pill" data-category="home">家居</button>
-          <button class="category-pill" data-category="food">美食</button>
-          <button class="category-pill" data-category="explore">探店</button>
-          <button class="category-pill" data-category="trend">潮玩</button>
-          <button class="category-pill" data-category="sport">运动</button>
-          <button class="category-pill" data-category="reading">读书</button>
-        </div>
         <div class="status-banner" id="statusBanner" hidden></div>
         <section class="unified-search" id="unifiedSearch" hidden>
           <div class="unified-search-head">
@@ -412,7 +398,7 @@
       </label>
       <label>
         图片地址
-        <input name="images" placeholder="/imgs/blogs/blog1.jpg，多个地址用英文逗号分隔">
+        <input name="images" placeholder="多个图片地址用英文逗号分隔，上传后会自动填充">
       </label>
       <label data-content-field="video">
         视频/直播地址

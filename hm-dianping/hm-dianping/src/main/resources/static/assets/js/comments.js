@@ -3,10 +3,10 @@
 // ------------------------------
 // Comments
 // ------------------------------
-async function loadComments(blogId) {
+async function loadComments(noteId) {
   els.commentList.innerHTML = `<p class="empty-text">正在加载评论...</p>`;
   try {
-    const result = await request(`/notes/comments/of/blog?blogId=${blogId}&sort=${state.commentSort}`, { raw: true });
+    const result = await request(`/notes/comments/of/note?noteId=${noteId}&sort=${state.commentSort}`, { raw: true });
     const comments = Array.isArray(result.data) ? result.data : [];
     updateCommentCount(result.total ?? comments.length);
     renderComments(comments);

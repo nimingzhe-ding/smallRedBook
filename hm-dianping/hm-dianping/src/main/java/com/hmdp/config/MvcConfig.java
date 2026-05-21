@@ -57,7 +57,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/notes/suggestions",
                         "/notes/*",
                         "/notes/user/**",
-                        "/notes/comments/of/blog",
+                        "/notes/comments/of/note",
                         // 个人主页查看（公开）
                         "/profiles/*",
                         // AI 智能体流式接口（公开）
@@ -73,9 +73,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         // 行为采集（公开，匿名也可上报）
                         "/note-event",
                         // 视频弹幕公开接口
-                        "/video-danmaku/public/**",
-                        // 评论浏览（公开）
-                        "/blog-comments/of/blog"
+                        "/video-danmaku/public/**"
                 ).addPathPatterns("/**").order(1);
         // Token 刷新拦截器：自动续期登录态
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
