@@ -21,6 +21,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
   state.searchTab = preferredTab;
   els.search.value = keyword;
   els.suggestPopover.classList.remove("is-open");
+  els.trendList.hidden = true;
   els.feed.hidden = true;
   els.loading.hidden = true;
   els.unifiedSearch.hidden = false;
@@ -40,6 +41,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
     state.searchTab = ["notes", "videos", "products", "shops", "topics"].find(tab => state.searchResults[tab].length) || "notes";
   }
   renderUnifiedSearch();
+  loadSearchHistory();
   if (loadAi) loadSmartRecommendation(keyword);
 }
 
@@ -97,8 +99,9 @@ function renderUnifiedSearch() {
 function renderUnifiedSearchResults() {
   const list = state.searchResults[state.searchTab] || [];
   if (!list.length) {
-    els.unifiedSearchResults.innerHTML = `${renderSearchRefinements()}${renderAiSearchInsight()}<p class="empty-text">这个分类暂时没有匹配结果。</p>`;
+    els.unifiedSearchResults.innerHTML = `${renderSearchRefinements()}${renderAiSearchInsight()}${renderSearchEmptyState()}`;
     bindSearchRefinements();
+    bindSearchDiscoveryActions(els.unifiedSearchResults);
     return;
   }
   if (state.searchTab === "notes" || state.searchTab === "videos") {
@@ -237,19 +240,44 @@ async function analyzeCurrentNote(note) {
 // ------------------------------
 function renderSuggestions(value = "") {
   const q = value.trim();
-  const source = state.trends.map(item => item.keyword).filter(Boolean);
-  const list = q ? source.filter(item => item.includes(q)).slice(0, 6) : [];
-  els.suggestPopover.innerHTML = list.map(item => `<button type="button" data-suggestion="${item}">${item}</button>`).join("");
-  els.suggestPopover.classList.toggle("is-open", list.length > 0 && document.activeElement === els.search);
+  window.clearTimeout(state.suggestionTimer);
+  if (!q) {
+    renderSearchDiscovery();
+    return;
+  }
+  const fallback = searchKeywordPool().filter(item => item.includes(q)).slice(0, 8);
+  renderSuggestionList(fallback);
+  state.suggestionTimer = window.setTimeout(() => loadRemoteSuggestions(q), 180);
+}
+
+function searchKeywordPool() {
+  return [
+    ...state.searchHistory,
+    ...state.hotSearches.map(item => item.keyword),
+    ...state.trends.map(item => item.keyword)
+  ].filter(Boolean).filter((item, index, list) => list.indexOf(item) === index);
+}
+
+function renderSuggestionList(list) {
   els.trendList.hidden = true;
-  els.suggestPopover.querySelectorAll("button").forEach(button => {
-    button.addEventListener("click", () => {
-      state.query = button.dataset.suggestion;
-      els.search.value = state.query;
-      els.suggestPopover.classList.remove("is-open");
-      enterUnifiedSearch(state.query);
-    });
+  els.suggestPopover.innerHTML = list.length
+    ? `<div class="suggest-section">${list.map(item => `<button type="button" data-suggestion="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}</div>`
+    : "";
+  els.suggestPopover.classList.toggle("is-open", list.length > 0 && document.activeElement === els.search);
+  els.suggestPopover.querySelectorAll("[data-suggestion]").forEach(button => {
+    button.addEventListener("click", () => runSearchKeyword(button.dataset.suggestion));
   });
+}
+
+async function loadRemoteSuggestions(q) {
+  try {
+    const list = await request(`/notes/suggestions?prefix=${encodeURIComponent(q)}`);
+    if (document.activeElement === els.search && els.search.value.trim() === q) {
+      renderSuggestionList(Array.isArray(list) ? list : []);
+    }
+  } catch {
+    // 本地趋势兜底已经展示，不影响输入体验。
+  }
 }
 
 async function loadTrends() {
@@ -260,6 +288,77 @@ async function loadTrends() {
     state.trends = [];
   }
   renderTrends();
+}
+
+async function loadHotSearches() {
+  try {
+    const data = await request("/notes/hot-search");
+    state.hotSearches = Array.isArray(data) ? data : [];
+  } catch {
+    state.hotSearches = [];
+  }
+}
+
+async function loadSearchHistory() {
+  if (!token()) {
+    state.searchHistory = JSON.parse(localStorage.getItem("hmdp_search_history") || "[]");
+    return state.searchHistory;
+  }
+  try {
+    const data = await request("/notes/search-history");
+    state.searchHistory = Array.isArray(data) ? data : [];
+  } catch {
+    state.searchHistory = [];
+  }
+  return state.searchHistory;
+}
+
+async function deleteSearchHistoryItem(keyword) {
+  const value = String(keyword || "").trim();
+  if (!value) return;
+  if (token()) {
+    try {
+      await request(`/notes/search-history?keyword=${encodeURIComponent(value)}`, { method: "DELETE" });
+    } catch {
+      // 本地也同步移除，避免 UI 卡住。
+    }
+  }
+  state.searchHistory = state.searchHistory.filter(item => item !== value);
+  localStorage.setItem("hmdp_search_history", JSON.stringify(state.searchHistory));
+  renderSearchDiscovery();
+}
+
+async function clearSearchHistoryAll() {
+  if (token()) {
+    try {
+      await request("/notes/search-history/all", { method: "DELETE" });
+    } catch {
+      // 本地清空仍继续。
+    }
+  }
+  state.searchHistory = [];
+  localStorage.removeItem("hmdp_search_history");
+  renderSearchDiscovery();
+}
+
+function rememberLocalSearch(keyword) {
+  const value = String(keyword || "").trim();
+  if (!value) return;
+  state.searchHistory = [value, ...state.searchHistory.filter(item => item !== value)].slice(0, 10);
+  if (!token()) {
+    localStorage.setItem("hmdp_search_history", JSON.stringify(state.searchHistory));
+  }
+}
+
+function runSearchKeyword(keyword, preferredTab = "notes") {
+  const value = String(keyword || "").trim();
+  if (!value) return;
+  rememberLocalSearch(value);
+  state.query = value;
+  els.search.value = value;
+  els.suggestPopover.classList.remove("is-open");
+  els.trendList.hidden = true;
+  enterUnifiedSearch(value, preferredTab);
 }
 
 function renderSearchRefinements() {
@@ -291,12 +390,83 @@ function renderTrends() {
   `).join("");
   els.trendList.querySelectorAll("button").forEach(button => {
     button.addEventListener("click", () => {
-      state.query = button.dataset.trend;
-      els.search.value = state.query;
-      trackEvent("search", { scene: "trend", keyword: state.query });
-      enterUnifiedSearch(state.query);
+      trackEvent("search", { scene: "trend", keyword: button.dataset.trend });
+      runSearchKeyword(button.dataset.trend);
     });
   });
+}
+
+async function renderSearchDiscovery() {
+  const valueWhenRequested = els.search.value.trim();
+  await Promise.all([loadSearchHistory(), state.hotSearches.length ? Promise.resolve() : loadHotSearches()]);
+  if (els.search.value.trim() !== valueWhenRequested) return;
+  const history = state.searchHistory.slice(0, 8);
+  const hot = (state.hotSearches.length ? state.hotSearches : state.trends).slice(0, 8);
+  if (!history.length && !hot.length) {
+    els.suggestPopover.classList.remove("is-open");
+    els.trendList.hidden = true;
+    return;
+  }
+  els.trendList.hidden = true;
+  els.suggestPopover.innerHTML = `
+    ${history.length ? `
+      <section class="search-discovery-section">
+        <div><strong>最近搜索</strong><button type="button" data-search-history-clear>清空</button></div>
+        <div class="search-chip-row">
+          ${history.map(item => `
+            <span class="search-history-chip">
+              <button type="button" data-search-history="${escapeHtml(item)}">${escapeHtml(item)}</button>
+              <button type="button" data-search-history-delete="${escapeHtml(item)}" aria-label="删除 ${escapeHtml(item)}">×</button>
+            </span>
+          `).join("")}
+        </div>
+      </section>
+    ` : ""}
+    ${hot.length ? `
+      <section class="search-discovery-section">
+        <div><strong>热门搜索</strong></div>
+        <div class="search-hot-grid">
+          ${hot.map((item, index) => `
+            <button type="button" data-search-hot="${escapeHtml(item.keyword)}">
+              <b>${index + 1}</b><span>${escapeHtml(item.keyword)}</span><small>${item.heat || ""}</small>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    ` : ""}
+  `;
+  els.suggestPopover.classList.toggle("is-open", document.activeElement === els.search);
+  bindSearchDiscoveryActions(els.suggestPopover);
+}
+
+function bindSearchDiscoveryActions(root) {
+  root.querySelectorAll("[data-search-history], [data-search-hot], [data-search-empty]").forEach(button => {
+    button.addEventListener("click", () => runSearchKeyword(button.dataset.searchHistory || button.dataset.searchHot || button.dataset.searchEmpty));
+  });
+  root.querySelectorAll("[data-search-history-delete]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      deleteSearchHistoryItem(button.dataset.searchHistoryDelete);
+    });
+  });
+  root.querySelector("[data-search-history-clear]")?.addEventListener("click", clearSearchHistoryAll);
+}
+
+function renderSearchEmptyState() {
+  const related = state.searchMeta?.relatedQueries || [];
+  const hot = (state.hotSearches.length ? state.hotSearches : state.trends).map(item => item.keyword).filter(Boolean);
+  const suggestions = [...related, ...hot].filter((item, index, list) => list.indexOf(item) === index).slice(0, 8);
+  return `
+    <section class="search-empty-state">
+      <strong>这个分类暂时没有匹配结果</strong>
+      <p>可以换个关键词，或者看看这些正在被搜索的内容。</p>
+      ${suggestions.length ? `
+        <div>
+          ${suggestions.map(item => `<button type="button" data-search-empty="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
 }
 
 // Export cross-module functions
@@ -315,5 +485,12 @@ window.analyzeCurrentNote = analyzeCurrentNote;
 window.renderSuggestions = renderSuggestions;
 window.loadTrends = loadTrends;
 window.renderTrends = renderTrends;
+window.loadHotSearches = loadHotSearches;
+window.loadSearchHistory = loadSearchHistory;
+window.deleteSearchHistoryItem = deleteSearchHistoryItem;
+window.clearSearchHistoryAll = clearSearchHistoryAll;
+window.renderSearchDiscovery = renderSearchDiscovery;
+window.runSearchKeyword = runSearchKeyword;
+window.renderSearchEmptyState = renderSearchEmptyState;
 
 })();

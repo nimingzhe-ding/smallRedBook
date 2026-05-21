@@ -18,7 +18,7 @@
 
   els.searchForm.addEventListener("submit", function(event) {
     event.preventDefault();
-    enterUnifiedSearch(els.search.value);
+    runSearchKeyword(els.search.value);
   });
 
   var searchTimer;
@@ -229,6 +229,8 @@
   setInterval(refreshNotificationBadge, 60000);
   loadNotes();
   loadTrends();
+  loadHotSearches();
+  loadSearchHistory();
   openSharedTargetFromUrl();
 
   function openSharedTargetFromUrl() {
