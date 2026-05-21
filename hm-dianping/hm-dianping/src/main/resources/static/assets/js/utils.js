@@ -290,6 +290,8 @@ function normalizeNote(note, index = 0) {
     icon: normalizeImage(note.icon) || fallbackAvatar,
     liked: note.liked || 0,
     comments: note.comments || 0,
+    status: Number(note.status || 0),
+    auditRemark: note.auditRemark || "",
     content: parsedContent.content,
     videoUrl,
     isVideo: ["VIDEO", "LIVE"].includes(contentType) && Boolean(videoUrl),

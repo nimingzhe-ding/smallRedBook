@@ -272,7 +272,13 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
         }
-        return userNotes(user.getId(), current);
+        int pageNo = normalizePage(current);
+        Page<Blog> page = blogService.query()
+                .eq("user_id", user.getId())
+                .orderByDesc("update_time")
+                .orderByDesc("create_time")
+                .page(new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE));
+        return Result.ok(toFeedResult(page, null));
     }
 
     @Override
@@ -1011,6 +1017,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         dto.setLiked(blog.getLiked() == null ? 0 : blog.getLiked());
         dto.setComments(blog.getComments() == null ? 0 : blog.getComments());
         dto.setStatus(statusOf(blog));
+        dto.setAuditRemark(blog.getAuditRemark());
         dto.setCreateTime(blog.getCreateTime());
         dto.setShop(buildShopDTO(blog.getShopId()));
 

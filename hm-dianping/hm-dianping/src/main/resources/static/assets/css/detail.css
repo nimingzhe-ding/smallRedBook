@@ -280,6 +280,28 @@
   line-height: 1.75;
 }
 
+.note-audit-notice {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 4px;
+  border: 1px solid #f1d6b6;
+  border-radius: 8px;
+  background: #fff8ef;
+  padding: 10px 12px;
+}
+
+.note-audit-notice strong {
+  color: #80532a;
+  font-size: 13px;
+}
+
+.note-audit-notice p {
+  margin: 0;
+  color: #80532a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .note-tags {
   display: flex;
   flex-wrap: wrap;

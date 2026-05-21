@@ -180,6 +180,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .set("tags", normalizeTags(blog.getTags()))
                 .set("content", blog.getContent())
                 .set("status", nextStatus)
+                .set("audit_remark", currentStatus == 2 ? "内容已修改，等待运营复审" : null)
+                .set("audit_time", currentStatus == 2 ? java.time.LocalDateTime.now() : null)
                 .eq("id", id)
                 .eq("user_id", user.getId())
                 .update();

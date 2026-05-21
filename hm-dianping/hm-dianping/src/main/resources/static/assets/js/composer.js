@@ -210,6 +210,12 @@
         ? "支持直播预告视频、回放或直播地址"
         : "支持 MP4/WebM/MOV，发布前会自动上传";
     }
+    var imageInput = els.composerForm.elements.images;
+    if (imageInput) {
+      imageInput.placeholder = isVideoLike
+        ? "视频封面图地址，留空时使用默认封面"
+        : "多个图片地址用英文逗号分隔，上传后会自动填充";
+    }
     var shopInput = els.composerForm.elements.shopId;
     if (shopInput) {
       shopInput.required = isProductNote;
@@ -324,6 +330,7 @@
         method: editingId ? "PUT" : "POST",
         body: JSON.stringify(payload)
       });
+      showStatus(editingId ? "内容已保存。" : "发布成功，已同步到内容流。");
       if (!editingId) clearComposerDraft();
       resetComposerMode();
       els.composer.close();

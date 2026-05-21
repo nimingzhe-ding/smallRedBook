@@ -88,9 +88,11 @@ function createNoteCard(note) {
   button.type = "button";
   button.addEventListener("click", () => openDrawer(note));
   const badge = note.contentType === "IMAGE" ? "" : `<span class="video-badge">${contentTypeLabel(note.contentType)}</span>`;
+  const auditBadge = renderNoteAuditBadge(note);
+  const productBadge = note.products?.length ? `<span class="product-badge">挂载 ${note.products.length} 件商品</span>` : "";
   const cover = note.isVideo
-    ? `<video class="note-image note-video-cover" style="--ratio:${note.ratio}" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" muted playsinline preload="metadata"></video>${badge}`
-    : `<img class="note-image" style="--ratio:${note.ratio}" src="${normalizeImage(note.image)}" alt="${escapeHtml(note.title)}" loading="lazy">${badge}`;
+    ? `<video class="note-image note-video-cover" style="--ratio:${note.ratio}" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" muted playsinline preload="metadata"></video>${badge}${auditBadge}${productBadge}`
+    : `<img class="note-image" style="--ratio:${note.ratio}" src="${normalizeImage(note.image)}" alt="${escapeHtml(note.title)}" loading="lazy">${badge}${auditBadge}${productBadge}`;
   button.innerHTML = `
     <div class="note-cover">
       ${cover}
@@ -110,6 +112,21 @@ function createNoteCard(note) {
   return card;
 }
 window.createNoteCard = createNoteCard;
+
+function noteAuditLabel(status) {
+  return {
+    1: "审核中",
+    2: "已隐藏"
+  }[Number(status)] || "";
+}
+window.noteAuditLabel = noteAuditLabel;
+
+function renderNoteAuditBadge(note) {
+  if (!note?.isOwner) return "";
+  const label = noteAuditLabel(note.status);
+  return label ? `<span class="audit-badge audit-${Number(note.status)}">${label}</span>` : "";
+}
+window.renderNoteAuditBadge = renderNoteAuditBadge;
 
 // ==================== 流重置与切换 ====================
 // 切换频道/分类/搜索时调用，清空当前流重新加载

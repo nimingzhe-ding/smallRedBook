@@ -33,6 +33,7 @@
     renderCreatorGrowth(els.drawerAuthorGrowth, note.creatorGrowth);
     document.querySelector("#drawerTitle").textContent = note.title;
     document.querySelector("#drawerContent").textContent = note.content || "这个作者还没有填写更多内容。";
+    renderNoteAuditNotice(note);
     renderNoteTags(note.tags);
     renderShopBridge(note.shop);
     renderNoteProducts(note.products);
@@ -110,6 +111,30 @@
     });
     target.hidden = false;
   }
+
+  function renderNoteAuditNotice(note) {
+    let target = document.querySelector("#drawerAuditNotice");
+    if (!target) {
+      document.querySelector("#drawerContent").insertAdjacentHTML("afterend", `<section class="note-audit-notice" id="drawerAuditNotice" hidden></section>`);
+      target = document.querySelector("#drawerAuditNotice");
+    }
+    const label = typeof noteAuditLabel === "function" ? noteAuditLabel(note.status) : "";
+    if (!note?.isOwner || !label) {
+      target.hidden = true;
+      target.innerHTML = "";
+      return;
+    }
+    const text = Number(note.status) === 2
+      ? "这篇内容当前仅自己可见，修改后会重新进入复审。"
+      : "这篇内容已进入运营审核，审核通过后会恢复公开展示。";
+    target.innerHTML = `
+      <strong>${escapeHtml(label)}</strong>
+      <p>${escapeHtml(note.auditRemark || text)}</p>
+    `;
+    target.hidden = false;
+  }
+
+  window.renderNoteAuditNotice = renderNoteAuditNotice;
 
   function renderNoteProducts(products = []) {
     const list = Array.isArray(products) ? products.map(normalizeProduct) : [];

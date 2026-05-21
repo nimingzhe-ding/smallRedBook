@@ -21,6 +21,7 @@ public class NoteDTO {
     private Integer liked;
     private Integer comments;
     private Integer status;
+    private String auditRemark;
     private Long collects;
     private String name;
     private String icon;
