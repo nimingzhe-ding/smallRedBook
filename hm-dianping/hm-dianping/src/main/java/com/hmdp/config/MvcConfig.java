@@ -74,7 +74,8 @@ public class MvcConfig implements WebMvcConfigurer {
                         // 行为采集（公开，匿名也可上报）
                         "/note-event",
                         // 视频弹幕公开接口
-                        "/video-danmaku/public/**"
+                        "/video-danmaku/public/**",
+                        "/video-danmaku/stream/**"
                 ).addPathPatterns("/**").order(1);
         // Token 刷新拦截器：自动续期登录态
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))

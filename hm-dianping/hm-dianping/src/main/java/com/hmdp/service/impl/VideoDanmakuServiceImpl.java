@@ -15,10 +15,13 @@ import com.hmdp.service.IVideoDanmakuService;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 视频弹幕领域服务。
@@ -26,6 +29,9 @@ import java.util.Map;
  */
 @Service
 public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, VideoDanmaku> implements IVideoDanmakuService {
+
+    private static final long SSE_TIMEOUT = 30 * 60 * 1000L;
+    private final Map<Long, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     @Resource
     private IBlogService blogService;
@@ -74,7 +80,29 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         danmaku.setLane(danmaku.getLane() == null ? null : Math.floorMod(danmaku.getLane(), 5));
         danmaku.setStatus(false);
         save(danmaku);
-        return Result.ok(toView(danmaku));
+        Map<String, Object> view = toView(danmaku);
+        broadcast(danmaku.getBlogId(), view);
+        return Result.ok(view);
+    }
+
+    @Override
+    public SseEmitter stream(Long blogId) {
+        if (blogId == null || !canUseDanmaku(blogId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频不存在或不支持弹幕");
+        }
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        emitters.computeIfAbsent(blogId, key -> ConcurrentHashMap.newKeySet()).add(emitter);
+        emitter.onCompletion(() -> removeEmitter(blogId, emitter));
+        emitter.onTimeout(() -> removeEmitter(blogId, emitter));
+        emitter.onError(error -> removeEmitter(blogId, emitter));
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("connected")
+                    .data(Map.of("blogId", blogId, "type", "connected")));
+        } catch (Exception e) {
+            removeEmitter(blogId, emitter);
+        }
+        return emitter;
     }
 
     private boolean canUseDanmaku(Long blogId) {
@@ -90,5 +118,30 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         view.put("videoSecond", danmaku.getVideoSecond() == null ? 0 : danmaku.getVideoSecond());
         view.put("lane", danmaku.getLane() == null ? 0 : danmaku.getLane());
         return view;
+    }
+
+    private void broadcast(Long blogId, Map<String, Object> view) {
+        Set<SseEmitter> blogEmitters = emitters.get(blogId);
+        if (blogEmitters == null || blogEmitters.isEmpty()) {
+            return;
+        }
+        for (SseEmitter emitter : List.copyOf(blogEmitters)) {
+            try {
+                emitter.send(SseEmitter.event().name("danmaku").data(view));
+            } catch (Exception e) {
+                removeEmitter(blogId, emitter);
+            }
+        }
+    }
+
+    private void removeEmitter(Long blogId, SseEmitter emitter) {
+        Set<SseEmitter> blogEmitters = emitters.get(blogId);
+        if (blogEmitters == null) {
+            return;
+        }
+        blogEmitters.remove(emitter);
+        if (blogEmitters.isEmpty()) {
+            emitters.remove(blogId);
+        }
     }
 }

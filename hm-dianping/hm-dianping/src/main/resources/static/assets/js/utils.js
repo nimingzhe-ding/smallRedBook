@@ -19,6 +19,8 @@ window.state = {
   cartItems: [],
   videoNotes: [],
   videoObserver: null,
+  danmakuSource: null,
+  danmakuSourceNoteId: null,
   danmakuStore: {},
   danmakuEnabled: JSON.parse(localStorage.getItem("hmdp_danmaku_enabled") || "true"),
   danmakuSpeed: Number(localStorage.getItem("hmdp_danmaku_speed") || 8.5),

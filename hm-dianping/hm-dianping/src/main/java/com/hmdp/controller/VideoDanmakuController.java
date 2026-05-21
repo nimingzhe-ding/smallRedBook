@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * 视频弹幕接口。
@@ -30,5 +31,10 @@ public class VideoDanmakuController {
     @PostMapping
     public Result send(@RequestBody VideoDanmaku danmaku) {
         return danmakuService.send(danmaku);
+    }
+
+    @GetMapping("/stream/{blogId}")
+    public SseEmitter stream(@PathVariable("blogId") Long blogId) {
+        return danmakuService.stream(blogId);
     }
 }

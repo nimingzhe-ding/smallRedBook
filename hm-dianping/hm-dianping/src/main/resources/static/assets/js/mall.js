@@ -29,6 +29,7 @@ function showContentArea() {
   setMallActive(false);
   setVideoActive(false);
   pauseImmersiveVideos();
+  closeDanmakuSource();
 }
 
 function switchMall() {
@@ -40,6 +41,7 @@ function switchMall() {
   setMallActive(true);
   setVideoActive(false);
   pauseImmersiveVideos();
+  closeDanmakuSource();
   hideStatus();
   loadProducts();
 }

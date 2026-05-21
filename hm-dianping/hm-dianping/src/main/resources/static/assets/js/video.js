@@ -64,6 +64,7 @@ function bindVideoFeedEvents(videos) {
       if (!video) return;
       if (entry.isIntersecting && entry.intersectionRatio > 0.62) {
         pauseImmersiveVideos(video);
+        subscribeDanmaku(entry.target.dataset.videoId);
         const savedState = loadVideoState(entry.target.dataset.videoId);
         if (state.videoAutoplay && !savedState.paused) {
           video.play().catch(() => {});
@@ -188,12 +189,68 @@ function defaultDanmaku(noteId) {
 async function loadDanmaku(noteId) {
   try {
     const data = await request(`/video-danmaku/public/${noteId}`);
-    state.danmakuStore[String(noteId)] = Array.isArray(data) ? data : [];
+    state.danmakuStore[String(noteId)] = dedupeDanmaku(Array.isArray(data) ? data : []);
   } catch {
     state.danmakuStore[String(noteId)] = defaultDanmaku(noteId);
   }
   const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
   if (layer) layer.hidden = !state.danmakuEnabled;
+}
+
+function subscribeDanmaku(noteId) {
+  if (!noteId || state.danmakuSourceNoteId === String(noteId)) return;
+  closeDanmakuSource();
+  if (typeof EventSource === "undefined") return;
+  const source = new EventSource(apiUrl(`/video-danmaku/stream/${noteId}`));
+  state.danmakuSource = source;
+  state.danmakuSourceNoteId = String(noteId);
+  source.addEventListener("danmaku", event => {
+    try {
+      receiveRealtimeDanmaku(noteId, JSON.parse(event.data));
+    } catch {
+      // Ignore malformed events; HTTP history remains the source of truth.
+    }
+  });
+  source.onerror = () => {
+    closeDanmakuSource();
+  };
+}
+
+function closeDanmakuSource() {
+  if (state.danmakuSource) {
+    state.danmakuSource.close();
+  }
+  state.danmakuSource = null;
+  state.danmakuSourceNoteId = null;
+}
+
+function receiveRealtimeDanmaku(noteId, item) {
+  if (!item || item.id == null) return;
+  const key = String(noteId);
+  const list = state.danmakuStore[key] || [];
+  if (list.some(existing => String(existing.id) === String(item.id))) {
+    return;
+  }
+  list.push(item);
+  state.danmakuStore[key] = dedupeDanmaku(list);
+  const slide = els.videoFeed.querySelector(`.video-slide[data-video-id="${noteId}"]`);
+  const video = slide?.querySelector("video");
+  const currentSecond = Math.floor(video?.currentTime || 0);
+  if (Math.abs(Number(item.videoSecond || 0) - currentSecond) <= 1) {
+    const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
+    if (layer) shootDanmaku(layer, item.content || "", item.lane);
+    item.__shownAtSecond = Number(item.videoSecond || 0);
+  }
+}
+
+function dedupeDanmaku(list) {
+  const seen = new Set();
+  return list.filter(item => {
+    const id = item && item.id != null ? String(item.id) : `${item.content}:${item.videoSecond}:${item.lane}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 function renderDanmaku(noteId, currentSecond) {
@@ -405,6 +462,10 @@ window.renderVideoFeed = renderVideoFeed;
 window.bindVideoFeedEvents = bindVideoFeedEvents;
 window.defaultDanmaku = defaultDanmaku;
 window.loadDanmaku = loadDanmaku;
+window.subscribeDanmaku = subscribeDanmaku;
+window.closeDanmakuSource = closeDanmakuSource;
+window.receiveRealtimeDanmaku = receiveRealtimeDanmaku;
+window.dedupeDanmaku = dedupeDanmaku;
 window.renderDanmaku = renderDanmaku;
 window.shootDanmaku = shootDanmaku;
 window.filterDanmakuList = filterDanmakuList;
