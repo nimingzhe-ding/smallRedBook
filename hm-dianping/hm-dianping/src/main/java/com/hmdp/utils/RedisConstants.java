@@ -3,6 +3,12 @@ package com.hmdp.utils;
 public class RedisConstants {
     public static final String LOGIN_CODE_KEY = "login:code:";
     public static final Long LOGIN_CODE_TTL = 2L;
+    public static final String LOGIN_CODE_COOLDOWN_KEY = "login:code:cooldown:";
+    public static final Long LOGIN_CODE_COOLDOWN_SECONDS = 60L;
+    public static final String LOGIN_FAIL_KEY = "login:fail:";
+    public static final Long LOGIN_FAIL_TTL = 10L;
+    public static final Long LOGIN_FAIL_LOCK_SECONDS = 300L;
+    public static final Long LOGIN_FAIL_MAX = 5L;
     public static final String LOGIN_USER_KEY = "login:token:";
     public static final Long LOGIN_USER_TTL = 36000L;
 

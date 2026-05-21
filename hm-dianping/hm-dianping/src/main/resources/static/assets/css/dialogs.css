@@ -656,6 +656,27 @@
   font-size: 13px;
 }
 
+.login-feedback {
+  margin: 0 0 14px;
+  border-radius: 8px;
+  background: var(--info-soft);
+  color: var(--info);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.login-feedback[data-type="success"] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.login-feedback[data-type="error"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

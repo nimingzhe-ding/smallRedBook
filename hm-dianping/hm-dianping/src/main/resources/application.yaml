@@ -52,6 +52,8 @@ hmdp:
     max-tokens: 1500
     max-messages: 12
     knowledge-top-k: 3
+  auth:
+    debug-code-response: ${HMDP_AUTH_DEBUG_CODE_RESPONSE:true}
   moderation:
     enabled: ${HMDP_MODERATION_ENABLED:true}
     sensitive-words: "${HMDP_SENSITIVE_WORDS:}"

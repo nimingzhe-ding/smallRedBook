@@ -132,6 +132,8 @@ window.els = {
   videoPreview: document.querySelector("#videoPreview"),
   loginDialog: document.querySelector("#loginDialog"),
   loginForm: document.querySelector("#loginForm"),
+  loginFeedback: document.querySelector("#loginFeedback"),
+  loginSubmitButton: document.querySelector("#loginSubmitButton"),
   noteSmart: document.querySelector("#noteSmart"),
   noteSmartText: document.querySelector("#noteSmartText"),
   shopBridge: document.querySelector("#shopBridge"),

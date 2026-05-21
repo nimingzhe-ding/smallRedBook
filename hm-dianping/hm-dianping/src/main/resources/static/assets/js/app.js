@@ -165,7 +165,7 @@
       loadProducts();
     });
   });
-  document.querySelector("#loginButton").addEventListener("click", function() { els.loginDialog.showModal(); });
+  document.querySelector("#loginButton").addEventListener("click", openLoginDialog);
   els.loginDialog.addEventListener("click", function(e) { if (e.target === els.loginDialog) els.loginDialog.close(); });
   document.querySelector("#editProfileButton").addEventListener("click", openProfileEdit);
   els.profileEditForm.addEventListener("submit", submitProfileEdit);

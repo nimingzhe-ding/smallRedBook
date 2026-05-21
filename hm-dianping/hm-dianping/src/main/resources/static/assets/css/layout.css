@@ -488,6 +488,13 @@
   background: var(--surface-soft);
 }
 
+.ghost-button.is-logged-in {
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ghost-button:active {
   transform: scale(.97);
 }
