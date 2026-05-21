@@ -162,6 +162,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         result.setNotes(notes);
         result.setVideos(videos);
         result.setProducts(searchProducts(keyword, pageNo));
+        result.setProductNotes(loadProductRelatedNotes(result.getProducts()));
         result.setShops(searchShops(keyword, pageNo));
         result.setTopics(searchTopics(keyword));
         result.setRelatedQueries(buildRelatedQueries(keyword, notes, result.getProducts(), result.getShops(), result.getTopics()));
@@ -1073,6 +1074,67 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             MallProduct product = productMap.get(relation.getProductId());
             if (product != null) {
                 result.computeIfAbsent(relation.getBlogId(), key -> new ArrayList<>()).add(product);
+            }
+        }
+        return result;
+    }
+
+    private Map<Long, List<ContentNoteDTO>> loadProductRelatedNotes(List<MallProduct> products) {
+        if (products == null || products.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> productIds = products.stream()
+                .map(MallProduct::getId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+        List<BlogProduct> relations = blogProductMapper.selectList(
+                new QueryWrapper<BlogProduct>()
+                        .in("product_id", productIds)
+                        .orderByAsc("sort")
+                        .orderByDesc("id"));
+        if (relations.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> blogIds = relations.stream()
+                .map(BlogProduct::getBlogId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (blogIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Blog> blogs = blogService.query()
+                .in("id", blogIds)
+                .eq("status", CONTENT_STATUS_NORMAL)
+                .orderByDesc("liked")
+                .orderByDesc("create_time")
+                .list();
+        Map<Long, ContentNoteDTO> noteMap = toNoteDTOs(blogs).stream()
+                .collect(Collectors.toMap(ContentNoteDTO::getId, Function.identity(), (first, second) -> first, LinkedHashMap::new));
+        Map<Long, Set<Long>> productBlogIds = new LinkedHashMap<>();
+        for (BlogProduct relation : relations) {
+            if (relation.getProductId() == null || relation.getBlogId() == null) {
+                continue;
+            }
+            productBlogIds.computeIfAbsent(relation.getProductId(), key -> new java.util.LinkedHashSet<>())
+                    .add(relation.getBlogId());
+        }
+        Map<Long, List<ContentNoteDTO>> result = new LinkedHashMap<>();
+        for (Long productId : productIds) {
+            Set<Long> relatedBlogIds = productBlogIds.get(productId);
+            if (relatedBlogIds == null || relatedBlogIds.isEmpty()) {
+                continue;
+            }
+            List<ContentNoteDTO> notes = noteMap.values().stream()
+                    .filter(note -> relatedBlogIds.contains(note.getId()))
+                    .limit(3)
+                    .toList();
+            if (!notes.isEmpty()) {
+                result.put(productId, notes);
             }
         }
         return result;

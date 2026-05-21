@@ -15,6 +15,7 @@ window.state = {
   mallQuery: "",
   searchTab: "notes",
   searchResults: { notes: [], videos: [], products: [], shops: [], topics: [] },
+  searchProductNotes: {},
   searchMeta: { summary: "", relatedQueries: [] },
   mallProducts: [],
   cartItems: [],

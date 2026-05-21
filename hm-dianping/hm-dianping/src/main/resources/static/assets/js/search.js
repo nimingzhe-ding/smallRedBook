@@ -36,6 +36,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
     return;
   }
   state.searchResults = results;
+  state.searchProductNotes = results.productNotes || {};
   state.searchMeta = results.meta || { summary: "", relatedQueries: [] };
   if (!state.searchResults[state.searchTab]?.length) {
     state.searchTab = ["notes", "videos", "products", "shops", "topics"].find(tab => state.searchResults[tab].length) || "notes";
@@ -53,6 +54,7 @@ async function searchUnified(keyword) {
       notes: Array.isArray(data?.notes) ? data.notes.map(normalizeNote) : [],
       videos: Array.isArray(data?.videos) ? data.videos.map(normalizeNote) : [],
       products: Array.isArray(data?.products) ? data.products.map(normalizeProduct) : [],
+      productNotes: normalizeProductNoteMap(data?.productNotes),
       shops: Array.isArray(data?.shops) ? data.shops.map(normalizeShop) : [],
       topics: Array.isArray(data?.topics) ? data.topics : [],
       meta: {
@@ -65,6 +67,7 @@ async function searchUnified(keyword) {
       notes: [],
       videos: [],
       products: [],
+      productNotes: {},
       shops: [],
       topics: [],
       meta: { summary: "", relatedQueries: [] }
@@ -107,7 +110,7 @@ function renderUnifiedSearchResults() {
   if (state.searchTab === "notes" || state.searchTab === "videos") {
     const grid = document.createElement("div");
     grid.className = "masonry-feed unified-note-results";
-    list.forEach(note => grid.appendChild(createNoteCard(note)));
+    list.forEach(note => grid.appendChild(renderSearchNoteCard(note)));
     els.unifiedSearchResults.innerHTML = renderSearchRefinements() + renderAiSearchInsight();
     bindSearchRefinements();
     els.unifiedSearchResults.appendChild(grid);
@@ -130,7 +133,7 @@ function renderUnifiedProducts(products) {
     ${renderAiSearchInsight()}
     <div class="unified-product-grid">
       ${products.map(product => `
-        <article class="product-card">
+        <article class="product-card search-product-card">
           <button type="button" data-unified-product="${product.id}">
             <div class="product-image-wrap">
               <img class="product-image" src="${normalizeImage(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy">
@@ -145,12 +148,20 @@ function renderUnifiedProducts(products) {
               </div>
             </div>
           </button>
+          ${renderSearchReason(buildSearchReason("product", product))}
+          ${renderProductRelatedNotes(product)}
         </article>
       `).join("")}
     </div>`;
   bindSearchRefinements();
   els.unifiedSearchResults.querySelectorAll("[data-unified-product]").forEach(button => {
     button.addEventListener("click", () => openProduct(button.dataset.unifiedProduct));
+  });
+  els.unifiedSearchResults.querySelectorAll("[data-product-note]").forEach(button => {
+    button.addEventListener("click", () => {
+      const note = findSearchProductNote(button.dataset.productNote);
+      if (note) openDrawer(note);
+    });
   });
 }
 
@@ -169,6 +180,7 @@ function renderUnifiedShops(shops) {
               <em>${escapeHtml(shop.address || "地址待补充")}</em>
             </span>
           </button>
+          ${renderSearchReason(buildSearchReason("shop", shop))}
         </article>
       `).join("")}
     </div>`;
@@ -188,6 +200,7 @@ function renderUnifiedTopics(topics) {
         <button type="button" data-unified-topic="${escapeHtml(topic.keyword)}">
           <strong>#${escapeHtml(topic.keyword)}</strong>
           <span>${topic.heat ? `热度 ${topic.heat}` : "继续探索这个话题"}</span>
+          <em>${escapeHtml(buildSearchReason("topic", topic))}</em>
         </button>
       `).join("")}
     </div>`;
@@ -195,6 +208,74 @@ function renderUnifiedTopics(topics) {
   els.unifiedSearchResults.querySelectorAll("[data-unified-topic]").forEach(button => {
     button.addEventListener("click", () => enterUnifiedSearch(button.dataset.unifiedTopic, "notes"));
   });
+}
+
+function normalizeProductNoteMap(map) {
+  const result = {};
+  Object.entries(map || {}).forEach(([productId, notes]) => {
+    result[String(productId)] = Array.isArray(notes) ? notes.map(normalizeNote) : [];
+  });
+  return result;
+}
+
+function renderSearchNoteCard(note) {
+  const card = createNoteCard(note);
+  card.insertAdjacentHTML("beforeend", renderSearchReason(buildSearchReason("note", note)));
+  return card;
+}
+
+function renderSearchReason(reason) {
+  return reason ? `<p class="search-result-reason">${escapeHtml(reason)}</p>` : "";
+}
+
+function buildSearchReason(type, item) {
+  const keyword = String(state.query || "").trim();
+  if (type === "note") {
+    if (item.products?.length) return `关联了 ${item.products.length} 件同款商品，适合边看内容边比较`;
+    if (keyword && String(item.tags || "").includes(keyword)) return `标签命中「${keyword}」，按互动热度排序`;
+    if (keyword && String(item.title || "").includes(keyword)) return `标题直接匹配「${keyword}」`;
+    if (item.isVideo) return "视频内容优先展示，适合快速判断现场体验";
+    if (Number(item.liked || 0) + Number(item.comments || 0) > 0) return "互动数据更高，优先推荐给你";
+    return "按内容相关度和发布时间综合排序";
+  }
+  if (type === "product") {
+    if (keyword && String(item.title || "").includes(keyword)) return `商品标题匹配「${keyword}」`;
+    if (keyword && String(item.category || "").includes(keyword)) return `来自「${item.category}」类目`;
+    if (Number(item.sold || 0) > 0) return `已售 ${item.sold}，可结合相关笔记判断`;
+    if (Number(item.stock || 0) > 0) return `当前库存 ${item.stock}，可继续查看详情`;
+    return "按商品标题、销量、优惠和库存综合排序";
+  }
+  if (type === "shop") {
+    if (keyword && String(item.area || "").includes(keyword)) return `商圈匹配「${keyword}」`;
+    if (Number(item.score || 0) > 0) return `评分 ${(Number(item.score) / 10).toFixed(1)}，按热度靠前`;
+    return "按店铺名称、地址和销量综合排序";
+  }
+  if (type === "topic") {
+    return item.heat ? `近期热度 ${item.heat}，继续探索相关笔记` : "可作为新的搜索方向";
+  }
+  return "";
+}
+
+function renderProductRelatedNotes(product) {
+  const notes = state.searchProductNotes[String(product.id)] || [];
+  if (!notes.length) return "";
+  return `
+    <div class="search-product-notes">
+      <span>相关笔记</span>
+      ${notes.slice(0, 2).map(note => `
+        <button type="button" data-product-note="${note.id}">
+          <img src="${normalizeImage(note.image)}" alt="">
+          <strong>${escapeHtml(note.title)}</strong>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function findSearchProductNote(noteId) {
+  return Object.values(state.searchProductNotes || {})
+    .flat()
+    .find(note => String(note.id) === String(noteId));
 }
 
 function renderAiSearchInsight() {
@@ -477,6 +558,12 @@ window.renderUnifiedSearchResults = renderUnifiedSearchResults;
 window.renderUnifiedProducts = renderUnifiedProducts;
 window.renderUnifiedShops = renderUnifiedShops;
 window.renderUnifiedTopics = renderUnifiedTopics;
+window.normalizeProductNoteMap = normalizeProductNoteMap;
+window.renderSearchNoteCard = renderSearchNoteCard;
+window.renderSearchReason = renderSearchReason;
+window.buildSearchReason = buildSearchReason;
+window.renderProductRelatedNotes = renderProductRelatedNotes;
+window.findSearchProductNote = findSearchProductNote;
 window.renderAiSearchInsight = renderAiSearchInsight;
 window.renderSearchRefinements = renderSearchRefinements;
 window.bindSearchRefinements = bindSearchRefinements;

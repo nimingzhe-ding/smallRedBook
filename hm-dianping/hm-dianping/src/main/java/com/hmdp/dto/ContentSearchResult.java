@@ -5,6 +5,7 @@ import com.hmdp.entity.Shop;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 统一搜索结果。
@@ -17,6 +18,7 @@ public class ContentSearchResult {
     private List<ContentNoteDTO> notes;
     private List<ContentNoteDTO> videos;
     private List<MallProduct> products;
+    private Map<Long, List<ContentNoteDTO>> productNotes;
     private List<Shop> shops;
     private List<ContentTrendDTO> topics;
     private List<String> relatedQueries;
