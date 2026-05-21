@@ -113,6 +113,7 @@ window.els = {
   notificationBadge: document.querySelector("#notificationBadge"),
   notificationSettings: document.querySelector("#notificationSettings"),
   customerServiceDialog: document.querySelector("#customerServiceDialog"),
+  customerServiceContext: document.querySelector("#customerServiceContext"),
   customerServiceMessages: document.querySelector("#customerServiceMessages"),
   customerServiceForm: document.querySelector("#customerServiceForm"),
   customerServiceInput: document.querySelector("#customerServiceInput"),

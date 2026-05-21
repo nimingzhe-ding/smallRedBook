@@ -344,6 +344,28 @@
   gap: 12px;
 }
 
+.customer-service-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.customer-service-context span {
+  max-width: 100%;
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #555;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .customer-service-messages {
   display: grid;
   gap: 10px;
@@ -369,6 +391,23 @@
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.cs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cs-actions button {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .cs-assistant {

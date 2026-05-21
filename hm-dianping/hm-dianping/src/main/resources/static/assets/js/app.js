@@ -131,11 +131,7 @@
   document.querySelector("#openCustomerService").addEventListener("click", function() { openCustomerServiceDialog(); });
   document.querySelector("#closeCustomerService").addEventListener("click", function() { els.customerServiceDialog.close(); });
   els.customerServiceForm.addEventListener("submit", submitCustomerService);
-  document.querySelectorAll("[data-cs-question]").forEach(function(button) {
-    button.addEventListener("click", function() {
-      askCustomerServiceQuestion(button.dataset.csQuestion);
-    });
-  });
+  bindCustomerQuickButtons();
   els.notificationList.addEventListener("click", function(e) {
     var actionBtn = e.target.closest("[data-action]");
     var item = e.target.closest(".notification-item");

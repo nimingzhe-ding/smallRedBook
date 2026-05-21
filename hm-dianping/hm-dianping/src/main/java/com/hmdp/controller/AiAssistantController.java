@@ -5,6 +5,7 @@ import com.hmdp.ai.dto.AiChatRequest;
 import com.hmdp.ai.dto.AiChatResponse;
 import com.hmdp.ai.enums.AiScene;
 import com.hmdp.ai.service.AiAssistantService;
+import com.hmdp.dto.AiCustomerServiceResponse;
 import com.hmdp.dto.AiFlowRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.enums.ErrorCode;
@@ -27,6 +28,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("/ai")
@@ -124,9 +129,9 @@ public class AiAssistantController {
         String question = text(request == null ? null : request.getQuery());
         String ruleAnswer = customerServiceFallback(question, context);
         if (context.shouldAnswerByRule(question)) {
-            return Result.ok(customerServiceResponse(context, ruleAnswer));
+            return Result.ok(customerServiceResponse(context, ruleAnswer, "rule", java.util.List.of("rule:customer-service")));
         }
-        return safeFlow("AI 客服", request, """
+        return Result.ok(customerServiceAiResponse(context, request, """
                 用户咨询：%s
                 当前登录用户：%s
                 当前页面场景：%s
@@ -140,7 +145,7 @@ public class AiAssistantController {
                 请按客服口吻回答，涉及退款、物流、库存、支付、取消时说明当前系统状态、可操作按钮和下一步建议。
                 """.formatted(question, context.user == null ? "未登录" : context.user.getId(), text(request == null ? null : request.getScenario()),
                 orderText(context.order), productText(context.product), voucherText(context.voucher)),
-                ruleAnswer);
+                ruleAnswer));
     }
 
     @PostMapping("/flow/recommend-reason")
@@ -194,7 +199,7 @@ public class AiAssistantController {
         UserDTO user = UserHolder.getUser();
         boolean orderRequested = request != null && request.getOrderId() != null;
         MallOrder order = orderRequested && user != null ? loadOwnedMallOrder(request, user) : null;
-        boolean orderDenied = orderRequested && order == null;
+        boolean orderDenied = orderRequested && user != null && order == null;
         if (orderDenied) {
             return new CustomerServiceContext(request, user, null, null, null, true, true);
         }
@@ -244,11 +249,41 @@ public class AiAssistantController {
                 .one();
     }
 
-    private AiChatResponse customerServiceResponse(CustomerServiceContext context, String answer) {
+    private AiCustomerServiceResponse customerServiceAiResponse(CustomerServiceContext context, AiFlowRequest request,
+                                                               String message, String fallback) {
+        AiChatRequest chatRequest = new AiChatRequest();
+        chatRequest.setSessionId(StrUtil.blankToDefault(request == null ? null : request.getSessionId(), "AI 客服"));
+        chatRequest.setReset(request == null ? null : request.getReset());
+        chatRequest.setMessage(message);
+        try {
+            AiChatResponse aiResponse = aiAssistantService.flow(chatRequest);
+            String answer = StrUtil.blankToDefault(aiResponse == null ? null : aiResponse.getAnswer(), fallback);
+            List<String> refs = aiResponse == null || aiResponse.getKnowledgeRefs() == null
+                    ? java.util.List.of("ai:customer-service")
+                    : aiResponse.getKnowledgeRefs();
+            return customerServiceResponse(context, answer, "ai", refs);
+        } catch (RuntimeException e) {
+            return customerServiceResponse(context, fallback, "fallback", java.util.List.of("fallback:customer-service"));
+        }
+    }
+
+    private AiCustomerServiceResponse customerServiceResponse(CustomerServiceContext context, String answer,
+                                                             String source, List<String> refs) {
         String sessionId = StrUtil.blankToDefault(context.request == null ? null : context.request.getSessionId(), "AI 客服");
         Long currentUserId = context.user == null ? null : context.user.getId();
-        return new AiChatResponse(AiScene.FLOW.getCode(), sessionId, answer,
-                java.util.List.of("rule:customer-service"), currentUserId, java.time.LocalDateTime.now());
+        AiCustomerServiceResponse response = new AiCustomerServiceResponse();
+        response.setScene(AiScene.FLOW.getCode());
+        response.setSessionId(sessionId);
+        response.setAnswer(answer);
+        response.setSource(source);
+        response.setScenario(context.scenario());
+        response.setRequiresLogin(context.requiresLogin());
+        response.setKnowledgeRefs(refs == null ? java.util.List.of() : refs);
+        response.setCurrentUserId(currentUserId);
+        response.setTimestamp(LocalDateTime.now());
+        response.setContext(context.toSummary());
+        response.setActions(context.actions());
+        return response;
     }
 
     private String customerServiceFallback(String question, CustomerServiceContext context) {
@@ -278,6 +313,9 @@ public class AiAssistantController {
         if (user == null && isPersonalOrderQuestion(normalizedQuestion, request)) {
             return "涉及你的订单状态、物流或售后进度时，需要先登录当前账号。登录后从“我的订单”进入咨询，我才能按订单归属查询并回答。";
         }
+        if (user != null && isPersonalOrderQuestion(normalizedQuestion, request)) {
+            return "我可以帮你查订单状态、退款进度和物流，但需要先确定具体订单。请从“我的订单”里选择一笔订单后再咨询，或在请求里带上 orderId。";
+        }
         if (containsAny(normalizedQuestion, "登录", "验证码", "手机")) {
             return "登录方式是手机号验证码登录：先点“登录”，输入手机号获取验证码；验证码会打印在后端日志里，本地调试时复制验证码完成登录。";
         }
@@ -297,9 +335,15 @@ public class AiAssistantController {
             if (voucher != null) {
                 return "当前可参考优惠券：" + voucherText(voucher) + "。结算页会按商品、店铺、平台范围校验门槛，满足条件后抵扣。";
             }
+            if (product != null) {
+                return productServiceFallback(normalizedQuestion, product, null);
+            }
             return "平台支持店铺优惠券、商城商品券和秒杀券。秒杀券需要在活动时间内且库存充足时下单，同一用户不能重复抢同一张券。";
         }
         if (containsAny(normalizedQuestion, "库存", "还有", "能买")) {
+            if (product != null) {
+                return productServiceFallback(normalizedQuestion, product, voucher);
+            }
             return "库存需要结合具体商品查询。请从商品详情页发起咨询，或在请求里带上 productId，我会返回当前商品库存和是否还能购买。";
         }
         if (containsAny(normalizedQuestion, "投诉", "举报", "违规")) {
@@ -332,7 +376,7 @@ public class AiAssistantController {
             if (isStatus(order, MallOrderServiceImpl.STATUS_PENDING_PAY)) {
                 return "这笔订单还未支付，不需要退款，可以直接取消订单。";
             }
-            if (isStatus(order, MallOrderServiceImpl.STATUS_PENDING_SHIP, MallOrderServiceImpl.STATUS_SHIPPED)) {
+            if (isStatus(order, MallOrderServiceImpl.STATUS_PAID, MallOrderServiceImpl.STATUS_PENDING_SHIP, MallOrderServiceImpl.STATUS_SHIPPED)) {
                 return "这笔订单可以申请退款。请在订单操作里提交退款申请，系统会创建售后单并通知商家处理。";
             }
             if (isStatus(order, MallOrderServiceImpl.STATUS_REFUNDING)) {
@@ -528,6 +572,98 @@ public class AiAssistantController {
             return containsAny(normalizedQuestion, "退款", "退货", "售后", "物流", "快递", "发货",
                     "库存", "还有", "能买", "优惠", "优惠券", "券", "满减", "抵扣")
                     || voucher != null && containsAny(normalizedQuestion, "优惠", "优惠券", "券", "满减", "抵扣");
+        }
+
+        private String scenario() {
+            if (request != null && StrUtil.isNotBlank(request.getScenario())) {
+                return request.getScenario();
+            }
+            if (order != null || orderRequested) {
+                return "order";
+            }
+            if (product != null) {
+                return "product";
+            }
+            return "customer-service";
+        }
+
+        private boolean requiresLogin() {
+            return user == null && (orderRequested
+                    || StrUtil.equalsIgnoreCase(scenario(), "order")
+                    || isPersonalOrderQuestion(requestQuestion(), request));
+        }
+
+        private AiCustomerServiceResponse.ContextSummary toSummary() {
+            AiCustomerServiceResponse.ContextSummary summary = new AiCustomerServiceResponse.ContextSummary();
+            summary.setLoggedIn(user != null);
+            summary.setPageScenario(scenario());
+            summary.setOrderRequested(orderRequested);
+            summary.setOrderDenied(orderDenied);
+            summary.setOrderId(order == null ? requestOrderId() : order.getId());
+            summary.setOrderStatus(order == null ? null : mallOrderStatus(order.getStatus()));
+            summary.setProductId(product == null ? requestProductId() : product.getId());
+            summary.setProductTitle(product == null ? null : product.getTitle());
+            summary.setProductStock(product == null ? null : product.getStock());
+            summary.setVoucherId(voucher == null ? requestVoucherId() : voucher.getId());
+            summary.setVoucherTitle(voucher == null ? null : voucher.getTitle());
+            return summary;
+        }
+
+        private List<AiCustomerServiceResponse.Action> actions() {
+            List<AiCustomerServiceResponse.Action> actions = new ArrayList<>();
+            if (requiresLogin()) {
+                actions.add(action("login", "去登录", null, null, null));
+                return actions;
+            }
+            if (orderDenied) {
+                actions.add(action("openOrders", "打开我的订单", null, null, null));
+                return actions;
+            }
+            if (order != null) {
+                actions.add(action("openOrders", "查看订单", order.getId(), order.getProductId(), order.getVoucherId()));
+                if (isStatus(order, MallOrderServiceImpl.STATUS_PENDING_PAY)) {
+                    actions.add(action("payOrder", "去支付", order.getId(), order.getProductId(), order.getVoucherId()));
+                    actions.add(action("cancelOrder", "取消订单", order.getId(), order.getProductId(), order.getVoucherId()));
+                }
+                if (isStatus(order, MallOrderServiceImpl.STATUS_PAID, MallOrderServiceImpl.STATUS_PENDING_SHIP, MallOrderServiceImpl.STATUS_SHIPPED)) {
+                    actions.add(action("applyRefund", "申请退款", order.getId(), order.getProductId(), order.getVoucherId()));
+                }
+                if (isStatus(order, MallOrderServiceImpl.STATUS_SHIPPED)) {
+                    actions.add(action("viewLogistics", "查看物流", order.getId(), order.getProductId(), order.getVoucherId()));
+                }
+            } else if (user != null && StrUtil.equalsIgnoreCase(scenario(), "order")) {
+                actions.add(action("openOrders", "选择订单", null, null, null));
+            }
+            if (product != null) {
+                actions.add(action("openProduct", "查看商品", null, product.getId(), voucher == null ? null : voucher.getId()));
+            }
+            return actions;
+        }
+
+        private AiCustomerServiceResponse.Action action(String code, String label, Long orderId, Long productId, Long voucherId) {
+            AiCustomerServiceResponse.Action action = new AiCustomerServiceResponse.Action();
+            action.setCode(code);
+            action.setLabel(label);
+            action.setOrderId(orderId);
+            action.setProductId(productId);
+            action.setVoucherId(voucherId);
+            return action;
+        }
+
+        private Long requestOrderId() {
+            return request == null ? null : request.getOrderId();
+        }
+
+        private Long requestProductId() {
+            return request == null ? null : request.getProductId();
+        }
+
+        private Long requestVoucherId() {
+            return request == null ? null : request.getVoucherId();
+        }
+
+        private String requestQuestion() {
+            return StrUtil.blankToDefault(request == null ? null : request.getQuery(), "").toLowerCase();
         }
     }
 }
