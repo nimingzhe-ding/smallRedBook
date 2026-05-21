@@ -229,11 +229,24 @@
   setInterval(refreshNotificationBadge, 60000);
   loadNotes();
   loadTrends();
-  openSharedNoteFromUrl();
+  openSharedTargetFromUrl();
 
-  function openSharedNoteFromUrl() {
-    var noteId = new URLSearchParams(location.search).get("noteId");
-    if (!noteId) return;
-    openDrawer({ id: Number(noteId) });
+  function openSharedTargetFromUrl() {
+    var params = new URLSearchParams(location.search);
+    var noteId = params.get("noteId");
+    var productId = params.get("productId");
+    var orderId = params.get("orderId");
+    if (noteId) {
+      openDrawer({ id: Number(noteId) });
+      return;
+    }
+    if (productId) {
+      switchMall();
+      setTimeout(function() { openProduct(Number(productId)); }, 80);
+      return;
+    }
+    if (orderId) {
+      openOrderDetail(Number(orderId));
+    }
   }
 })();

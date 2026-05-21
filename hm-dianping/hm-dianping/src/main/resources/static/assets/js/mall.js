@@ -75,7 +75,8 @@ async function loadProducts() {
 
 function renderProducts(products) {
   if (!products.length) {
-    els.productGrid.innerHTML = `<p class="empty-text mall-empty">这个类目暂时没有商品。</p>`;
+    els.productGrid.innerHTML = renderCommerceEmpty("这个类目暂时没有商品。", "查看推荐商品", "mall-all");
+    bindCommerceEmptyActions(els.productGrid);
     return;
   }
   els.productGrid.innerHTML = products.map(product => `
@@ -190,7 +191,8 @@ async function openCartDialog() {
 function renderCartItems(items) {
   state.cartItems = Array.isArray(items) ? items : [];
   if (!items.length) {
-    els.cartList.innerHTML = `<p class="empty-text">购物车还是空的，先去商城挑一件。</p>`;
+    els.cartList.innerHTML = renderCommerceEmpty("购物车还是空的，先去商城挑一件。", "去商城看看", "mall");
+    bindCommerceEmptyActions(els.cartList);
     return;
   }
   els.cartList.innerHTML = items.map(item => `
@@ -254,9 +256,39 @@ async function payMallOrder(orderId) {
   return request(`/mall/orders/${orderId}/pay`, { method: "POST" });
 }
 
+function renderCommerceEmpty(message, actionLabel = "", action = "") {
+  return `
+    <div class="commerce-empty">
+      <p class="empty-text">${escapeHtml(message)}</p>
+      ${action ? `<button class="soft-button" type="button" data-empty-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>` : ""}
+    </div>
+  `;
+}
+
+function bindCommerceEmptyActions(root) {
+  root.querySelectorAll("[data-empty-action]").forEach(button => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.emptyAction;
+      if (action === "mall" || action === "mall-all") {
+        if (action === "mall-all") {
+          state.mallCategory = "all";
+          document.querySelectorAll("[data-mall-category]").forEach(item => {
+            item.classList.toggle("is-active", item.dataset.mallCategory === "all");
+          });
+        }
+        els.cartDialog?.close();
+        els.checkoutDialog?.close();
+        els.productDialog?.close();
+        switchMall();
+      }
+    });
+  });
+}
+
 function renderOrders(orders, focusOrderId = null) {
   if (!orders.length) {
-    els.cartList.innerHTML = `<p class="empty-text">还没有商城订单。</p>`;
+    els.cartList.innerHTML = renderCommerceEmpty("还没有商城订单。", "去商城逛逛", "mall");
+    bindCommerceEmptyActions(els.cartList);
     return;
   }
   els.cartList.innerHTML = orders.map(order => `
@@ -271,15 +303,26 @@ function renderOrders(orders, focusOrderId = null) {
           <p data-order-ai-answer="${order.id}"></p>
         </div>
       </div>
-      ${Number(order.status) === 1 ? `
-        <div class="cart-actions">
-          <button class="publish-button" type="button" data-order-pay="${order.id}">去支付</button>
-        </div>
-      ` : ""}
+      <div class="cart-actions">
+        <button class="soft-button" type="button" data-order-detail="${order.id}">详情</button>
+        ${renderOrderListActions(order)}
+      </div>
     </article>
   `).join("");
+  els.cartList.querySelectorAll("[data-order-detail]").forEach(button => {
+    button.addEventListener("click", () => openOrderDetail(button.dataset.orderDetail));
+  });
   els.cartList.querySelectorAll("[data-order-pay]").forEach(button => {
     button.addEventListener("click", () => payOrderFromList(button.dataset.orderPay));
+  });
+  els.cartList.querySelectorAll("[data-order-cancel]").forEach(button => {
+    button.addEventListener("click", () => cancelOrderFromList(button.dataset.orderCancel));
+  });
+  els.cartList.querySelectorAll("[data-order-refund]").forEach(button => {
+    button.addEventListener("click", () => applyRefundFromList(button.dataset.orderRefund));
+  });
+  els.cartList.querySelectorAll("[data-order-receive]").forEach(button => {
+    button.addEventListener("click", () => receiveOrderFromList(button.dataset.orderReceive));
   });
   els.cartList.querySelectorAll("[data-order-ai-input]").forEach(input => {
     input.addEventListener("keydown", event => {
@@ -294,6 +337,24 @@ function renderOrders(orders, focusOrderId = null) {
       els.cartList.querySelector(`[data-order-id="${focusOrderId}"]`)?.scrollIntoView({ block: "center" });
     }, 50);
   }
+}
+
+function renderOrderListActions(order) {
+  const status = Number(order.status);
+  if (status === 1) {
+    return `
+      <button class="publish-button" type="button" data-order-pay="${order.id}">去支付</button>
+      <button class="ghost-button" type="button" data-order-cancel="${order.id}">取消</button>
+    `;
+  }
+  if (status === 4) {
+    return `<button class="ghost-button" type="button" data-order-refund="${order.id}">退款</button>
+      <button class="publish-button" type="button" data-order-receive="${order.id}">确认收货</button>`;
+  }
+  if ([2, 3].includes(status)) {
+    return `<button class="ghost-button" type="button" data-order-refund="${order.id}">退款</button>`;
+  }
+  return "";
 }
 
 async function askOrderService(orderId, question) {
@@ -316,10 +377,221 @@ async function payOrderFromList(orderId) {
   try {
     await payMallOrder(orderId);
     showStatus(`付款成功，订单号：${orderId}`);
-    openOrdersDialog();
+    openOrderDetail(orderId);
   } catch (error) {
     showStatus(error.message || "支付失败，请稍后再试。");
   }
+}
+
+async function cancelOrderFromList(orderId) {
+  try {
+    await request(`/mall/orders/${orderId}/cancel`, { method: "POST" });
+    showStatus("订单已取消。");
+    openOrderDetail(orderId);
+  } catch (error) {
+    showStatus(error.message || "取消订单失败。");
+  }
+}
+
+async function applyRefundFromList(orderId, reason = "用户申请退款") {
+  try {
+    await request(`/mall/orders/${orderId}/refunds`, {
+      method: "POST",
+      body: JSON.stringify({ reason })
+    });
+    showStatus("退款申请已提交。");
+    openOrderDetail(orderId);
+  } catch (error) {
+    showStatus(error.message || "退款申请失败。");
+  }
+}
+
+async function receiveOrderFromList(orderId) {
+  try {
+    await request(`/mall/orders/${orderId}/receive`, { method: "POST" });
+    showStatus("已确认收货。");
+    openOrderDetail(orderId);
+  } catch (error) {
+    showStatus(error.message || "确认收货失败。");
+  }
+}
+
+async function openOrderDetail(orderId) {
+  if (!requireLoginThen(() => openOrderDetail(orderId))) return;
+  document.querySelector("#cartDialogTitle").textContent = "订单详情";
+  els.cartList.innerHTML = `<p class="empty-text">正在加载订单详情...</p>`;
+  if (!els.cartDialog.open) els.cartDialog.showModal();
+  try {
+    const detail = await request(`/mall/orders/${orderId}`);
+    renderOrderDetail(detail);
+  } catch (error) {
+    els.cartList.innerHTML = `<p class="empty-text">${escapeHtml(error.message || "订单详情加载失败")}</p>`;
+  }
+}
+
+function renderOrderDetail(detail) {
+  const order = detail?.order || detail;
+  if (!order?.id) {
+    els.cartList.innerHTML = `<p class="empty-text">订单不存在。</p>`;
+    return;
+  }
+  const refunds = Array.isArray(detail?.refunds) ? detail.refunds : [];
+  const logistics = detail?.logistics || null;
+  const voucher = detail?.voucher || null;
+  const merchant = detail?.merchant || null;
+  els.cartList.innerHTML = `
+    <div class="order-detail-panel">
+      <div class="order-detail-head">
+        <button class="ghost-button" type="button" id="backToOrders">返回列表</button>
+        <span>${mallOrderStatus(order.status)}</span>
+      </div>
+      <section class="order-detail-product">
+        <img src="${normalizeImage(order.productImage)}" alt="${escapeHtml(order.productTitle)}">
+        <div>
+          <strong>${escapeHtml(order.productTitle || "订单商品")}</strong>
+          <span>${escapeHtml(order.skuName || formatSkuSpecs(order.skuSpecs) || "默认规格")}</span>
+          <small>订单号 ${order.id}</small>
+        </div>
+      </section>
+      <section class="order-detail-grid">
+        <div><span>实付金额</span><strong>¥${formatMoney(order.totalAmount)}</strong></div>
+        <div><span>商品数量</span><strong>${order.quantity || 1}</strong></div>
+        <div><span>优惠抵扣</span><strong>¥${formatMoney(order.discountAmount)}</strong></div>
+        <div><span>商家</span><strong>${escapeHtml(merchant?.name || "平台商家")}</strong></div>
+      </section>
+      <section class="order-detail-section">
+        <strong>收货信息</strong>
+        <p>${escapeHtml(order.receiverName || "")} ${escapeHtml(order.receiverPhone || "")}</p>
+        <p>${escapeHtml(order.receiverAddress || "未保存收货地址")}</p>
+      </section>
+      <section class="order-detail-section">
+        <strong>优惠信息</strong>
+        <p>${voucher ? `${escapeHtml(voucher.title || "优惠券")} · 满 ¥${formatMoney(voucher.payValue)} 减 ¥${formatMoney(voucher.actualValue)}` : "这笔订单没有使用优惠券。"}</p>
+      </section>
+      ${renderOrderTimeline(order, logistics)}
+      ${renderRefundTimeline(refunds)}
+      <section class="order-detail-section">
+        <strong>智能客服</strong>
+        <div class="order-ai-service">
+          <input data-order-ai-input="${order.id}" data-order-product="${order.productId || ""}" placeholder="继续问这笔订单的问题">
+          <p data-order-ai-answer="${order.id}"></p>
+        </div>
+      </section>
+      <div class="order-detail-actions">
+        ${renderOrderDetailActions(order)}
+      </div>
+    </div>
+  `;
+  document.querySelector("#backToOrders")?.addEventListener("click", () => openOrdersDialog(order.id));
+  bindOrderDetailActions(order);
+  const input = els.cartList.querySelector(`[data-order-ai-input="${order.id}"]`);
+  input?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      askOrderService(order.id, input.value);
+    }
+  });
+}
+
+function renderOrderTimeline(order, logistics) {
+  const items = [
+    ["订单创建", order.createTime],
+    ["支付成功", order.payTime],
+    ["商家发货", order.shipTime || logistics?.shipTime],
+    ["确认收货", order.receiveTime || logistics?.signedTime],
+    ["取消订单", order.cancelTime],
+    ["退款完成", order.refundTime]
+  ].filter(([, time]) => Boolean(time));
+  const logisticsText = logistics?.trackingNo || order.logisticsNo
+    ? `${escapeHtml(logistics?.company || order.logisticsCompany || "物流")} · ${escapeHtml(logistics?.trackingNo || order.logisticsNo)}`
+    : order.status >= 3 ? "商家发货后会同步物流单号。" : "支付后等待商家发货。";
+  return `
+    <section class="order-detail-section">
+      <strong>物流进度</strong>
+      <p>${logisticsText}</p>
+      <div class="order-timeline">
+        ${items.length ? items.map(([label, time]) => `
+          <div><b>${escapeHtml(label)}</b><span>${formatDateTime(time)}</span></div>
+        `).join("") : `<p>暂无进度记录。</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderRefundTimeline(refunds) {
+  return `
+    <section class="order-detail-section">
+      <strong>售后记录</strong>
+      ${refunds.length ? `
+        <div class="refund-list">
+          ${refunds.map(refund => `
+            <article>
+              <b>${refundStatusLabel(refund.status)}</b>
+              <span>退款金额 ¥${formatMoney(refund.amount)} · ${escapeHtml(refund.reason || "用户申请退款")}</span>
+              <small>${formatDateTime(refund.applyTime || refund.createTime)}${refund.merchantRemark ? ` · ${escapeHtml(refund.merchantRemark)}` : ""}</small>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p>暂无售后记录。</p>`}
+    </section>
+  `;
+}
+
+function renderOrderDetailActions(order) {
+  const status = Number(order.status);
+  if (status === 1) {
+    return `
+      <button class="publish-button" type="button" data-detail-pay="${order.id}">去支付</button>
+      <button class="ghost-button" type="button" data-detail-cancel="${order.id}">取消订单</button>
+    `;
+  }
+  if (status === 4) {
+    return `
+      <button class="ghost-button" type="button" data-detail-refund="${order.id}">申请退款</button>
+      <button class="publish-button" type="button" data-detail-receive="${order.id}">确认收货</button>
+    `;
+  }
+  if ([2, 3].includes(status)) {
+    return `<button class="ghost-button" type="button" data-detail-refund="${order.id}">申请退款</button>`;
+  }
+  return `<button class="ghost-button" type="button" data-detail-cs="${order.id}">咨询客服</button>`;
+}
+
+function bindOrderDetailActions(order) {
+  els.cartList.querySelector("[data-detail-pay]")?.addEventListener("click", () => payOrderFromList(order.id));
+  els.cartList.querySelector("[data-detail-cancel]")?.addEventListener("click", () => cancelOrderFromList(order.id));
+  els.cartList.querySelector("[data-detail-refund]")?.addEventListener("click", () => applyRefundFromList(order.id));
+  els.cartList.querySelector("[data-detail-receive]")?.addEventListener("click", () => receiveOrderFromList(order.id));
+  els.cartList.querySelector("[data-detail-cs]")?.addEventListener("click", () => {
+    els.cartDialog.close();
+    openCustomerServiceDialog();
+    askCustomerServiceQuestion("这笔订单需要帮助", {
+      orderId: order.id,
+      productId: order.productId || null,
+      voucherId: order.voucherId || null,
+      scenario: "order"
+    });
+  });
+}
+
+function refundStatusLabel(status) {
+  return {
+    0: "待商家处理",
+    1: "退款成功",
+    2: "退款被拒绝"
+  }[Number(status)] || "处理中";
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 // ------------------------------
@@ -754,6 +1026,7 @@ async function submitCheckout() {
     els.cartDialog.close();
     showStatus(`支付成功，订单号：${order.id}`);
     loadProducts();
+    openOrderDetail(order.id);
   } catch (error) {
     showStatus(error.message || "提交订单失败，请检查地址、库存和优惠券。");
   }
@@ -787,6 +1060,7 @@ window.renderCartItems = renderCartItems;
 window.orderFromCart = orderFromCart;
 window.removeCartItem = removeCartItem;
 window.openOrdersDialog = openOrdersDialog;
+window.openOrderDetail = openOrderDetail;
 window.renderOrders = renderOrders;
 window.mallOrderStatus = mallOrderStatus;
 window.payMallOrder = payMallOrder;

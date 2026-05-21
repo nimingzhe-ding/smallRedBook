@@ -257,6 +257,28 @@ public class MallCommerceController {
                 .last("limit 1")));
     }
 
+    @GetMapping("/orders/{id}")
+    public Result orderDetail(@PathVariable("id") Long orderId) {
+        UserDTO user = currentUser();
+        if (user == null) throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        MallOrder order = orderService.getById(orderId);
+        if (order == null || !user.getId().equals(order.getUserId())) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "订单不存在");
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("order", order);
+        detail.put("logistics", logisticsMapper.selectOne(new LambdaQueryWrapper<MallLogistics>()
+                .eq(MallLogistics::getOrderId, orderId)
+                .last("limit 1")));
+        detail.put("refunds", refundMapper.selectList(new LambdaQueryWrapper<MallRefund>()
+                .eq(MallRefund::getOrderId, orderId)
+                .orderByDesc(MallRefund::getCreateTime)));
+        detail.put("product", order.getProductId() == null ? null : productService.getById(order.getProductId()));
+        detail.put("voucher", order.getVoucherId() == null ? null : voucherService.getById(order.getVoucherId()));
+        detail.put("merchant", order.getMerchantId() == null ? null : merchantService.getById(order.getMerchantId()));
+        return Result.ok(detail);
+    }
+
     @PostMapping("/orders/{id}/refunds")
     public Result applyRefund(@PathVariable("id") Long orderId, @RequestBody MallRefund request) {
         Result result = orderService.refundOrder(orderId);

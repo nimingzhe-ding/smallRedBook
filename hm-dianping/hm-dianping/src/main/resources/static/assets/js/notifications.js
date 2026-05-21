@@ -273,7 +273,8 @@ function navigateFromNotification(item) {
   if (noteId && isNoteNotificationType(type)) {
     openDrawer({ id: Number(noteId) });
   } else if (orderId && type.startsWith("ORDER_")) {
-    openOrdersDialog(Number(orderId));
+    if (typeof openOrderDetail === "function") openOrderDetail(Number(orderId));
+    else openOrdersDialog(Number(orderId));
   } else if (actorUserId && type === "FOLLOW") {
     openUserProfile(actorUserId);
   }

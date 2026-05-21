@@ -204,7 +204,8 @@ async function runCustomerServiceAction(action) {
   }
   if (code === "openOrders") {
     els.customerServiceDialog.close();
-    if (typeof openOrdersDialog === "function") openOrdersDialog(action.orderId || null);
+    if (action.orderId && typeof openOrderDetail === "function") openOrderDetail(action.orderId);
+    else if (typeof openOrdersDialog === "function") openOrdersDialog(action.orderId || null);
     return;
   }
   if (code === "openProduct" && action.productId) {
@@ -238,7 +239,13 @@ window.runCustomerServiceAction = runCustomerServiceAction;
 
 async function customerOrderOperation(orderId, operation, successMessage) {
   try {
-    await request(`/mall/orders/${orderId}/${operation}`, { method: "POST" });
+    const url = operation === "refund"
+      ? `/mall/orders/${orderId}/refunds`
+      : `/mall/orders/${orderId}/${operation}`;
+    const options = operation === "refund"
+      ? { method: "POST", body: JSON.stringify({ reason: "智能客服协助申请退款" }) }
+      : { method: "POST" };
+    await request(url, options);
     showStatus(successMessage);
     await askCustomerServiceQuestion("这笔订单现在是什么状态？", { orderId, scenario: "order" });
   } catch (error) {
