@@ -7,7 +7,7 @@ import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.FollowMapper;
-import com.hmdp.service.IFollowService;
+import com.hmdp.service.FollowService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IUserNotificationService;
 import com.hmdp.utils.UserHolder;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * @since 2021-12-22
  */
 @Service
-public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements IFollowService {
+public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements FollowService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource

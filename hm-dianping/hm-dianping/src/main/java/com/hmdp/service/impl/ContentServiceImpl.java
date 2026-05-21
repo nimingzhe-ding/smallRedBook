@@ -6,14 +6,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.ai.dto.AiChatRequest;
 import com.hmdp.ai.service.AiAssistantService;
 import com.hmdp.dto.ContentAiRequest;
-import com.hmdp.dto.ContentFeedResult;
 import com.hmdp.dto.ContentNoteDTO;
-import com.hmdp.dto.ContentProfileDTO;
 import com.hmdp.dto.ContentProfileUpdateRequest;
 import com.hmdp.dto.ContentSearchResult;
 import com.hmdp.dto.ContentShopDTO;
 import com.hmdp.dto.ContentTrendDTO;
 import com.hmdp.dto.CreatorGrowthDTO;
+import com.hmdp.dto.NoteFeedResult;
+import com.hmdp.dto.ProfileDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
@@ -38,6 +38,7 @@ import com.hmdp.mapper.ContentTopicMapper;
 import com.hmdp.mapper.NoteEventMapper;
 import com.hmdp.service.IBlogCollectService;
 import com.hmdp.service.IBlogService;
+import com.hmdp.service.NoteService;
 import com.hmdp.service.IContentService;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.INoteEventService;
@@ -46,6 +47,8 @@ import com.hmdp.service.IShopService;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
 import com.hmdp.service.IVoucherService;
+import com.hmdp.service.ProfileService;
+import com.hmdp.service.RecommendationService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -70,7 +73,7 @@ import java.util.stream.Collectors;
  * 通过批量查询和缓存避免 N+1 查询，统一管理 Redis 搜索历史与热度数据。
  */
 @Service
-public class ContentServiceImpl implements IContentService {
+public class ContentServiceImpl implements IContentService, NoteService, ProfileService, RecommendationService {
 
     @Resource
     private IBlogService blogService;
@@ -183,6 +186,45 @@ public class ContentServiceImpl implements IContentService {
         return Result.ok(note);
     }
 
+    @Override
+    public Result publish(Blog note) {
+        return blogService.saveBlog(note);
+    }
+
+    @Override
+    public Result updateOwnNote(Long noteId, Blog note) {
+        return blogService.updateOwnBlog(noteId, note);
+    }
+
+    @Override
+    public Result deleteOwnNote(Long noteId) {
+        return blogService.deleteOwnBlog(noteId);
+    }
+
+    @Override
+    public Blog getNoteEntity(Long noteId) {
+        return noteId == null ? null : blogService.getById(noteId);
+    }
+
+    @Override
+    public boolean increaseCommentCount(Long noteId) {
+        return blogService.update()
+                .setSql("comments = IFNULL(comments, 0) + 1")
+                .eq("id", noteId)
+                .update();
+    }
+
+    @Override
+    public boolean decreaseCommentCount(Long noteId, long count) {
+        if (count <= 0) {
+            return true;
+        }
+        return blogService.update()
+                .setSql("comments = GREATEST(IFNULL(comments, 0) - " + count + ", 0)")
+                .eq("id", noteId)
+                .update();
+    }
+
     // ==================== 个人中心（我的笔记/收藏/点赞） ====================
 
     @Override
@@ -242,7 +284,7 @@ public class ContentServiceImpl implements IContentService {
                 .toList();
         List<ContentNoteDTO> notes = findNotesByIds(blogIds);
         boolean hasMore = collectPage.getCurrent() < collectPage.getPages();
-        return Result.ok(new ContentFeedResult(notes, collectPage.getTotal(), hasMore, null));
+        return Result.ok(new NoteFeedResult(notes, collectPage.getTotal(), hasMore, null));
     }
 
     @Override
@@ -256,7 +298,7 @@ public class ContentServiceImpl implements IContentService {
         int to = Math.min(from + SystemConstants.MAX_PAGE_SIZE, likedBlogIds.size());
         List<ContentNoteDTO> notes = findNotesByIds(likedBlogIds.subList(from, to));
         boolean hasMore = to < likedBlogIds.size();
-        return Result.ok(new ContentFeedResult(notes, (long) likedBlogIds.size(), hasMore, null));
+        return Result.ok(new NoteFeedResult(notes, (long) likedBlogIds.size(), hasMore, null));
     }
 
     @Override
@@ -310,7 +352,7 @@ public class ContentServiceImpl implements IContentService {
         if (user == null) {
             throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "用户不存在");
         }
-        ContentProfileDTO profile = new ContentProfileDTO();
+        ProfileDTO profile = new ProfileDTO();
         profile.setUserId(user.getId());
         profile.setNickName(user.getNickName());
         profile.setIcon(user.getIcon());
@@ -564,10 +606,10 @@ public class ContentServiceImpl implements IContentService {
         return wrapper.page(page);
     }
 
-    private ContentFeedResult toFeedResult(Page<Blog> page, String query) {
+    private NoteFeedResult toFeedResult(Page<Blog> page, String query) {
         List<ContentNoteDTO> list = toNoteDTOs(page.getRecords());
         boolean hasMore = page.getCurrent() < page.getPages();
-        return new ContentFeedResult(list, page.getTotal(), hasMore, query);
+        return new NoteFeedResult(list, page.getTotal(), hasMore, query);
     }
 
     private boolean isVideoNote(ContentNoteDTO note) {

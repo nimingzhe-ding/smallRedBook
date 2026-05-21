@@ -13,9 +13,9 @@ import com.hmdp.entity.Blog;
 import com.hmdp.entity.MallOrder;
 import com.hmdp.entity.MallProduct;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.service.IBlogService;
 import com.hmdp.service.IMallOrderService;
 import com.hmdp.service.IMallProductService;
+import com.hmdp.service.NoteService;
 import com.hmdp.service.impl.MallOrderServiceImpl;
 import com.hmdp.utils.UserHolder;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiAssistantController {
 
     private final AiAssistantService aiAssistantService;
-    private final IBlogService blogService;
+    private final NoteService noteService;
     private final IMallProductService productService;
     private final IMallOrderService orderService;
 
@@ -74,7 +74,7 @@ public class AiAssistantController {
 
     @PostMapping("/flow/note-summary")
     public Result noteSummary(@RequestBody AiFlowRequest request) {
-        Blog blog = request == null || request.getNoteId() == null ? null : blogService.getById(request.getNoteId());
+        Blog blog = request == null || request.getNoteId() == null ? null : noteService.getNoteEntity(request.getNoteId());
         String title = text(request == null ? null : request.getTitle());
         String content = text(request == null ? null : request.getContent());
         if (blog != null) {
@@ -133,7 +133,7 @@ public class AiAssistantController {
 
     @PostMapping("/flow/recommend-reason")
     public Result recommendReason(@RequestBody AiFlowRequest request) {
-        Blog blog = request == null || request.getNoteId() == null ? null : blogService.getById(request.getNoteId());
+        Blog blog = request == null || request.getNoteId() == null ? null : noteService.getNoteEntity(request.getNoteId());
         return safeFlow("AI 推荐解释", request, """
                 推荐内容：%s
                 用户当前意图：%s

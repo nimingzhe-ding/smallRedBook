@@ -7,9 +7,11 @@ import com.hmdp.dto.NoteUpdateRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
 import com.hmdp.enums.UserRole;
-import com.hmdp.service.IBlogCollectService;
-import com.hmdp.service.IBlogService;
-import com.hmdp.service.IContentService;
+import com.hmdp.service.CollectService;
+import com.hmdp.service.LikeService;
+import com.hmdp.service.NoteService;
+import com.hmdp.service.ProfileService;
+import com.hmdp.service.RecommendationService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,21 +26,27 @@ import jakarta.annotation.Resource;
 
 /**
  * 笔记统一入口控制器 —— 前端主要 API。
- * 所有笔记相关的读（feed/搜索/详情/个人主页）走 IContentService，
- * 写（发布/编辑/删除/点赞）走 IBlogService，收藏走 IBlogCollectService。
+ * 所有笔记相关入口统一走笔记社区命名的 service 门面。
+ * 内部暂时继续复用 Blog 实体和旧表结构，避免一次性大重命名影响稳定性。
  */
 @RestController
 @RequestMapping("/notes")
 public class NotesController {
 
     @Resource
-    private IContentService contentService;
+    private NoteService noteService;
 
     @Resource
-    private IBlogService blogService;
+    private LikeService likeService;
 
     @Resource
-    private IBlogCollectService blogCollectService;
+    private CollectService collectService;
+
+    @Resource
+    private RecommendationService recommendationService;
+
+    @Resource
+    private ProfileService profileService;
 
     // ======================== 信息流与搜索 ========================
 
@@ -53,7 +61,7 @@ public class NotesController {
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "x", required = false) Double x,
             @RequestParam(value = "y", required = false) Double y) {
-        return contentService.feed(channel, query, current, x, y);
+        return noteService.feed(channel, query, current, x, y);
     }
 
     /**
@@ -63,7 +71,7 @@ public class NotesController {
     public Result search(
             @RequestParam("query") String query,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.search(query, current);
+        return noteService.search(query, current);
     }
 
     // ======================== 笔记 CRUD ========================
@@ -73,7 +81,7 @@ public class NotesController {
      */
     @GetMapping("/{id}")
     public Result detail(@PathVariable("id") Long noteId) {
-        return contentService.detail(noteId);
+        return noteService.detail(noteId);
     }
 
     /**
@@ -82,7 +90,7 @@ public class NotesController {
     @PostMapping
     @RequireRole(UserRole.USER)
     public Result publish(@RequestBody NoteCreateRequest request) {
-        return blogService.saveBlog(toBlog(request));
+        return noteService.publish(toBlog(request));
     }
 
     /**
@@ -90,7 +98,7 @@ public class NotesController {
      */
     @PutMapping("/{id}")
     public Result update(@PathVariable("id") Long noteId, @RequestBody NoteUpdateRequest request) {
-        return blogService.updateOwnBlog(noteId, toBlog(request));
+        return noteService.updateOwnNote(noteId, toBlog(request));
     }
 
     /**
@@ -98,7 +106,7 @@ public class NotesController {
      */
     @DeleteMapping("/{id}")
     public Result delete(@PathVariable("id") Long noteId) {
-        return blogService.deleteOwnBlog(noteId);
+        return noteService.deleteOwnNote(noteId);
     }
 
     // ======================== 点赞 ========================
@@ -108,7 +116,7 @@ public class NotesController {
      */
     @PutMapping("/{id}/like")
     public Result like(@PathVariable("id") Long noteId) {
-        return blogService.likeBlog(noteId);
+        return likeService.likeNote(noteId);
     }
 
     /**
@@ -116,7 +124,7 @@ public class NotesController {
      */
     @GetMapping("/{id}/likes")
     public Result likes(@PathVariable("id") Long noteId) {
-        return blogService.queryBlogLikes(noteId);
+        return likeService.queryNoteLikes(noteId);
     }
 
     // ======================== 收藏 ========================
@@ -126,7 +134,7 @@ public class NotesController {
      */
     @PutMapping("/{id}/collect/{collect}")
     public Result collect(@PathVariable("id") Long noteId, @PathVariable("collect") Boolean collect) {
-        return blogCollectService.collectBlog(noteId, collect);
+        return collectService.collectBlog(noteId, collect);
     }
 
     /**
@@ -134,7 +142,7 @@ public class NotesController {
      */
     @GetMapping("/{id}/collect")
     public Result isCollected(@PathVariable("id") Long noteId) {
-        return blogCollectService.isCollected(noteId);
+        return collectService.isCollected(noteId);
     }
 
     // ======================== 个人中心 ========================
@@ -144,7 +152,7 @@ public class NotesController {
      */
     @GetMapping("/mine")
     public Result mine(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.mine(current);
+        return noteService.mine(current);
     }
 
     /**
@@ -152,7 +160,7 @@ public class NotesController {
      */
     @GetMapping("/collections")
     public Result collections(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.collections(current);
+        return noteService.collections(current);
     }
 
     /**
@@ -160,7 +168,7 @@ public class NotesController {
      */
     @GetMapping("/liked")
     public Result liked(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.liked(current);
+        return noteService.liked(current);
     }
 
     // ======================== 用户主页数据 ========================
@@ -172,7 +180,7 @@ public class NotesController {
     public Result userNotes(
             @PathVariable("id") Long userId,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.userNotes(userId, current);
+        return noteService.userNotes(userId, current);
     }
 
     /**
@@ -182,7 +190,7 @@ public class NotesController {
     public Result userCollections(
             @PathVariable("id") Long userId,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.userCollections(userId, current);
+        return noteService.userCollections(userId, current);
     }
 
     /**
@@ -192,7 +200,7 @@ public class NotesController {
     public Result userLiked(
             @PathVariable("id") Long userId,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.userLiked(userId, current);
+        return noteService.userLiked(userId, current);
     }
 
     /**
@@ -202,7 +210,7 @@ public class NotesController {
     public Result following(
             @PathVariable("id") Long userId,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.following(userId, current);
+        return profileService.following(userId, current);
     }
 
     /**
@@ -212,7 +220,7 @@ public class NotesController {
     public Result followers(
             @PathVariable("id") Long userId,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
-        return contentService.followers(userId, current);
+        return profileService.followers(userId, current);
     }
 
     // ======================== 搜索辅助 ========================
@@ -222,7 +230,7 @@ public class NotesController {
      */
     @GetMapping("/trends")
     public Result trends() {
-        return contentService.trends();
+        return recommendationService.trends();
     }
 
     /**
@@ -230,7 +238,7 @@ public class NotesController {
      */
     @GetMapping("/suggestions")
     public Result suggestions(@RequestParam("prefix") String prefix) {
-        return contentService.suggestions(prefix);
+        return recommendationService.suggestions(prefix);
     }
 
     /**
@@ -238,7 +246,7 @@ public class NotesController {
      */
     @GetMapping("/search-history")
     public Result searchHistory() {
-        return contentService.searchHistory();
+        return recommendationService.searchHistory();
     }
 
     /**
@@ -246,7 +254,7 @@ public class NotesController {
      */
     @DeleteMapping("/search-history")
     public Result deleteSearchHistory(@RequestParam("keyword") String keyword) {
-        return contentService.deleteSearchHistory(keyword);
+        return recommendationService.deleteSearchHistory(keyword);
     }
 
     /**
@@ -254,7 +262,7 @@ public class NotesController {
      */
     @DeleteMapping("/search-history/all")
     public Result clearSearchHistory() {
-        return contentService.clearSearchHistory();
+        return recommendationService.clearSearchHistory();
     }
 
     /**
@@ -262,7 +270,7 @@ public class NotesController {
      */
     @GetMapping("/hot-search")
     public Result hotSearch() {
-        return contentService.hotSearch();
+        return recommendationService.hotSearch();
     }
 
     // ======================== AI 智能体 ========================
@@ -272,7 +280,7 @@ public class NotesController {
      */
     @PostMapping("/ai/recommend")
     public Result aiRecommend(@RequestBody ContentAiRequest request) {
-        return contentService.aiRecommend(request);
+        return recommendationService.aiRecommend(request);
     }
 
     /**
@@ -280,7 +288,7 @@ public class NotesController {
      */
     @PostMapping("/ai/summary")
     public Result aiNoteSummary(@RequestBody ContentAiRequest request) {
-        return contentService.aiNoteSummary(request);
+        return recommendationService.aiNoteSummary(request);
     }
 
     private Blog toBlog(NoteCreateRequest request) {

@@ -32,6 +32,7 @@ import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.INoteEventService;
+import com.hmdp.service.LikeService;
 import com.hmdp.service.IUserNotificationService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
@@ -63,7 +64,7 @@ import static org.springframework.data.redis.connection.RedisListCommands.Direct
  * @since 2021-12-22
  */
 @Service
-public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
+public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService, LikeService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource
@@ -432,6 +433,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok();
     }
 
+    @Override
+    public Result likeNote(Long noteId) {
+        return likeBlog(noteId);
+    }
+
     /**
      * 查询博文点赞名单
      * @param id
@@ -458,6 +464,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
         //返回
         return Result.ok(userDTOS);
+    }
+
+    @Override
+    public Result queryNoteLikes(Long noteId) {
+        return queryBlogLikes(noteId);
     }
 
     /**

@@ -10,8 +10,8 @@ import com.hmdp.entity.User;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.enums.EventType;
 import com.hmdp.exception.BusinessException;
-import com.hmdp.service.IBlogCommentsService;
-import com.hmdp.service.IBlogService;
+import com.hmdp.service.CommentService;
+import com.hmdp.service.NoteService;
 import com.hmdp.service.INoteEventService;
 import com.hmdp.service.IUserService;
 import com.hmdp.service.IUserNotificationService;
@@ -44,13 +44,13 @@ import java.util.stream.Collectors;
 public class NoteCommentsController {
 
     @Resource
-    private IBlogCommentsService commentsService;
+    private CommentService commentsService;
 
     @Resource
     private IUserService userService;
 
     @Resource
-    private IBlogService blogService;
+    private NoteService noteService;
 
     @Resource
     private IUserNotificationService notificationService;
@@ -149,17 +149,14 @@ public class NoteCommentsController {
         comment.setLiked(0);
         comment.setStatus(0);
         commentsService.save(comment);
-        blogService.update()
-                .setSql("comments = IFNULL(comments, 0) + 1")
-                .eq("id", comment.getBlogId())
-                .update();
+        noteService.increaseCommentCount(comment.getBlogId());
         notifyCommentReceivers(comment, user.getId());
         noteEventService.track(user.getId(), comment.getBlogId(), EventType.COMMENT, null, null);
         return Result.ok(commentResult(comment.getId(), comment.getBlogId()));
     }
 
     private void notifyCommentReceivers(BlogComments comment, Long actorUserId) {
-        var blog = blogService.getById(comment.getBlogId());
+        var blog = noteService.getNoteEntity(comment.getBlogId());
         String title = blog == null ? "未命名笔记" : Objects.toString(blog.getTitle(), "未命名笔记");
         if (blog != null) {
             notificationService.notifyUser(blog.getUserId(), actorUserId, "COMMENT", "你的笔记有新评论",
@@ -313,9 +310,6 @@ public class NoteCommentsController {
         if (count <= 0) {
             return;
         }
-        blogService.update()
-                .setSql("comments = GREATEST(IFNULL(comments, 0) - " + count + ", 0)")
-                .eq("id", blogId)
-                .update();
+        noteService.decreaseCommentCount(blogId, count);
     }
 }
