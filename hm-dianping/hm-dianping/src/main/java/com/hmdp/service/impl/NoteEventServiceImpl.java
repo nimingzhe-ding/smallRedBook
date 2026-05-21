@@ -1,10 +1,13 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.entity.NoteEvent;
+import com.hmdp.entity.Blog;
 import com.hmdp.enums.EventType;
 import com.hmdp.mapper.NoteEventMapper;
+import com.hmdp.service.IBlogService;
 import com.hmdp.service.INoteEventService;
 import com.hmdp.utils.RedisConstants;
+import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +42,8 @@ public class NoteEventServiceImpl implements INoteEventService {
     private NoteEventMapper noteEventMapper;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private IBlogService blogService;
 
     private final ExecutorService noteEventExecutor = Executors.newSingleThreadExecutor();
 
@@ -62,6 +67,7 @@ public class NoteEventServiceImpl implements INoteEventService {
         event.setScene(scene);
         event.setKeyword(keyword);
         event.setCreateTime(LocalDateTime.now());
+        updateRealtimeSignals(event);
         try {
             stringRedisTemplate.opsForStream().add(RedisConstants.NOTE_EVENT_STREAM_KEY, toStreamMap(event));
         } catch (Exception e) {
@@ -87,6 +93,7 @@ public class NoteEventServiceImpl implements INoteEventService {
             if (event.getCreateTime() == null) {
                 event.setCreateTime(now);
             }
+            updateRealtimeSignals(event);
             try {
                 stringRedisTemplate.opsForStream().add(RedisConstants.NOTE_EVENT_STREAM_KEY, toStreamMap(event));
             } catch (Exception e) {
@@ -134,6 +141,107 @@ public class NoteEventServiceImpl implements INoteEventService {
             noteEventMapper.insert(event);
         } catch (Exception e) {
             log.warn("行为事件落库失败: event={}, error={}", event, e.getMessage());
+        }
+    }
+
+    private void updateRealtimeSignals(NoteEvent event) {
+        if (event == null || StrUtil.isBlank(event.getEventType())) {
+            return;
+        }
+        EventType type;
+        try {
+            type = EventType.valueOf(event.getEventType().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        updateHotSearch(type, event.getKeyword());
+        updateUserInterest(event.getUserId(), event.getBlogId(), event.getKeyword(), type);
+    }
+
+    private void updateHotSearch(EventType type, String keyword) {
+        if (type != EventType.SEARCH || StrUtil.isBlank(keyword)) {
+            return;
+        }
+        try {
+            String normalizedKeyword = StrUtil.sub(StrUtil.trim(keyword), 0, 64);
+            stringRedisTemplate.opsForZSet().incrementScore(RedisConstants.HOT_SEARCH_KEY, normalizedKeyword, 1);
+            stringRedisTemplate.expire(RedisConstants.HOT_SEARCH_KEY,
+                    RedisConstants.HOT_SEARCH_TTL, java.util.concurrent.TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.debug("更新热搜缓存失败: keyword={}, error={}", keyword, e.getMessage());
+        }
+    }
+
+    private void updateUserInterest(Long userId, Long blogId, String keyword, EventType type) {
+        if (userId == null) {
+            return;
+        }
+        int weight = eventWeight(type);
+        if (weight == 0) {
+            return;
+        }
+        try {
+            String key = RedisConstants.USER_INTEREST_KEY + userId;
+            if (type == EventType.SEARCH && StrUtil.isNotBlank(keyword)) {
+                stringRedisTemplate.opsForZSet().incrementScore(key, StrUtil.sub(StrUtil.trim(keyword), 0, 32), weight);
+            }
+            if (blogId != null) {
+                Blog blog = blogService.getById(blogId);
+                if (blog != null) {
+                    for (String tag : extractInterestWords(blog)) {
+                        stringRedisTemplate.opsForZSet().incrementScore(key, tag, weight);
+                    }
+                }
+            }
+            stringRedisTemplate.expire(key, RedisConstants.USER_INTEREST_TTL, java.util.concurrent.TimeUnit.DAYS);
+        } catch (Exception e) {
+            log.debug("更新用户兴趣失败: userId={}, blogId={}, type={}, error={}",
+                    userId, blogId, type, e.getMessage());
+        }
+    }
+
+    private int eventWeight(EventType type) {
+        return switch (type) {
+            case SEARCH -> 1;
+            case IMPRESSION -> 0;
+            case CLICK, DETAIL, PLAY, DWELL -> 2;
+            case LIKE, COMMENT, SHARE -> 3;
+            case COLLECT, PURCHASE -> 5;
+            case UNCOLLECT -> -3;
+        };
+    }
+
+    private java.util.List<String> extractInterestWords(Blog blog) {
+        java.util.LinkedHashSet<String> words = new java.util.LinkedHashSet<>();
+        addCsvWords(words, blog.getTags());
+        addTopicWords(words, blog.getContent());
+        if (StrUtil.isNotBlank(blog.getContentType())) {
+            words.add(blog.getContentType());
+        }
+        return words.stream().limit(8).toList();
+    }
+
+    private void addCsvWords(java.util.Set<String> words, String value) {
+        if (StrUtil.isBlank(value)) {
+            return;
+        }
+        for (String item : value.split(",")) {
+            String word = StrUtil.sub(StrUtil.trim(item), 0, 32);
+            if (StrUtil.isNotBlank(word)) {
+                words.add(word);
+            }
+        }
+    }
+
+    private void addTopicWords(java.util.Set<String> words, String content) {
+        if (StrUtil.isBlank(content)) {
+            return;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("#([\\p{IsHan}\\w\\-]{1,30})")
+                .matcher(content);
+        while (matcher.find()) {
+            words.add(matcher.group(1));
         }
     }
 

@@ -9,7 +9,7 @@ window.state = {
   loading: false,
   hasMore: true,
   query: "",
-  feed: "hot",
+  feed: "recommend",
   mode: "feed",
   mallCategory: "all",
   mallQuery: "",

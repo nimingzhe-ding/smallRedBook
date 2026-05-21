@@ -73,9 +73,12 @@ public class BlogCollectServiceImpl extends ServiceImpl<BlogCollectMapper, BlogC
                 }
             }
         } else {
-            remove(new QueryWrapper<BlogCollect>()
+            boolean removed = remove(new QueryWrapper<BlogCollect>()
                     .eq("user_id", userId)
                     .eq("blog_id", blogId));
+            if (removed) {
+                noteEventService.track(userId, blogId, EventType.UNCOLLECT, null, null);
+            }
         }
         return Result.ok();
     }

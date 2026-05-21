@@ -89,6 +89,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private INoteEventService noteEventService;
 
     private static final Pattern TOPIC_PATTERN = Pattern.compile("#([\\p{IsHan}\\w\\-]{1,30})");
+    private static final Pattern AD_PATTERN = Pattern.compile("(加微信|加vx|v信|返现|刷单|兼职|私聊返|平台代理|\\d{6,})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ABUSE_PATTERN = Pattern.compile("(垃圾|傻[子逼]|滚|死|骗子)");
 
     /**
      * 保存博文
@@ -126,7 +128,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             throw new BusinessException(ErrorCode.OPERATION_FAIL, "新增博文失败！");
         }
         saveBlogProducts(blog.getId(), productIds);
-        syncBlogTopics(blog.getContent());
+        syncBlogTopics(blog);
         List<Follow> follows = followService.query().eq("follow_user_id", id).list();
         //推送粉丝
         for (Follow follow : follows) {
@@ -176,7 +178,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .eq("user_id", user.getId())
                 .update();
         replaceBlogProducts(id, productIds);
-        syncBlogTopics(blog.getContent());
+        syncBlogTopics(blog);
         return Result.ok(id);
     }
 
@@ -231,6 +233,18 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (blog.getContent().trim().length() > 5000) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "正文不能超过5000个字");
         }
+        if (blog.getContent().trim().length() < 12) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "正文至少需要12个字，补充真实体验后再发布");
+        }
+        if (isLowQualityText(blog.getTitle(), blog.getContent())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "内容过于重复，建议补充具体体验、价格、环境或使用感受");
+        }
+        if (AD_PATTERN.matcher(joinText(blog.getTitle(), blog.getContent(), blog.getTags())).find()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "内容疑似广告、刷评或引流，请修改后再发布");
+        }
+        if (ABUSE_PATTERN.matcher(joinText(blog.getTitle(), blog.getContent(), blog.getTags())).find()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "内容包含不友善表达，请修改后再发布");
+        }
         boolean videoNote = ContentType.VIDEO.name().equals(contentType) || ContentType.LIVE.name().equals(contentType);
         if (videoNote && StrUtil.isBlank(blog.getVideoUrl())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "视频笔记需要上传视频或填写视频地址");
@@ -254,19 +268,45 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .stream()
                 .map(String::trim)
                 .filter(StrUtil::isNotBlank)
+                .map(tag -> StrUtil.sub(tag.replace("#", ""), 0, 32))
                 .distinct()
                 .limit(6)
                 .collect(Collectors.joining(","));
     }
 
-    private void syncBlogTopics(String content) {
-        if (StrUtil.isBlank(content)) {
+    private boolean isLowQualityText(String title, String content) {
+        String compact = joinText(title, content, "").replaceAll("\\s+", "");
+        if (compact.length() < 20) {
+            return true;
+        }
+        long distinctChars = compact.chars().distinct().count();
+        return distinctChars <= 6 && compact.length() >= 20;
+    }
+
+    private String joinText(String title, String content, String tags) {
+        return StrUtil.blankToDefault(title, "") + " " + StrUtil.blankToDefault(content, "") + " " + StrUtil.blankToDefault(tags, "");
+    }
+
+    private void syncBlogTopics(Blog blog) {
+        if (blog == null) {
             return;
         }
-        Matcher matcher = TOPIC_PATTERN.matcher(content);
+        String searchableText = joinText(blog.getTitle(), blog.getContent(), blog.getTags());
+        if (StrUtil.isBlank(searchableText)) {
+            return;
+        }
+        Matcher matcher = TOPIC_PATTERN.matcher(searchableText);
         Set<String> topics = new java.util.LinkedHashSet<>();
         while (matcher.find()) {
             topics.add(matcher.group(1));
+        }
+        if (StrUtil.isNotBlank(blog.getTags())) {
+            for (String tag : blog.getTags().split(",")) {
+                String keyword = StrUtil.sub(StrUtil.trim(tag), 0, 32);
+                if (StrUtil.isNotBlank(keyword)) {
+                    topics.add(keyword);
+                }
+            }
         }
         for (String keyword : topics) {
             ContentTopic topic = contentTopicMapper.selectOne(new QueryWrapper<ContentTopic>().eq("keyword", keyword).last("limit 1"));

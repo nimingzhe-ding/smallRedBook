@@ -143,7 +143,9 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (StrUtil.isBlank(keyword)) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "搜索词不能为空");
         }
-        saveSearchHistory(UserHolder.getUser(), keyword);
+        UserDTO currentUser = UserHolder.getUser();
+        saveSearchHistory(currentUser, keyword);
+        noteEventService.track(currentUser == null ? null : currentUser.getId(), null, EventType.SEARCH, "search", keyword);
         int pageNo = normalizePage(current);
         Page<Blog> notePage = buildFeedQuery("hot", keyword, pageNo, null, null);
         List<ContentNoteDTO> notes = toNoteDTOs(notePage.getRecords());
@@ -519,22 +521,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         }
         // 个性化推荐：基于用户兴趣画像
         if ("recommend".equals(normalizedChannel)) {
-            UserDTO user = UserHolder.getUser();
-            if (user != null) {
-                String interestKey = RedisConstants.USER_INTEREST_KEY + user.getId();
-                Set<String> topTags = stringRedisTemplate.opsForZSet().reverseRange(interestKey, 0, 4);
-                if (topTags != null && !topTags.isEmpty()) {
-                    wrapper.and(w -> {
-                        boolean[] first = {true};
-                        for (String tag : topTags) {
-                            if (!first[0]) w.or();
-                            w.like("tags", tag);
-                            first[0] = false;
-                        }
-                    });
-                }
-            }
-            wrapper.last(orderByRecommendScore(72));
+            wrapper.last(orderByPersonalRecommendScore(72));
             return wrapper.page(page);
         }
         if ("follow".equals(normalizedChannel)) {
@@ -597,6 +584,47 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     private String orderByRecommendScore(int freshHours) {
         return "ORDER BY (" + recommendScoreSql(freshHours) + ") DESC, create_time DESC";
+    }
+
+    private String orderByPersonalRecommendScore(int freshHours) {
+        Set<String> topTags = topInterestTags();
+        if (topTags.isEmpty()) {
+            return orderByRecommendScore(freshHours);
+        }
+        StringBuilder tagScore = new StringBuilder();
+        int index = 0;
+        for (String tag : topTags) {
+            if (StrUtil.isBlank(tag)) {
+                continue;
+            }
+            if (tagScore.length() > 0) {
+                tagScore.append(" + ");
+            }
+            String escaped = tag.replace("'", "''").replace("%", "\\%").replace("_", "\\_");
+            int weight = Math.max(2, 10 - index * 2);
+            tagScore.append("CASE WHEN tags LIKE '%").append(escaped).append("%' OR content LIKE '%")
+                    .append(escaped).append("%' OR title LIKE '%").append(escaped)
+                    .append("%' THEN ").append(weight).append(" ELSE 0 END");
+            index++;
+        }
+        if (tagScore.length() == 0) {
+            return orderByRecommendScore(freshHours);
+        }
+        return "ORDER BY (" + recommendScoreSql(freshHours) + " + " + tagScore + ") DESC, create_time DESC";
+    }
+
+    private Set<String> topInterestTags() {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            return Set.of();
+        }
+        try {
+            Set<String> tags = stringRedisTemplate.opsForZSet()
+                    .reverseRange(RedisConstants.USER_INTEREST_KEY + user.getId(), 0, 4);
+            return tags == null ? Set.of() : tags;
+        } catch (Exception e) {
+            return Set.of();
+        }
     }
 
     private String recommendScoreSql(int freshHours) {
