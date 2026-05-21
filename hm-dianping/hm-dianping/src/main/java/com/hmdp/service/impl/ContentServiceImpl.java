@@ -75,6 +75,10 @@ import java.util.stream.Collectors;
 @Service
 public class ContentServiceImpl implements IContentService, NoteService, ProfileService, RecommendationService {
 
+    private static final int CONTENT_STATUS_NORMAL = 0;
+    private static final int CONTENT_STATUS_REPORTED = 1;
+    private static final int CONTENT_STATUS_HIDDEN = 2;
+
     @Resource
     private IBlogService blogService;
 
@@ -178,6 +182,9 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (blog == null) {
             throw new BusinessException(ErrorCode.BLOG_NOT_EXIST);
         }
+        if (!canViewBlog(blog)) {
+            throw new BusinessException(ErrorCode.BLOG_NOT_EXIST);
+        }
         ContentNoteDTO note = toNoteDTO(blog);
         note.setCreatorGrowth(buildCreatorGrowth(blog.getUserId()));
         note.setRelatedNotes(findRelatedNotes(blog));
@@ -201,6 +208,30 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
     @Override
     public Result deleteOwnNote(Long noteId) {
         return blogService.deleteOwnBlog(noteId);
+    }
+
+    @Override
+    public Result reportNote(Long noteId) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        }
+        if (noteId == null) {
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "笔记ID不能为空");
+        }
+        Blog blog = blogService.getById(noteId);
+        if (blog == null || CONTENT_STATUS_HIDDEN == statusOf(blog)) {
+            throw new BusinessException(ErrorCode.BLOG_NOT_EXIST);
+        }
+        if (blog.getUserId() != null && blog.getUserId().equals(user.getId())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能举报自己的笔记");
+        }
+        blogService.update()
+                .set("status", CONTENT_STATUS_REPORTED)
+                .eq("id", noteId)
+                .ne("status", CONTENT_STATUS_HIDDEN)
+                .update();
+        return Result.ok(noteId);
     }
 
     @Override
@@ -266,6 +297,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         int pageNo = normalizePage(current);
         Page<Blog> page = blogService.query()
                 .eq("user_id", userId)
+                .eq("status", CONTENT_STATUS_NORMAL)
                 .orderByDesc("create_time")
                 .page(new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE));
         return Result.ok(toFeedResult(page, null));
@@ -516,6 +548,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         String normalizedChannel = StrUtil.blankToDefault(channel, "hot");
         Page<Blog> page = new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE);
         var wrapper = blogService.query();
+        wrapper.eq("status", CONTENT_STATUS_NORMAL);
         if (StrUtil.isNotBlank(query)) {
             wrapper.and(w -> w.like("title", query).or().like("content", query).or().like("tags", query));
         }
@@ -655,7 +688,8 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             return List.of();
         }
         QueryWrapper<Blog> wrapper = new QueryWrapper<Blog>()
-                .ne("id", source.getId());
+                .ne("id", source.getId())
+                .eq("status", CONTENT_STATUS_NORMAL);
         List<String> tags = splitTags(source.getTags());
         if (!tags.isEmpty() || StrUtil.isNotBlank(source.getContentType()) || source.getShopId() != null) {
             wrapper.and(w -> {
@@ -691,6 +725,24 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                 .distinct()
                 .limit(6)
                 .toList();
+    }
+
+    private boolean canViewBlog(Blog blog) {
+        if (blog == null) {
+            return false;
+        }
+        if (statusOf(blog) == CONTENT_STATUS_NORMAL) {
+            return true;
+        }
+        if (statusOf(blog) == CONTENT_STATUS_HIDDEN) {
+            return false;
+        }
+        UserDTO user = UserHolder.getUser();
+        return user != null && blog.getUserId() != null && blog.getUserId().equals(user.getId());
+    }
+
+    private int statusOf(Blog blog) {
+        return blog == null || blog.getStatus() == null ? CONTENT_STATUS_NORMAL : blog.getStatus();
     }
 
     private List<MallProduct> searchProducts(String keyword, int pageNo) {
@@ -759,6 +811,9 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         List<Blog> blogs = blogService.query().in("id", blogIds).list();
         Map<Long, Blog> blogMap = new LinkedHashMap<>();
         for (Blog blog : blogs) {
+            if (!canViewBlog(blog)) {
+                continue;
+            }
             blogMap.put(blog.getId(), blog);
         }
         List<Blog> orderedBlogs = new ArrayList<>();
@@ -861,6 +916,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         dto.setContent(blog.getContent());
         dto.setLiked(blog.getLiked() == null ? 0 : blog.getLiked());
         dto.setComments(blog.getComments() == null ? 0 : blog.getComments());
+        dto.setStatus(statusOf(blog));
         dto.setCreateTime(blog.getCreateTime());
         dto.setShop(buildShopDTO(blog.getShopId()));
 
@@ -1209,6 +1265,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (results.size() < 8) {
             List<Blog> blogs = blogService.query()
                     .select("title")
+                    .eq("status", CONTENT_STATUS_NORMAL)
                     .likeRight("title", keyword)
                     .orderByDesc("liked")
                     .last("limit 5")
@@ -1331,6 +1388,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (heatMap.size() < 5) {
             List<Blog> hotBlogs = blogService.query()
                     .select("title", "liked")
+                    .eq("status", CONTENT_STATUS_NORMAL)
                     .isNotNull("title")
                     .orderByDesc("liked")
                     .last("limit " + (limit - heatMap.size()))

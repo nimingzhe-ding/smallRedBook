@@ -7,6 +7,7 @@ import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +32,11 @@ public class VideoDanmakuController {
     @PostMapping
     public Result send(@RequestBody VideoDanmaku danmaku) {
         return danmakuService.send(danmaku);
+    }
+
+    @PutMapping("/{id}/report")
+    public Result report(@PathVariable("id") Long id) {
+        return danmakuService.report(id);
     }
 
     @GetMapping("/stream/{blogId}")

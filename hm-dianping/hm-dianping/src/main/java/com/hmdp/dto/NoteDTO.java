@@ -20,6 +20,7 @@ public class NoteDTO {
     private String content;
     private Integer liked;
     private Integer comments;
+    private Integer status;
     private Long collects;
     private String name;
     private String icon;

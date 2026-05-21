@@ -109,6 +109,11 @@ public class NotesController {
         return noteService.deleteOwnNote(noteId);
     }
 
+    @PutMapping("/{id}/report")
+    public Result report(@PathVariable("id") Long noteId) {
+        return noteService.reportNote(noteId);
+    }
+
     // ======================== 点赞 ========================
 
     /**

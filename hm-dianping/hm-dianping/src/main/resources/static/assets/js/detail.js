@@ -46,6 +46,11 @@
     document.querySelector("#drawerCollect").onclick = () => toggleCollect(note);
     document.querySelector("#drawerFollow").onclick = () => toggleFollow(note);
     document.querySelector("#drawerShare").onclick = () => shareNote(note);
+    const reportButton = document.querySelector("#drawerReport");
+    if (reportButton) {
+      reportButton.hidden = Boolean(note.isOwner);
+      reportButton.onclick = () => reportNote(note);
+    }
     document.querySelector("#drawerAnalyze").hidden = true;
     document.querySelector("#drawerAnalyze").onclick = () => analyzeCurrentNote(note);
     const editButton = document.querySelector("#drawerEdit");
@@ -369,6 +374,23 @@
     }
   }
 
+  async function reportNote(note) {
+    if (!note?.id || !requireLogin()) return;
+    try {
+      await request(`/notes/${note.id}/report`, { method: "PUT" });
+      state.notes = state.notes.filter(item => String(item.id) !== String(note.id));
+      state.videoNotes = state.videoNotes.filter(item => String(item.id) !== String(note.id));
+      document.querySelectorAll(".note-card").forEach(card => {
+        const title = card.querySelector(".note-title")?.textContent || "";
+        if (title === note.title) card.remove();
+      });
+      closeDrawer();
+      showStatus("已提交举报，内容将进入运营审核。");
+    } catch (error) {
+      showStatus(error.message || "举报失败，请稍后再试。");
+    }
+  }
+
   // Export cross-module functions
   window.openDrawer = openDrawer;
   window.renderCreatorGrowth = renderCreatorGrowth;
@@ -378,4 +400,5 @@
   window.loadCollectState = loadCollectState;
   window.toggleFollow = toggleFollow;
   window.shareNote = shareNote;
+  window.reportNote = reportNote;
 })();

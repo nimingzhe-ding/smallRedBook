@@ -28,7 +28,7 @@ public class VideoDanmaku implements Serializable {
     private String content;
     private Integer videoSecond;
     private Integer lane;
-    private Boolean status;
+    private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

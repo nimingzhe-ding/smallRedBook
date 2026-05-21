@@ -3,6 +3,7 @@
 USE hmdp;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
+DROP PROCEDURE IF EXISTS add_index_if_missing;
 DELIMITER //
 CREATE PROCEDURE add_column_if_missing(
   IN p_table_name varchar(64),
@@ -17,6 +18,25 @@ BEGIN
       AND column_name = p_column_name
   ) THEN
     SET @ddl = CONCAT('ALTER TABLE `', p_table_name, '` ADD COLUMN `', p_column_name, '` ', p_column_definition);
+    PREPARE stmt FROM @ddl;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END//
+
+CREATE PROCEDURE add_index_if_missing(
+  IN p_table_name varchar(64),
+  IN p_index_name varchar(64),
+  IN p_index_definition text
+)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = p_table_name
+      AND index_name = p_index_name
+  ) THEN
+    SET @ddl = CONCAT('ALTER TABLE `', p_table_name, '` ', p_index_definition);
     PREPARE stmt FROM @ddl;
     EXECUTE stmt;
     DEALLOCATE PREPARE stmt;
@@ -357,3 +377,13 @@ VALUES
   (501, 5, '家居日用', 2, 10, 1),
   (502, 5, '个护清洁', 2, 20, 1)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `status` = VALUES(`status`);
+
+-- Content governance: 0=normal, 1=reported, 2=hidden.
+CALL add_column_if_missing('tb_blog', 'status', 'tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT ''content governance status'' AFTER `comments`');
+UPDATE `tb_blog` SET `status` = 0 WHERE `status` IS NULL;
+CALL add_index_if_missing('tb_blog', 'idx_blog_status_time', 'ADD INDEX `idx_blog_status_time` (`status`, `create_time`)');
+
+UPDATE `tb_video_danmaku` SET `status` = 0 WHERE `status` IS NULL;
+ALTER TABLE `tb_video_danmaku`
+  MODIFY COLUMN `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT 'content governance status';
+CALL add_index_if_missing('tb_video_danmaku', 'idx_danmaku_status_time', 'ADD INDEX `idx_danmaku_status_time` (`status`, `update_time`, `create_time`)');

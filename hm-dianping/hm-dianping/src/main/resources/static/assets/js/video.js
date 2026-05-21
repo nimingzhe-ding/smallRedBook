@@ -29,6 +29,7 @@ function renderVideoFeed() {
         <button type="button" data-video-like="${note.id}"><span>♥</span><small>${note.liked || 0}</small></button>
         <button type="button" data-video-comment="${note.id}"><span>评</span><small>${note.comments || 0}</small></button>
         <button type="button" data-video-buy="${note.id}"><span>购</span><small>同款</small></button>
+        <button type="button" data-video-report-note="${note.id}"><span>!</span><small>举报</small></button>
         <button type="button" data-video-open="${note.id}"><span>···</span><small>详情</small></button>
       </div>
       <form class="danmaku-form" data-danmaku-form="${note.id}">
@@ -105,6 +106,12 @@ function bindVideoFeedEvents(videos) {
       }
       if (note?.shop) openDrawer(note);
       else switchMall();
+    });
+  });
+  els.videoFeed.querySelectorAll("[data-video-report-note]").forEach(button => {
+    button.addEventListener("click", () => {
+      const note = videos.find(item => String(item.id) === String(button.dataset.videoReportNote));
+      if (note) reportNote(note);
     });
   });
   els.videoFeed.querySelectorAll("[data-danmaku-form]").forEach(form => {
@@ -238,7 +245,7 @@ function receiveRealtimeDanmaku(noteId, item) {
   const currentSecond = Math.floor(video?.currentTime || 0);
   if (Math.abs(Number(item.videoSecond || 0) - currentSecond) <= 1) {
     const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
-    if (layer) shootDanmaku(layer, item.content || "", item.lane);
+    if (layer) shootDanmaku(layer, item.content || "", item.lane, item.id);
     item.__shownAtSecond = Number(item.videoSecond || 0);
   }
 }
@@ -262,14 +269,19 @@ function renderDanmaku(noteId, currentSecond) {
     .slice(0, 8)
     .forEach((item, index) => {
       item.__shownAtSecond = currentSecond;
-      shootDanmaku(layer, item.content || item.text || item, item.lane ?? index % 5);
+      shootDanmaku(layer, item.content || item.text || item, item.lane ?? index % 5, item.id);
     });
 }
 
-function shootDanmaku(layer, text, lane) {
+function shootDanmaku(layer, text, lane, danmakuId) {
   const item = document.createElement("span");
   item.className = "danmaku-item";
   item.textContent = text;
+  if (danmakuId != null) {
+    item.dataset.danmakuId = String(danmakuId);
+    item.title = "双击举报弹幕";
+    item.addEventListener("dblclick", () => reportDanmaku(danmakuId), { once: true });
+  }
   const laneNumber = Number(lane);
   const track = Number.isInteger(laneNumber) ? ((laneNumber % 5) + 5) % 5 : Math.floor(Math.random() * 5);
   item.style.setProperty("--lane", String(track));
@@ -410,9 +422,24 @@ async function submitDanmaku(event) {
     state.danmakuStore[noteId] = list;
     input.value = "";
     const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
-    if (layer) shootDanmaku(layer, text, payload.lane);
+    if (layer) shootDanmaku(layer, text, payload.lane, saved?.id);
   } catch (error) {
     showStatus(error.message || "弹幕发送失败。");
+  }
+}
+
+async function reportDanmaku(danmakuId) {
+  if (!danmakuId || !requireLogin()) return;
+  try {
+    await request(`/video-danmaku/${danmakuId}/report`, { method: "PUT" });
+    Object.keys(state.danmakuStore).forEach(key => {
+      state.danmakuStore[key] = (state.danmakuStore[key] || [])
+        .filter(item => String(item.id) !== String(danmakuId));
+    });
+    document.querySelectorAll(`[data-danmaku-id="${danmakuId}"]`).forEach(item => item.remove());
+    showStatus("已提交弹幕举报。");
+  } catch (error) {
+    showStatus(error.message || "弹幕举报失败。");
   }
 }
 
@@ -468,6 +495,7 @@ window.receiveRealtimeDanmaku = receiveRealtimeDanmaku;
 window.dedupeDanmaku = dedupeDanmaku;
 window.renderDanmaku = renderDanmaku;
 window.shootDanmaku = shootDanmaku;
+window.reportDanmaku = reportDanmaku;
 window.filterDanmakuList = filterDanmakuList;
 window.videoStateKey = videoStateKey;
 window.loadVideoState = loadVideoState;

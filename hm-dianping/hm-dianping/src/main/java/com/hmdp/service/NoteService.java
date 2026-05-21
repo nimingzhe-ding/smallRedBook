@@ -32,6 +32,8 @@ public interface NoteService {
 
     Result deleteOwnNote(Long noteId);
 
+    Result reportNote(Long noteId);
+
     Blog getNoteEntity(Long noteId);
 
     boolean increaseCommentCount(Long noteId);

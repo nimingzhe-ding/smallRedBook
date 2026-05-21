@@ -31,6 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, VideoDanmaku> implements IVideoDanmakuService {
 
+    public static final int STATUS_NORMAL = 0;
+    public static final int STATUS_REPORTED = 1;
+    public static final int STATUS_HIDDEN = 2;
     private static final long SSE_TIMEOUT = 30 * 60 * 1000L;
     private final Map<Long, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -49,7 +52,7 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         }
         List<Map<String, Object>> list = query()
                 .eq("blog_id", blogId)
-                .eq("status", false)
+                .eq("status", STATUS_NORMAL)
                 .orderByAsc("video_second")
                 .last("LIMIT 300")
                 .list()
@@ -82,11 +85,35 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         danmaku.setContent(StrUtil.sub(danmaku.getContent().trim(), 0, 40));
         danmaku.setVideoSecond(Math.max(0, danmaku.getVideoSecond() == null ? 0 : danmaku.getVideoSecond()));
         danmaku.setLane(danmaku.getLane() == null ? null : Math.floorMod(danmaku.getLane(), 5));
-        danmaku.setStatus(false);
+        danmaku.setStatus(STATUS_NORMAL);
         save(danmaku);
         Map<String, Object> view = toView(danmaku);
         broadcast(danmaku.getBlogId(), view);
         return Result.ok(view);
+    }
+
+    @Override
+    public Result report(Long danmakuId) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        }
+        if (danmakuId == null) {
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "弹幕ID不能为空");
+        }
+        VideoDanmaku danmaku = getById(danmakuId);
+        if (danmaku == null || danmaku.getStatus() != null && danmaku.getStatus() == STATUS_HIDDEN) {
+            throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "弹幕不存在");
+        }
+        if (danmaku.getUserId() != null && danmaku.getUserId().equals(user.getId())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能举报自己的弹幕");
+        }
+        update()
+                .set("status", STATUS_REPORTED)
+                .eq("id", danmakuId)
+                .ne("status", STATUS_HIDDEN)
+                .update();
+        return Result.ok(danmakuId);
     }
 
     @Override
