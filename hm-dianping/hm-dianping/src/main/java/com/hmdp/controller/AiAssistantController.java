@@ -120,11 +120,12 @@ public class AiAssistantController {
 
     @PostMapping("/flow/customer-service")
     public Result customerServiceFlow(@RequestBody AiFlowRequest request) {
-        UserDTO user = UserHolder.getUser();
-        MallOrder order = loadOwnedMallOrder(request, user);
-        MallProduct product = loadCustomerServiceProduct(request, order);
-        Voucher voucher = loadCustomerServiceVoucher(request, product);
+        CustomerServiceContext context = buildCustomerServiceContext(request);
         String question = text(request == null ? null : request.getQuery());
+        String ruleAnswer = customerServiceFallback(question, context);
+        if (context.shouldAnswerByRule(question)) {
+            return Result.ok(customerServiceResponse(context, ruleAnswer));
+        }
         return safeFlow("AI 客服", request, """
                 用户咨询：%s
                 当前登录用户：%s
@@ -132,10 +133,14 @@ public class AiAssistantController {
                 订单信息：%s
                 商品信息：%s
                 优惠券信息：%s
+                安全要求：
+                1. 未登录时不得查询或猜测订单信息。
+                2. 订单不存在或不属于当前用户时，只能提示用户核对订单，不能输出任何订单细节。
+                3. 只允许基于上方业务上下文回答，不要编造物流单号、退款进度、库存或优惠券。
                 请按客服口吻回答，涉及退款、物流、库存、支付、取消时说明当前系统状态、可操作按钮和下一步建议。
-                """.formatted(question, user == null ? "未登录" : user.getId(), text(request == null ? null : request.getScenario()),
-                orderText(order), productText(product), voucherText(voucher)),
-                customerServiceFallback(question, request, user, order, product, voucher));
+                """.formatted(question, context.user == null ? "未登录" : context.user.getId(), text(request == null ? null : request.getScenario()),
+                orderText(context.order), productText(context.product), voucherText(context.voucher)),
+                ruleAnswer);
     }
 
     @PostMapping("/flow/recommend-reason")
@@ -185,15 +190,28 @@ public class AiAssistantController {
         }
     }
 
+    private CustomerServiceContext buildCustomerServiceContext(AiFlowRequest request) {
+        UserDTO user = UserHolder.getUser();
+        boolean orderRequested = request != null && request.getOrderId() != null;
+        MallOrder order = orderRequested && user != null ? loadOwnedMallOrder(request, user) : null;
+        boolean orderDenied = orderRequested && order == null;
+        if (orderDenied) {
+            return new CustomerServiceContext(request, user, null, null, null, true, true);
+        }
+        MallProduct product = loadCustomerServiceProduct(request, order);
+        Voucher voucher = loadCustomerServiceVoucher(request, order, product);
+        return new CustomerServiceContext(request, user, order, product, voucher, orderRequested, orderDenied);
+    }
+
     private MallOrder loadOwnedMallOrder(AiFlowRequest request, UserDTO user) {
         if (request == null || request.getOrderId() == null || user == null) {
             return null;
         }
-        MallOrder order = orderService.getById(request.getOrderId());
-        if (order == null || !user.getId().equals(order.getUserId())) {
-            return null;
-        }
-        return order;
+        return orderService.query()
+                .eq("id", request.getOrderId())
+                .eq("user_id", user.getId())
+                .last("limit 1")
+                .one();
     }
 
     private MallProduct loadCustomerServiceProduct(AiFlowRequest request, MallOrder order) {
@@ -206,9 +224,12 @@ public class AiAssistantController {
         return productId == null ? null : productService.getById(productId);
     }
 
-    private Voucher loadCustomerServiceVoucher(AiFlowRequest request, MallProduct product) {
+    private Voucher loadCustomerServiceVoucher(AiFlowRequest request, MallOrder order, MallProduct product) {
         if (request != null && request.getVoucherId() != null) {
             return voucherService.getById(request.getVoucherId());
+        }
+        if (order != null && order.getVoucherId() != null) {
+            return voucherService.getById(order.getVoucherId());
         }
         if (product == null) {
             return null;
@@ -223,19 +244,39 @@ public class AiAssistantController {
                 .one();
     }
 
-    private String customerServiceFallback(String question, AiFlowRequest request, UserDTO user, MallOrder order, MallProduct product, Voucher voucher) {
+    private AiChatResponse customerServiceResponse(CustomerServiceContext context, String answer) {
+        String sessionId = StrUtil.blankToDefault(context.request == null ? null : context.request.getSessionId(), "AI 客服");
+        Long currentUserId = context.user == null ? null : context.user.getId();
+        return new AiChatResponse(AiScene.FLOW.getCode(), sessionId, answer,
+                java.util.List.of("rule:customer-service"), currentUserId, java.time.LocalDateTime.now());
+    }
+
+    private String customerServiceFallback(String question, CustomerServiceContext context) {
+        return customerServiceFallback(question, context.request, context.user, context.order, context.product, context.voucher,
+                context.orderRequested, context.orderDenied);
+    }
+
+    private String customerServiceFallback(String question, AiFlowRequest request, UserDTO user, MallOrder order,
+                                           MallProduct product, Voucher voucher) {
+        boolean orderRequested = request != null && request.getOrderId() != null;
+        boolean orderDenied = orderRequested && order == null;
+        return customerServiceFallback(question, request, user, order, product, voucher, orderRequested, orderDenied);
+    }
+
+    private String customerServiceFallback(String question, AiFlowRequest request, UserDTO user, MallOrder order,
+                                           MallProduct product, Voucher voucher, boolean orderRequested, boolean orderDenied) {
         String normalizedQuestion = StrUtil.blankToDefault(question, "").toLowerCase();
-        if (request != null && request.getOrderId() != null && user == null) {
+        if (orderRequested && user == null) {
             return "我可以帮你查订单，但需要先登录当前账号。登录后打开“我的订单”，再输入订单问题，我会结合订单状态、物流和售后信息回答。";
         }
-        if (request != null && request.getOrderId() != null && order == null) {
+        if (orderDenied) {
             return "没有查到这个订单，或该订单不属于当前登录账号。请确认订单号后，在“我的订单”里重新发起咨询。";
         }
         if (order != null) {
             return orderServiceFallback(normalizedQuestion, order, product, voucher);
         }
-        if (product != null) {
-            return productServiceFallback(normalizedQuestion, product, voucher);
+        if (user == null && isPersonalOrderQuestion(normalizedQuestion, request)) {
+            return "涉及你的订单状态、物流或售后进度时，需要先登录当前账号。登录后从“我的订单”进入咨询，我才能按订单归属查询并回答。";
         }
         if (containsAny(normalizedQuestion, "登录", "验证码", "手机")) {
             return "登录方式是手机号验证码登录：先点“登录”，输入手机号获取验证码；验证码会打印在后端日志里，本地调试时复制验证码完成登录。";
@@ -258,8 +299,14 @@ public class AiAssistantController {
             }
             return "平台支持店铺优惠券、商城商品券和秒杀券。秒杀券需要在活动时间内且库存充足时下单，同一用户不能重复抢同一张券。";
         }
+        if (containsAny(normalizedQuestion, "库存", "还有", "能买")) {
+            return "库存需要结合具体商品查询。请从商品详情页发起咨询，或在请求里带上 productId，我会返回当前商品库存和是否还能购买。";
+        }
         if (containsAny(normalizedQuestion, "投诉", "举报", "违规")) {
             return "如果遇到虚假商品、异常订单或不合适的笔记内容，可以先保留订单号/笔记信息。评论区支持举报，订单类问题建议从“我的订单”带订单号咨询，系统会避免泄露他人订单信息。";
+        }
+        if (product != null) {
+            return productServiceFallback(normalizedQuestion, product, voucher);
         }
         return "我可以回答登录、订单、支付、退款、物流、优惠券、商品库存等问题。你可以这样问：我的订单怎么退款、物流到哪了、这个商品还有库存吗。";
     }
@@ -362,6 +409,13 @@ public class AiAssistantController {
         return false;
     }
 
+    private boolean isPersonalOrderQuestion(String question, AiFlowRequest request) {
+        if (request != null && StrUtil.equalsIgnoreCase(request.getScenario(), "order")) {
+            return true;
+        }
+        return containsAny(question, "我的订单", "订单状态", "查订单", "物流到哪", "快递到哪", "退款进度", "售后进度");
+    }
+
     private boolean isStatus(MallOrder order, int... statuses) {
         if (order == null || order.getStatus() == null) return false;
         for (int status : statuses) {
@@ -438,5 +492,42 @@ public class AiAssistantController {
         return "订单号：" + order.getId() + "；商品：" + order.getProductTitle() + "；状态：" + order.getStatus()
                 + "；实付：" + money(order.getTotalAmount()) + "；收货地址：" + order.getReceiverAddress()
                 + "；物流：" + order.getLogisticsCompany() + "/" + order.getLogisticsNo();
+    }
+
+    private class CustomerServiceContext {
+        private final AiFlowRequest request;
+        private final UserDTO user;
+        private final MallOrder order;
+        private final MallProduct product;
+        private final Voucher voucher;
+        private final boolean orderRequested;
+        private final boolean orderDenied;
+
+        private CustomerServiceContext(AiFlowRequest request, UserDTO user, MallOrder order, MallProduct product,
+                                       Voucher voucher, boolean orderRequested, boolean orderDenied) {
+            this.request = request;
+            this.user = user;
+            this.order = order;
+            this.product = product;
+            this.voucher = voucher;
+            this.orderRequested = orderRequested;
+            this.orderDenied = orderDenied;
+        }
+
+        private boolean shouldAnswerByRule(String question) {
+            String normalizedQuestion = StrUtil.blankToDefault(question, "").toLowerCase();
+            if (orderRequested || orderDenied || isPersonalOrderQuestion(normalizedQuestion, request)) {
+                return true;
+            }
+            if (order != null) {
+                return true;
+            }
+            if (product != null && containsAny(normalizedQuestion, "库存", "还有", "能买", "优惠", "优惠券", "券")) {
+                return true;
+            }
+            return containsAny(normalizedQuestion, "退款", "退货", "售后", "物流", "快递", "发货",
+                    "库存", "还有", "能买", "优惠", "优惠券", "券", "满减", "抵扣")
+                    || voucher != null && containsAny(normalizedQuestion, "优惠", "优惠券", "券", "满减", "抵扣");
+        }
     }
 }
