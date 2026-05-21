@@ -11,6 +11,7 @@ import com.hmdp.enums.ErrorCode;
 import com.hmdp.enums.EventType;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.service.CommentService;
+import com.hmdp.service.ContentModerationService;
 import com.hmdp.service.NoteService;
 import com.hmdp.service.INoteEventService;
 import com.hmdp.service.IUserService;
@@ -57,6 +58,8 @@ public class NoteCommentsController {
 
     @Resource
     private INoteEventService noteEventService;
+    @Resource
+    private ContentModerationService contentModerationService;
 
     /**
      * 查询笔记评论流。
@@ -134,6 +137,7 @@ public class NoteCommentsController {
         if (comment.getContent() == null || comment.getContent().trim().isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "评论内容不能为空");
         }
+        contentModerationService.checkText("评论内容", comment.getContent());
         comment.setId(null);
         comment.setUserId(user.getId());
         Long parentId = comment.getParentId() == null ? 0L : comment.getParentId();

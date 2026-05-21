@@ -30,6 +30,7 @@ import com.hmdp.mapper.ContentTopicMapper;
 import com.hmdp.mapper.MallProductMapper;
 import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.service.ContentModerationService;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.INoteEventService;
 import com.hmdp.service.LikeService;
@@ -87,6 +88,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private IUserNotificationService notificationService;
     @Resource
     private INoteEventService noteEventService;
+    @Resource
+    private ContentModerationService contentModerationService;
 
     private static final Pattern TOPIC_PATTERN = Pattern.compile("#([\\p{IsHan}\\w\\-]{1,30})");
     private static final Pattern AD_PATTERN = Pattern.compile("(加微信|加vx|v信|返现|刷单|兼职|私聊返|平台代理|\\d{6,})", Pattern.CASE_INSENSITIVE);
@@ -245,6 +248,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (ABUSE_PATTERN.matcher(joinText(blog.getTitle(), blog.getContent(), blog.getTags())).find()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "内容包含不友善表达，请修改后再发布");
         }
+        contentModerationService.checkText("笔记内容", blog.getTitle(), blog.getContent(), blog.getTags());
         boolean videoNote = ContentType.VIDEO.name().equals(contentType) || ContentType.LIVE.name().equals(contentType);
         if (videoNote && StrUtil.isBlank(blog.getVideoUrl())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "视频笔记需要上传视频或填写视频地址");

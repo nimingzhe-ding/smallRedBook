@@ -10,6 +10,7 @@ import com.hmdp.enums.ContentType;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.mapper.VideoDanmakuMapper;
+import com.hmdp.service.ContentModerationService;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IVideoDanmakuService;
 import com.hmdp.utils.UserHolder;
@@ -35,6 +36,8 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
 
     @Resource
     private IBlogService blogService;
+    @Resource
+    private ContentModerationService contentModerationService;
 
     @Override
     public Result listByBlog(Long blogId) {
@@ -71,6 +74,7 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         if (!canUseDanmaku(danmaku.getBlogId())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "只有视频和直播内容可以发送弹幕");
         }
+        contentModerationService.checkText("弹幕内容", danmaku.getContent());
 
         // 保存用户 ID 便于后续审核和治理，但公开响应不暴露发送人。
         danmaku.setId(null);

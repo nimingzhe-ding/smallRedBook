@@ -52,3 +52,6 @@ hmdp:
     max-tokens: 1500
     max-messages: 12
     knowledge-top-k: 3
+  moderation:
+    enabled: ${HMDP_MODERATION_ENABLED:true}
+    sensitive-words: "${HMDP_SENSITIVE_WORDS:}"
