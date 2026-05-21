@@ -53,7 +53,8 @@ window.state = {
   notificationFilter: "all",
   aiSearchInsight: "",
   aiComposerTimer: null,
-  aiCommentLoadedFor: null
+  aiCommentLoadedFor: null,
+  afterLoginAction: null
 };
 
 localStorage.setItem("hmdp_ai_session", state.aiSessionId);

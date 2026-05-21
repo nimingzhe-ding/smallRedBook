@@ -358,6 +358,12 @@
   color: inherit;
 }
 
+.profile-home-stats button.is-active {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
 .profile-home-stats strong,
 .profile-home-stats span {
   display: block;
@@ -371,6 +377,16 @@
   margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.profile-home-stats button.is-active span {
+  color: rgba(255, 255, 255, .72);
+}
+
+.profile-hero .soft-button.is-following {
+  border-color: var(--line);
+  background: #f6f6f7;
+  color: var(--muted);
 }
 
 .profile-home-tabs button {

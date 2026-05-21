@@ -61,6 +61,12 @@ async function submitLogin(event) {
     localStorage.setItem("hmdp_token", loginToken);
     els.loginDialog.close();
     await initUser();
+    if (state.afterLoginAction === "profile" && typeof openMyProfile === "function") {
+      state.afterLoginAction = null;
+      openMyProfile();
+      return;
+    }
+    state.afterLoginAction = null;
     resetAndLoad();
   } catch {
     showStatus("登录失败，请确认验证码正确。");

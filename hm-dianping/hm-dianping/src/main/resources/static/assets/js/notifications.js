@@ -148,7 +148,19 @@ async function loadProfileStats() {
 window.loadProfileStats = loadProfileStats;
 
 async function openMyProfile(tab = "works") {
-  if (!requireLogin()) return;
+  setMobileTabActive("profile");
+  if (!token()) {
+    state.afterLoginAction = "profile";
+    requireLogin();
+    return;
+  }
+  state.query = "";
+  els.search.value = "";
+  await openUserProfile(null, tab);
+}
+window.openMyProfile = openMyProfile;
+
+async function openUserProfile(userId, tab = "works") {
   showContentArea();
   setMobileTabActive("profile");
   hideUnifiedSearch();
@@ -160,7 +172,7 @@ async function openMyProfile(tab = "works") {
   els.profileHomeResults.innerHTML = `<p class="empty-text">正在加载主页...</p>`;
   document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
   try {
-    const profile = await request("/profiles/me");
+    const profile = await request(userId ? `/profiles/${userId}` : "/profiles/me");
     state.currentProfile = profile;
     renderProfileHome(profile);
     await loadProfileTab(tab);
@@ -168,7 +180,7 @@ async function openMyProfile(tab = "works") {
     els.profileHomeResults.innerHTML = `<p class="empty-text">${escapeHtml(error.message || "主页加载失败")}</p>`;
   }
 }
-window.openMyProfile = openMyProfile;
+window.openUserProfile = openUserProfile;
 
 function renderProfileHome(profile) {
   document.querySelector("#profileHomeAvatar").src = normalizeImage(profile.icon) || fallbackAvatar;
@@ -181,7 +193,10 @@ function renderProfileHome(profile) {
   document.querySelector("#profileHomeLiked").textContent = profile.likes || 0;
   document.querySelector("#profileHomeFollowing").textContent = profile.following || 0;
   document.querySelector("#profileHomeFollowers").textContent = profile.followers || 0;
-  document.querySelector("#editProfileButton").hidden = !profile.isMe;
+  const actionButton = document.querySelector("#editProfileButton");
+  actionButton.hidden = false;
+  actionButton.textContent = profile.isMe ? "编辑资料" : (profile.isFollow ? "已关注" : "关注");
+  actionButton.classList.toggle("is-following", Boolean(!profile.isMe && profile.isFollow));
   renderProfileTabs();
 }
 window.renderProfileHome = renderProfileHome;
@@ -200,6 +215,9 @@ function renderProfileTabs() {
   els.profileHomeTabs.querySelectorAll("[data-profile-tab]").forEach(button => {
     button.addEventListener("click", () => loadProfileTab(button.dataset.profileTab));
   });
+  document.querySelectorAll(".profile-home-stats [data-profile-tab]").forEach(button => {
+    button.classList.toggle("is-active", button.dataset.profileTab === state.profileTab);
+  });
 }
 window.renderProfileTabs = renderProfileTabs;
 
@@ -210,10 +228,7 @@ async function loadProfileTab(tab) {
   if (!userId) return;
   els.profileHomeResults.innerHTML = `<p class="empty-text">正在加载...</p>`;
   if (["works", "collections", "liked"].includes(tab)) {
-    const path = tab === "works"
-      ? `/notes/user/${userId}`
-      : `/notes/user/${userId}/${tab}`;
-    const data = await request(`${path}?current=1`);
+    const data = await request(`${profileNotesPath(tab, userId)}?current=1`);
     const notes = (Array.isArray(data?.list) ? data.list : []).map(normalizeNote);
     renderProfileNotes(notes);
     return;
@@ -222,6 +237,22 @@ async function loadProfileTab(tab) {
   renderProfileUsers(Array.isArray(users) ? users : []);
 }
 window.loadProfileTab = loadProfileTab;
+
+function profileNotesPath(tab, userId) {
+  if (state.currentProfile?.isMe) {
+    return {
+      works: "/notes/mine",
+      collections: "/notes/collections",
+      liked: "/notes/liked"
+    }[tab];
+  }
+  return {
+    works: `/notes/user/${userId}`,
+    collections: `/notes/user/${userId}/collections`,
+    liked: `/notes/user/${userId}/liked`
+  }[tab];
+}
+window.profileNotesPath = profileNotesPath;
 
 function renderProfileNotes(notes) {
   if (!notes.length) {
@@ -244,7 +275,7 @@ function renderProfileUsers(users) {
   els.profileHomeResults.innerHTML = `
     <div class="profile-user-list">
       ${users.map(user => `
-        <article class="profile-user-row">
+        <article class="profile-user-row" data-profile-user="${user.id}">
           <img src="${normalizeImage(user.icon) || fallbackAvatar}" alt="">
           <span>
             <strong>${escapeHtml(user.nickName || "探店用户")}</strong>
@@ -253,11 +284,18 @@ function renderProfileUsers(users) {
         </article>
       `).join("")}
     </div>`;
+  els.profileHomeResults.querySelectorAll("[data-profile-user]").forEach(row => {
+    row.addEventListener("click", () => openUserProfile(row.dataset.profileUser));
+  });
 }
 window.renderProfileUsers = renderProfileUsers;
 
 function openProfileEdit() {
   const profile = state.currentProfile || {};
+  if (!profile.isMe) {
+    toggleProfileFollow();
+    return;
+  }
   els.profileEditForm.elements.nickName.value = profile.nickName || "";
   els.profileEditForm.elements.icon.value = profile.icon || "";
   els.profileEditForm.elements.city.value = profile.city || "";
@@ -265,6 +303,22 @@ function openProfileEdit() {
   els.profileEditDialog.showModal();
 }
 window.openProfileEdit = openProfileEdit;
+
+async function toggleProfileFollow() {
+  const profile = state.currentProfile;
+  if (!profile?.userId || profile.isMe || !requireLogin()) return;
+  const nextFollow = !profile.isFollow;
+  try {
+    await request(`/follow/${profile.userId}/${nextFollow}`, { method: "PUT" });
+    const updated = await request(`/profiles/${profile.userId}`);
+    state.currentProfile = updated;
+    renderProfileHome(updated);
+    await loadProfileTab(state.profileTab || "works");
+  } catch (error) {
+    showStatus(error.message || "关注操作失败。");
+  }
+}
+window.toggleProfileFollow = toggleProfileFollow;
 
 async function submitProfileEdit(event) {
   if (event.submitter && event.submitter.value === "cancel") return;
