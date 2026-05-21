@@ -11,7 +11,6 @@ window.state = {
   query: "",
   feed: "hot",
   mode: "feed",
-  category: "all",
   mallCategory: "all",
   mallQuery: "",
   searchTab: "notes",
@@ -353,7 +352,7 @@ function trackEvent(eventType, options = {}) {
     method: "POST",
     body: JSON.stringify({
       eventType,
-      blogId: options.blogId || null,
+      noteId: options.noteId || options.blogId || null,
       scene: options.scene || state.feed,
       keyword: options.keyword || state.query || null
     })

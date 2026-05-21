@@ -1,7 +1,5 @@
--- ============================================================
--- 为 tb_user 添加角色字段
--- 执行方式：mysql -u root -p hmdp < upgrade-roles.sql
--- ============================================================
+-- Add role column to tb_user.
+-- Usage: mysql -u root -p hmdp < upgrade-roles.sql
 
 SET @column_exists := (
   SELECT COUNT(1)
@@ -13,12 +11,12 @@ SET @column_exists := (
 
 SET @ddl := IF(
   @column_exists = 0,
-  'ALTER TABLE `tb_user` ADD COLUMN `role` TINYINT NOT NULL DEFAULT 1 COMMENT ''用户角色：0游客 1用户 2商家 3管理员'' AFTER `icon`',
+  'ALTER TABLE `tb_user` ADD COLUMN `role` TINYINT NOT NULL DEFAULT 1 AFTER `icon`',
   'SELECT 1'
 );
 
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
-DEALLOCATE PREPARE;
+DEALLOCATE PREPARE stmt;
 
 UPDATE `tb_user` SET `role` = 1 WHERE `role` = 0;

@@ -29,7 +29,7 @@ async function loadNotes() {
     }
     appendNotes(notes);
     state.notes.push(...notes);
-    notes.forEach(note => trackEvent("impression", { blogId: note.id, scene: state.mode }));
+    notes.forEach(note => trackEvent("impression", { noteId: note.id, scene: state.mode }));
     loadProfileStats();
     state.page += 1;
     state.hasMore = Boolean(data?.hasMore);

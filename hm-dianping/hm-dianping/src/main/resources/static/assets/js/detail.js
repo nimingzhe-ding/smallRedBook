@@ -33,6 +33,7 @@
     renderCreatorGrowth(els.drawerAuthorGrowth, note.creatorGrowth);
     document.querySelector("#drawerTitle").textContent = note.title;
     document.querySelector("#drawerContent").textContent = note.content || "这个作者还没有填写更多内容。";
+    renderNoteTags(note.tags);
     renderShopBridge(note.shop);
     renderNoteProducts(note.products);
     renderRelatedNotes(note.relatedNotes || []);
@@ -44,6 +45,7 @@
     document.querySelector("#drawerLike").onclick = () => likeNote(note);
     document.querySelector("#drawerCollect").onclick = () => toggleCollect(note);
     document.querySelector("#drawerFollow").onclick = () => toggleFollow(note);
+    document.querySelector("#drawerShare").onclick = () => shareNote(note);
     document.querySelector("#drawerAnalyze").hidden = true;
     document.querySelector("#drawerAnalyze").onclick = () => analyzeCurrentNote(note);
     const editButton = document.querySelector("#drawerEdit");
@@ -55,7 +57,7 @@
     els.drawer.classList.add("is-open");
     els.drawer.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
-    trackEvent("detail", { blogId: note.id, scene: "detail" });
+    trackEvent("detail", { noteId: note.id, scene: "detail" });
     loadCollectState(note);
     loadComments(note.id);
     analyzeCurrentNote(note);
@@ -82,6 +84,26 @@
       document.querySelector("#voucherAction").onclick = () => openShopDialog(shop);
     }
     els.shopBridge.hidden = false;
+  }
+
+  function renderNoteTags(tags) {
+    const target = document.querySelector("#drawerTags");
+    if (!target) return;
+    const list = String(tags || "")
+      .split(/[,，#\s]+/)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    if (!list.length) {
+      target.hidden = true;
+      target.innerHTML = "";
+      return;
+    }
+    target.innerHTML = list.map(tag => `<button type="button" data-note-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join("");
+    target.querySelectorAll("[data-note-tag]").forEach(button => {
+      button.addEventListener("click", () => enterUnifiedSearch(button.dataset.noteTag, "notes", false));
+    });
+    target.hidden = false;
   }
 
   function renderNoteProducts(products = []) {
@@ -274,7 +296,7 @@
     if (!requireLogin()) return;
     try {
       await request(`/notes/${note.id}/like`, { method: "PUT" });
-      trackEvent("like", { blogId: note.id, scene: "detail" });
+      trackEvent("like", { noteId: note.id, scene: "detail" });
       note.liked += note.isLike ? -1 : 1;
       note.isLike = !note.isLike;
       document.querySelector("#drawerLike").textContent = `♥ ${note.liked}`;
@@ -291,7 +313,7 @@
       .then(() => {
         if (next) state.collected.add(id);
         else state.collected.delete(id);
-        trackEvent(next ? "collect" : "uncollect", { blogId: note.id, scene: "detail" });
+        trackEvent(next ? "collect" : "uncollect", { noteId: note.id, scene: "detail" });
         localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
         document.querySelector("#drawerCollect").textContent = next ? "★ 已收藏" : "☆ 收藏";
         var statCollects = document.querySelector("#statCollects");
@@ -329,11 +351,31 @@
     }
   }
 
+  async function shareNote(note) {
+    const url = `${location.origin}${location.pathname}?noteId=${encodeURIComponent(note.id)}`;
+    const title = note.title || "分享一篇笔记";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: note.content || title, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        showStatus("笔记链接已复制。");
+      } else {
+        showStatus(url);
+      }
+      trackEvent("share", { noteId: note.id, scene: "detail" });
+    } catch {
+      // 用户取消系统分享面板时不需要提示错误。
+    }
+  }
+
   // Export cross-module functions
   window.openDrawer = openDrawer;
   window.renderCreatorGrowth = renderCreatorGrowth;
+  window.renderNoteTags = renderNoteTags;
   window.likeNote = likeNote;
   window.toggleCollect = toggleCollect;
   window.loadCollectState = loadCollectState;
   window.toggleFollow = toggleFollow;
+  window.shareNote = shareNote;
 })();

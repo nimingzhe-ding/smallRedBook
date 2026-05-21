@@ -37,7 +37,8 @@ public class NoteEventController {
         } catch (IllegalArgumentException e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的事件类型: " + event.getEventType());
         }
-        noteEventService.track(userId, event.getBlogId(), type, event.getScene(), event.getKeyword());
+        Long noteId = event.getNoteId() == null ? event.getBlogId() : event.getNoteId();
+        noteEventService.track(userId, noteId, type, event.getScene(), event.getKeyword());
         return Result.ok();
     }
 
@@ -47,6 +48,9 @@ public class NoteEventController {
         Long userId = user == null ? null : user.getId();
         for (NoteEvent event : events) {
             event.setUserId(userId);
+            if (event.getBlogId() == null) {
+                event.setBlogId(event.getNoteId());
+            }
         }
         noteEventService.trackBatch(events);
         return Result.ok();

@@ -45,7 +45,7 @@ function renderNotifications(list) {
     return;
   }
   els.notificationList.innerHTML = list.map(item => `
-    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-blog-id="${item.blogId || ""}" data-order-id="${item.orderId || ""}" data-type="${item.type || ""}">
+    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-note-id="${item.noteId || item.blogId || ""}" data-order-id="${item.orderId || ""}" data-type="${item.type || ""}">
       <div class="notification-item-body">
         <strong>${escapeHtml(item.title || notificationTypeLabel(item.type))}</strong>
         <span>${escapeHtml(item.content || "")}</span>
@@ -121,12 +121,12 @@ async function deleteNotification(id) {
 window.deleteNotification = deleteNotification;
 
 function navigateFromNotification(item) {
-  const blogId = item.dataset.blogId;
+  const noteId = item.dataset.noteId;
   const orderId = item.dataset.orderId;
   const type = item.dataset.type;
   els.notificationDialog.close();
-  if (blogId && (type === "LIKE" || type === "COLLECT" || type === "COMMENT" || type === "REPLY")) {
-    openDrawer({ id: Number(blogId) });
+  if (noteId && (type === "LIKE" || type === "COLLECT" || type === "COMMENT" || type === "REPLY")) {
+    openDrawer({ id: Number(noteId) });
   } else if (orderId && type.startsWith("ORDER_")) {
     openOrdersDialog();
   }

@@ -214,4 +214,11 @@
   setInterval(refreshNotificationBadge, 60000);
   loadNotes();
   loadTrends();
+  openSharedNoteFromUrl();
+
+  function openSharedNoteFromUrl() {
+    var noteId = new URLSearchParams(location.search).get("noteId");
+    if (!noteId) return;
+    openDrawer({ id: Number(noteId) });
+  }
 })();

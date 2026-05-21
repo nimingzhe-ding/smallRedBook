@@ -58,6 +58,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/notes/*",
                         "/notes/user/**",
                         "/notes/comments/of/note",
+                        "/notes/comments/of/blog",
                         // 个人主页查看（公开）
                         "/profiles/*",
                         // AI 智能体流式接口（公开）

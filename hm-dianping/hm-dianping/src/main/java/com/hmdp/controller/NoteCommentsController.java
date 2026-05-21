@@ -2,6 +2,7 @@ package com.hmdp.controller;
 
 import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.dto.NoteCommentRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.BlogComments;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/notes/comments")
-public class BlogCommentsController {
+public class NoteCommentsController {
 
     @Resource
     private IBlogCommentsService commentsService;
@@ -61,13 +62,15 @@ public class BlogCommentsController {
      * 查询笔记评论流。
      * sort 支持 hot/new/old：热门、最新、最早。
      */
-    @GetMapping("/of/note")
+    @GetMapping({"/of/note", "/of/blog"})
     public Result queryComments(
-            @RequestParam("noteId") Long noteId,
+            @RequestParam(value = "noteId", required = false) Long noteId,
+            @RequestParam(value = "blogId", required = false) Long blogId,
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "sort", defaultValue = "hot") String sort) {
+        Long resolvedNoteId = resolveNoteId(noteId, blogId);
         QueryChainWrapper<BlogComments> query = commentsService.query()
-                .eq("blog_id", noteId)
+                .eq("blog_id", resolvedNoteId)
                 .eq("parent_id", 0)
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"));
         if ("new".equals(sort)) {
@@ -85,7 +88,7 @@ public class BlogCommentsController {
         List<BlogComments> replies = parentIds.isEmpty()
                 ? List.of()
                 : commentsService.query()
-                .eq("blog_id", noteId)
+                .eq("blog_id", resolvedNoteId)
                 .in("parent_id", parentIds)
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"))
                 .orderByAsc("create_time")
@@ -108,18 +111,23 @@ public class BlogCommentsController {
         List<Map<String, Object>> records = comments.stream()
                 .map(comment -> toCommentMap(comment, userMap, replyMap.getOrDefault(comment.getId(), List.of())))
                 .toList();
-        return Result.ok(records, countVisibleComments(noteId));
+        return Result.ok(records, countVisibleComments(resolvedNoteId));
     }
 
     /**
      * 发表评论或二级回复。
      */
     @PostMapping
-    public Result saveComment(@RequestBody BlogComments comment) {
+    public Result saveComment(@RequestBody NoteCommentRequest request) {
         UserDTO user = UserHolder.getUser();
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
         }
+        BlogComments comment = new BlogComments();
+        comment.setBlogId(request == null ? null : request.getNoteId());
+        comment.setContent(request == null ? null : request.getContent());
+        comment.setParentId(request == null ? null : request.getParentId());
+        comment.setAnswerId(request == null ? null : request.getAnswerId());
         if (comment.getBlogId() == null) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "笔记ID不能为空");
         }
@@ -236,7 +244,7 @@ public class BlogCommentsController {
         UserDTO current = UserHolder.getUser();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", comment.getId());
-        result.put("blogId", comment.getBlogId());
+        result.put("noteId", comment.getBlogId());
         result.put("userId", comment.getUserId());
         result.put("parentId", comment.getParentId());
         result.put("answerId", comment.getAnswerId());
@@ -264,8 +272,17 @@ public class BlogCommentsController {
     private Map<String, Object> commentResult(Long id, Long blogId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", id);
+        result.put("noteId", blogId);
         result.put("comments", countVisibleComments(blogId));
         return result;
+    }
+
+    private Long resolveNoteId(Long noteId, Long legacyBlogId) {
+        Long resolved = noteId == null ? legacyBlogId : noteId;
+        if (resolved == null) {
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "绗旇ID涓嶈兘涓虹┖");
+        }
+        return resolved;
     }
 
     private long updateCommentThreadStatus(BlogComments comment, int status) {

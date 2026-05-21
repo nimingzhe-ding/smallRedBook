@@ -138,7 +138,7 @@ async function submitComment(event) {
   if (!(await checkAiRisk(content, "comment"))) return;
   try {
     const payload = {
-      blogId: state.currentNote.id,
+      noteId: state.currentNote.id,
       content,
       parentId: state.replyTarget?.parentId || 0,
       answerId: state.replyTarget?.answerId || 0
@@ -147,7 +147,7 @@ async function submitComment(event) {
       method: "POST",
       body: JSON.stringify(payload)
     });
-    trackEvent("comment", { blogId: state.currentNote.id, scene: "detail" });
+    trackEvent("comment", { noteId: state.currentNote.id, scene: "detail" });
     updateCommentCount(data?.comments);
     state.replyTarget = null;
     els.commentInput.value = "";
