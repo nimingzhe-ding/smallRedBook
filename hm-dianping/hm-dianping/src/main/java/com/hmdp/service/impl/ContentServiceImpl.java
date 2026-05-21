@@ -734,9 +734,6 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (statusOf(blog) == CONTENT_STATUS_NORMAL) {
             return true;
         }
-        if (statusOf(blog) == CONTENT_STATUS_HIDDEN) {
-            return false;
-        }
         UserDTO user = UserHolder.getUser();
         return user != null && blog.getUserId() != null && blog.getUserId().equals(user.getId());
     }

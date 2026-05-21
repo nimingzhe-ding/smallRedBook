@@ -160,6 +160,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (!Objects.equals(existing.getUserId(), user.getId())) {
             throw new BusinessException(ErrorCode.NO_PERMISSION, "只能编辑自己的笔记");
         }
+        int currentStatus = existing.getStatus() == null ? 0 : existing.getStatus();
+        int nextStatus = currentStatus == 2 ? 1 : currentStatus;
         List<Long> productIds = normalizeProductIds(blog.getProductIds());
         String contentType = ContentType.resolve(blog.getContentType(), blog.getVideoUrl());
         validateWritePayload(blog, contentType, productIds);
@@ -177,6 +179,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .set("content_type", contentType)
                 .set("tags", normalizeTags(blog.getTags()))
                 .set("content", blog.getContent())
+                .set("status", nextStatus)
                 .eq("id", id)
                 .eq("user_id", user.getId())
                 .update();

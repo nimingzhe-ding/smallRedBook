@@ -44,8 +44,13 @@ function renderNotifications(list) {
     els.notificationList.innerHTML = `<p class="empty-text">暂时还没有消息。</p>`;
     return;
   }
-  els.notificationList.innerHTML = list.map(item => `
-    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-note-id="${item.noteId || item.blogId || ""}" data-order-id="${item.orderId || ""}" data-type="${item.type || ""}">
+  els.notificationList.innerHTML = list.map(item => {
+    const payload = notificationPayload(item);
+    const noteId = notificationTargetNoteId(item, payload);
+    const orderId = notificationTargetOrderId(item, payload);
+    const actorUserId = item.actorUserId || payload.actorUserId || "";
+    return `
+    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-note-id="${noteId || ""}" data-order-id="${orderId || ""}" data-actor-user-id="${actorUserId || ""}" data-type="${escapeHtml(item.type || "")}">
       <div class="notification-item-body">
         <strong>${escapeHtml(item.title || notificationTypeLabel(item.type))}</strong>
         <span>${escapeHtml(item.content || "")}</span>
@@ -56,9 +61,32 @@ function renderNotifications(list) {
         <button class="notification-action-btn" data-action="delete" title="删除"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z" fill="currentColor"/></svg></button>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 window.renderNotifications = renderNotifications;
+
+function notificationPayload(item) {
+  const payload = item?.payload;
+  if (!payload) return {};
+  if (typeof payload === "object") return payload;
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return {};
+  }
+}
+window.notificationPayload = notificationPayload;
+
+function notificationTargetNoteId(item, payload = notificationPayload(item)) {
+  return item?.noteId || item?.blogId || payload.noteId || payload.blogId || "";
+}
+window.notificationTargetNoteId = notificationTargetNoteId;
+
+function notificationTargetOrderId(item, payload = notificationPayload(item)) {
+  return item?.orderId || payload.orderId || "";
+}
+window.notificationTargetOrderId = notificationTargetOrderId;
 
 function notificationTypeLabel(type) {
   return {
@@ -74,7 +102,13 @@ function notificationTypeLabel(type) {
     ORDER_CANCELLED: "取消",
     ORDER_REFUNDING: "退款",
     ORDER_REFUND_APPROVED: "退款",
-    ORDER_REFUND_REJECTED: "退款"
+    ORDER_REFUND_REJECTED: "退款",
+    AUDIT_NOTE_RESTORED: "笔记审核",
+    AUDIT_NOTE_HIDDEN: "笔记审核",
+    AUDIT_COMMENT_RESTORED: "评论审核",
+    AUDIT_COMMENT_HIDDEN: "评论审核",
+    AUDIT_DANMAKU_RESTORED: "弹幕审核",
+    AUDIT_DANMAKU_HIDDEN: "弹幕审核"
   }[type] || "通知";
 }
 window.notificationTypeLabel = notificationTypeLabel;
@@ -123,15 +157,26 @@ window.deleteNotification = deleteNotification;
 function navigateFromNotification(item) {
   const noteId = item.dataset.noteId;
   const orderId = item.dataset.orderId;
-  const type = item.dataset.type;
+  const actorUserId = item.dataset.actorUserId;
+  const type = item.dataset.type || "";
+  if (item.dataset.id) {
+    markSingleNotificationRead(Number(item.dataset.id));
+  }
   els.notificationDialog.close();
-  if (noteId && (type === "LIKE" || type === "COLLECT" || type === "COMMENT" || type === "REPLY")) {
+  if (noteId && isNoteNotificationType(type)) {
     openDrawer({ id: Number(noteId) });
   } else if (orderId && type.startsWith("ORDER_")) {
-    openOrdersDialog();
+    openOrdersDialog(Number(orderId));
+  } else if (actorUserId && type === "FOLLOW") {
+    openUserProfile(actorUserId);
   }
 }
 window.navigateFromNotification = navigateFromNotification;
+
+function isNoteNotificationType(type) {
+  return ["LIKE", "COLLECT", "COMMENT", "REPLY"].includes(type) || type.startsWith("AUDIT_");
+}
+window.isNoteNotificationType = isNoteNotificationType;
 
 // ------------------------------
 // Profile

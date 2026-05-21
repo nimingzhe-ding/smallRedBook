@@ -46,6 +46,11 @@
   gap: 10px;
 }
 
+.order-item.is-highlight {
+  outline: 2px solid var(--accent, #ff2442);
+  background: var(--accent-soft, #fff0f2);
+}
+
 .product-dialog-image {
   display: block;
   width: 100%;

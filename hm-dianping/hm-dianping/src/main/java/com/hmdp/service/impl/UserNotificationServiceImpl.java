@@ -24,6 +24,11 @@ public class UserNotificationServiceImpl extends ServiceImpl<UserNotificationMap
 
     @Override
     public void notifyUser(Long userId, Long actorUserId, String type, String title, String content, Long blogId, Long orderId) {
+        notifyUser(userId, actorUserId, type, title, content, blogId, orderId, "{}");
+    }
+
+    @Override
+    public void notifyUser(Long userId, Long actorUserId, String type, String title, String content, Long blogId, Long orderId, String payload) {
         if (userId == null || (actorUserId != null && Objects.equals(userId, actorUserId))) {
             return;
         }
@@ -35,7 +40,7 @@ public class UserNotificationServiceImpl extends ServiceImpl<UserNotificationMap
                 .setContent(content)
                 .setBlogId(blogId)
                 .setOrderId(orderId)
-                .setPayload("{}")
+                .setPayload(payload == null || payload.isBlank() ? "{}" : payload)
                 .setReadFlag(false)
                 .setCreateTime(LocalDateTime.now());
         save(notification);

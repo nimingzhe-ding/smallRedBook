@@ -224,14 +224,14 @@ async function removeCartItem(cartItemId) {
   }
 }
 
-async function openOrdersDialog() {
+async function openOrdersDialog(focusOrderId = null) {
   if (!requireLogin()) return;
   document.querySelector("#cartDialogTitle").textContent = "我的订单";
   els.cartList.innerHTML = `<p class="empty-text">正在加载订单...</p>`;
   els.cartDialog.showModal();
   try {
     const orders = await request("/mall/orders");
-    renderOrders(Array.isArray(orders) ? orders : []);
+    renderOrders(Array.isArray(orders) ? orders : [], focusOrderId);
   } catch {
     els.cartList.innerHTML = `<p class="empty-text">订单加载失败，请确认已经登录。</p>`;
   }
@@ -254,13 +254,13 @@ async function payMallOrder(orderId) {
   return request(`/mall/orders/${orderId}/pay`, { method: "POST" });
 }
 
-function renderOrders(orders) {
+function renderOrders(orders, focusOrderId = null) {
   if (!orders.length) {
     els.cartList.innerHTML = `<p class="empty-text">还没有商城订单。</p>`;
     return;
   }
   els.cartList.innerHTML = orders.map(order => `
-    <article class="cart-item order-item">
+    <article class="cart-item order-item${String(order.id) === String(focusOrderId) ? " is-highlight" : ""}" data-order-id="${order.id}">
       <img src="${normalizeImage(order.productImage)}" alt="${escapeHtml(order.productTitle)}">
       <div>
         <strong>${escapeHtml(order.productTitle)}</strong>
@@ -289,6 +289,11 @@ function renderOrders(orders) {
       }
     });
   });
+  if (focusOrderId) {
+    setTimeout(() => {
+      els.cartList.querySelector(`[data-order-id="${focusOrderId}"]`)?.scrollIntoView({ block: "center" });
+    }, 50);
+  }
 }
 
 async function askOrderService(orderId, question) {

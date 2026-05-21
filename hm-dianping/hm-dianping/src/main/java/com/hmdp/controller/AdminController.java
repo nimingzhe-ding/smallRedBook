@@ -20,6 +20,7 @@ import com.hmdp.mapper.MallProductMapper;
 import com.hmdp.mapper.NoteEventMapper;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.mapper.VideoDanmakuMapper;
+import com.hmdp.service.IUserNotificationService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,6 +59,8 @@ public class AdminController {
     private MallOrderMapper mallOrderMapper;
     @Resource
     private VideoDanmakuMapper videoDanmakuMapper;
+    @Resource
+    private IUserNotificationService notificationService;
 
     @GetMapping("/dashboard")
     public Result dashboard() {
@@ -170,6 +173,7 @@ public class AdminController {
                 .set("status", 0)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", commentId));
+        notifyCommentAudit(comment, true);
         return Result.ok(commentId);
     }
 
@@ -183,46 +187,51 @@ public class AdminController {
                 .set("status", 2)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", commentId));
+        notifyCommentAudit(comment, false);
         return Result.ok(commentId);
     }
 
     @PostMapping("/notes/{id}/restore")
     public Result restoreNote(@PathVariable("id") Long noteId) {
-        requireNote(noteId);
+        Blog note = requireNote(noteId);
         blogMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Blog>()
                 .set("status", 0)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", noteId));
+        notifyNoteAudit(note, true);
         return Result.ok(noteId);
     }
 
     @PostMapping("/notes/{id}/hide")
     public Result hideNote(@PathVariable("id") Long noteId) {
-        requireNote(noteId);
+        Blog note = requireNote(noteId);
         blogMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Blog>()
                 .set("status", 2)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", noteId));
+        notifyNoteAudit(note, false);
         return Result.ok(noteId);
     }
 
     @PostMapping("/danmaku/{id}/restore")
     public Result restoreDanmaku(@PathVariable("id") Long danmakuId) {
-        requireDanmaku(danmakuId);
+        VideoDanmaku danmaku = requireDanmaku(danmakuId);
         videoDanmakuMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<VideoDanmaku>()
                 .set("status", 0)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", danmakuId));
+        notifyDanmakuAudit(danmaku, true);
         return Result.ok(danmakuId);
     }
 
     @PostMapping("/danmaku/{id}/hide")
     public Result hideDanmaku(@PathVariable("id") Long danmakuId) {
-        requireDanmaku(danmakuId);
+        VideoDanmaku danmaku = requireDanmaku(danmakuId);
         videoDanmakuMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<VideoDanmaku>()
                 .set("status", 2)
                 .set("update_time", LocalDateTime.now())
                 .eq("id", danmakuId));
+        notifyDanmakuAudit(danmaku, false);
         return Result.ok(danmakuId);
     }
 
@@ -309,5 +318,59 @@ public class AdminController {
         item.put("createTime", danmaku.getCreateTime());
         item.put("updateTime", danmaku.getUpdateTime());
         return item;
+    }
+
+    private void notifyNoteAudit(Blog note, boolean restored) {
+        if (note == null || note.getUserId() == null) {
+            return;
+        }
+        String title = note.getTitle() == null || note.getTitle().isBlank() ? "未命名笔记" : note.getTitle();
+        notificationService.notifyUser(
+                note.getUserId(),
+                null,
+                restored ? "AUDIT_NOTE_RESTORED" : "AUDIT_NOTE_HIDDEN",
+                restored ? "你的笔记已恢复展示" : "你的笔记已被隐藏",
+                restored ? "笔记《" + title + "》已通过审核并恢复展示。"
+                        : "笔记《" + title + "》因违反社区规范已被隐藏，请修改后再发布。",
+                note.getId(),
+                null,
+                "{\"auditTarget\":\"NOTE\",\"noteId\":" + note.getId()
+                        + ",\"action\":\"" + (restored ? "RESTORED" : "HIDDEN") + "\"}");
+    }
+
+    private void notifyCommentAudit(BlogComments comment, boolean restored) {
+        if (comment == null || comment.getUserId() == null) {
+            return;
+        }
+        notificationService.notifyUser(
+                comment.getUserId(),
+                null,
+                restored ? "AUDIT_COMMENT_RESTORED" : "AUDIT_COMMENT_HIDDEN",
+                restored ? "你的评论已恢复展示" : "你的评论已被隐藏",
+                restored ? "你的评论已通过审核并恢复展示。"
+                        : "你的评论因违反社区规范已被隐藏，请注意友善交流。",
+                comment.getBlogId(),
+                null,
+                "{\"auditTarget\":\"COMMENT\",\"commentId\":" + comment.getId()
+                        + ",\"noteId\":" + comment.getBlogId()
+                        + ",\"action\":\"" + (restored ? "RESTORED" : "HIDDEN") + "\"}");
+    }
+
+    private void notifyDanmakuAudit(VideoDanmaku danmaku, boolean restored) {
+        if (danmaku == null || danmaku.getUserId() == null) {
+            return;
+        }
+        notificationService.notifyUser(
+                danmaku.getUserId(),
+                null,
+                restored ? "AUDIT_DANMAKU_RESTORED" : "AUDIT_DANMAKU_HIDDEN",
+                restored ? "你的弹幕已恢复展示" : "你的弹幕已被隐藏",
+                restored ? "你的弹幕已通过审核并恢复展示。"
+                        : "你的弹幕因违反社区规范已被隐藏，请注意表达方式。",
+                danmaku.getBlogId(),
+                null,
+                "{\"auditTarget\":\"DANMAKU\",\"danmakuId\":" + danmaku.getId()
+                        + ",\"noteId\":" + danmaku.getBlogId()
+                        + ",\"action\":\"" + (restored ? "RESTORED" : "HIDDEN") + "\"}");
     }
 }

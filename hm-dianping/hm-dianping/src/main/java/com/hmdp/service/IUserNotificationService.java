@@ -10,6 +10,8 @@ import com.hmdp.entity.UserNotification;
 public interface IUserNotificationService extends IService<UserNotification> {
     void notifyUser(Long userId, Long actorUserId, String type, String title, String content, Long blogId, Long orderId);
 
+    void notifyUser(Long userId, Long actorUserId, String type, String title, String content, Long blogId, Long orderId, String payload);
+
     Result listMine(Boolean unreadOnly);
 
     Result unreadCount();
