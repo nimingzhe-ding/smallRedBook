@@ -90,15 +90,19 @@
           <div class="unified-results" id="unifiedSearchResults"></div>
         </section>
         <section class="profile-home" id="profileHome" hidden>
+          <div class="profile-cover" aria-hidden="true"></div>
           <div class="profile-hero">
             <img id="profileHomeAvatar" alt="">
-            <div>
+            <div class="profile-identity">
               <strong id="profileHomeName">探店用户</strong>
               <span id="profileHomeIntro">这个人还没有写简介。</span>
               <small id="profileHomeMeta"></small>
               <div class="creator-growth" id="profileGrowth"></div>
             </div>
+            <div class="profile-actions">
             <button class="soft-button" id="editProfileButton" type="button">编辑资料</button>
+              <button class="soft-button profile-message-button" id="profileMessageButton" type="button" hidden>私信</button>
+            </div>
           </div>
           <div class="profile-home-stats">
             <button type="button" data-profile-tab="works"><strong id="profileHomeWorks">0</strong><span>作品</span></button>
@@ -156,21 +160,27 @@
             </div>
             <div class="message-start-box">
               <input id="dmSearchInput" type="text" placeholder="搜索或输入用户 ID" autocomplete="off">
-              <button id="startDmButton" type="button">新聊天</button>
+              <button id="startDmButton" type="button">搜索</button>
             </div>
+            <div class="dm-search-results" id="dmSearchResults" hidden></div>
             <div class="dm-conversation-list" id="dmConversationList"></div>
           </aside>
           <section class="dm-pane" id="dmPane">
             <div class="dm-chat-head">
+              <button class="dm-back-button" id="dmBackButton" type="button" aria-label="返回会话列表">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 5.3 8 12l6.7 6.7 1.4-1.4L10.8 12l5.3-5.3-1.4-1.4Z"/></svg>
+              </button>
+              <img class="dm-peer-avatar" id="dmPeerAvatar" alt="">
               <div>
                 <strong id="dmChatName">选择一个会话</strong>
                 <span id="dmChatMeta">支持本地私信草稿，可从互动通知发起聊天</span>
               </div>
-              <button class="soft-button" id="clearDmConversation" type="button">清空</button>
+              <button class="soft-button" id="clearDmConversation" type="button" hidden>清空</button>
+              <button class="soft-button" id="dmOpenProfile" type="button" hidden>去主页</button>
             </div>
             <div class="dm-thread" id="dmThread"></div>
             <form class="dm-compose" id="dmComposeForm">
-              <input id="dmInput" maxlength="240" placeholder="写一条私信..." autocomplete="off">
+              <input id="dmInput" maxlength="500" placeholder="写一条私信..." autocomplete="off">
               <button type="submit">发送</button>
             </form>
           </section>

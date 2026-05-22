@@ -14,8 +14,17 @@ async function refreshNotificationBadge() {
     return;
   }
   try {
-    const data = await request("/notifications/unread-count");
-    const count = Number(data?.count || 0);
+    const [notificationResult, messageResult] = await Promise.allSettled([
+      request("/notifications/unread-count"),
+      request("/messages/unread-count")
+    ]);
+    const notificationCount = notificationResult.status === "fulfilled"
+      ? Number(notificationResult.value?.count || 0)
+      : 0;
+    const messageCount = messageResult.status === "fulfilled"
+      ? Number(messageResult.value?.count || 0)
+      : 0;
+    const count = notificationCount + messageCount;
     els.notificationBadge.textContent = count > 99 ? "99+" : String(count);
     els.notificationBadge.hidden = count <= 0;
   } catch {
@@ -28,10 +37,10 @@ async function openNotificationDialog() {
   if (!requireLoginThen("notifications")) return;
   setMobileTabActive("messages");
   switchMessageArea();
-  loadDmConversations();
-  renderDmConversations();
-  renderDmThread();
   switchMessageMode(state.messageMode || "dm");
+  await loadDmConversations();
+  renderDmThread();
+  startMessagePolling();
   if (!state.notificationSettings) {
     loadNotificationSettings();
   }
@@ -54,6 +63,7 @@ function switchMessageArea() {
   closeDanmakuSource();
   hideStatus();
   window.scrollTo({ top: 0, behavior: "smooth" });
+  startMessagePolling();
 }
 window.switchMessageArea = switchMessageArea;
 
@@ -361,6 +371,312 @@ function clearActiveDmConversation() {
 }
 window.clearActiveDmConversation = clearActiveDmConversation;
 
+// ------------------------------
+// Direct messages (real backend)
+// ------------------------------
+async function loadDmConversations(options = {}) {
+  if (!token() || !els.dmConversationList) return;
+  const silent = Boolean(options.silent);
+  if (!silent && !state.dmConversations.length) {
+    els.dmConversationList.innerHTML = `<p class="empty-text">正在加载私信...</p>`;
+  }
+  try {
+    const list = await request("/messages/conversations");
+    state.dmConversations = Array.isArray(list) ? list.map(normalizeDmConversation) : [];
+    if (state.activeDmId && !state.dmConversations.some(item => String(item.id) === String(state.activeDmId))) {
+      state.activeDmId = null;
+      state.activeDmConversation = null;
+      state.dmMessages = [];
+    }
+    if (!state.activeDmId && state.dmConversations.length && !isSmallScreen()) {
+      state.activeDmId = state.dmConversations[0].id;
+      state.activeDmConversation = state.dmConversations[0];
+      loadDmThread({ silent: true });
+    } else if (state.activeDmId) {
+      state.activeDmConversation = findDmConversation(state.activeDmId) || state.activeDmConversation;
+    }
+    renderDmConversations();
+    renderDmThread();
+    refreshNotificationBadge();
+  } catch (error) {
+    if (!silent) {
+      els.dmConversationList.innerHTML = `<p class="empty-text">${escapeHtml(error.message || "私信加载失败")}</p>`;
+    }
+  }
+}
+window.loadDmConversations = loadDmConversations;
+
+function switchMessageMode(mode) {
+  state.messageMode = mode === "notifications" ? "notifications" : "dm";
+  els.messageArea?.classList.toggle("is-notification-mode", state.messageMode === "notifications");
+  els.messageArea?.classList.toggle("is-dm-chat-open", state.messageMode === "dm" && state.dmMobileChatOpen);
+  els.messageModeDm?.classList.toggle("is-active", state.messageMode === "dm");
+  els.messageModeNotify?.classList.toggle("is-active", state.messageMode === "notifications");
+  if (els.dmPane) els.dmPane.hidden = state.messageMode !== "dm";
+  if (els.notificationPane) els.notificationPane.hidden = state.messageMode !== "notifications";
+  if (state.messageMode === "dm") {
+    startMessagePolling();
+    if (state.activeDmId) startDmThreadPolling();
+  } else {
+    stopDmThreadPolling();
+  }
+}
+window.switchMessageMode = switchMessageMode;
+
+function findDmConversation(id) {
+  return state.dmConversations.find(item => String(item.id) === String(id));
+}
+window.findDmConversation = findDmConversation;
+
+function renderDmConversations() {
+  if (!els.dmConversationList) return;
+  if (!state.dmConversations.length) {
+    els.dmConversationList.innerHTML = `<p class="empty-text">还没有私信，搜索用户开始聊天。</p>`;
+    return;
+  }
+  els.dmConversationList.innerHTML = state.dmConversations.map(item => `
+    <button class="dm-conversation${String(item.id) === String(state.activeDmId) ? " is-active" : ""}" type="button" data-dm-id="${escapeHtml(item.id)}">
+      <img src="${normalizeImage(item.peerIcon) || fallbackAvatar}" alt="">
+      <span>
+        <strong>${escapeHtml(item.peerNickName || "探店用户")}</strong>
+        <small>${escapeHtml(item.lastMessageContent || "还没有聊天记录")}</small>
+      </span>
+      <em>${formatDmTime(item.lastMessageTime || item.updatedAt)}</em>
+      ${item.unreadCount ? `<b>${item.unreadCount > 99 ? "99+" : item.unreadCount}</b>` : ""}
+    </button>
+  `).join("");
+}
+window.renderDmConversations = renderDmConversations;
+
+function renderDmThread() {
+  if (!els.dmThread) return;
+  const conversation = state.activeDmConversation || findDmConversation(state.activeDmId);
+  state.activeDmConversation = conversation || null;
+  els.messageArea?.classList.toggle("is-dm-chat-open", state.messageMode === "dm" && state.dmMobileChatOpen);
+  if (!conversation) {
+    if (els.dmChatName) els.dmChatName.textContent = "选择一个会话";
+    if (els.dmChatMeta) els.dmChatMeta.textContent = "搜索用户或从左侧会话开始聊天";
+    if (els.dmPeerAvatar) els.dmPeerAvatar.src = fallbackAvatar;
+    if (els.dmOpenProfile) els.dmOpenProfile.hidden = true;
+    els.dmThread.innerHTML = `<div class="dm-empty">还没有选择聊天。</div>`;
+    if (els.dmInput) els.dmInput.disabled = true;
+    return;
+  }
+  if (els.dmInput) els.dmInput.disabled = false;
+  if (els.dmChatName) els.dmChatName.textContent = conversation.peerNickName || "探店用户";
+  if (els.dmChatMeta) els.dmChatMeta.textContent = `ID ${conversation.peerUserId || ""}`;
+  if (els.dmPeerAvatar) els.dmPeerAvatar.src = normalizeImage(conversation.peerIcon) || fallbackAvatar;
+  if (els.dmOpenProfile) els.dmOpenProfile.hidden = !conversation.peerUserId;
+  if (els.clearDmConversation) els.clearDmConversation.hidden = true;
+  const messages = state.dmMessages || [];
+  els.dmThread.innerHTML = messages.length ? messages.map(message => `
+    <div class="dm-message ${message.isMe ? "is-me" : "is-them"}">
+      <p>${escapeHtml(message.content || "")}</p>
+      <span>${formatTime(message.createTime)}</span>
+    </div>
+  `).join("") : `<div class="dm-empty">还没有聊天记录，先打个招呼。</div>`;
+  els.dmThread.scrollTop = els.dmThread.scrollHeight;
+  renderDmConversations();
+}
+window.renderDmThread = renderDmThread;
+
+async function selectDmConversation(id) {
+  const conversation = findDmConversation(id);
+  if (!conversation) return;
+  state.activeDmId = conversation.id;
+  state.activeDmConversation = conversation;
+  state.dmMobileChatOpen = true;
+  renderDmConversations();
+  await loadDmThread();
+  startDmThreadPolling();
+}
+window.selectDmConversation = selectDmConversation;
+
+async function loadDmThread(options = {}) {
+  if (!state.activeDmId || state.messageMode !== "dm") return;
+  try {
+    const messages = await request(`/messages/conversations/${state.activeDmId}/messages?limit=30`);
+    state.dmMessages = Array.isArray(messages) ? messages : [];
+    await request(`/messages/conversations/${state.activeDmId}/read`, { method: "POST" });
+    const conversation = findDmConversation(state.activeDmId);
+    if (conversation) conversation.unreadCount = 0;
+    renderDmThread();
+    refreshNotificationBadge();
+  } catch (error) {
+    if (!options.silent) showStatus(error.message || "聊天加载失败");
+  }
+}
+window.loadDmThread = loadDmThread;
+
+async function sendDmMessage(text) {
+  const value = String(text || "").trim();
+  if (!value || !state.activeDmId) return;
+  try {
+    await request(`/messages/conversations/${state.activeDmId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content: value })
+    });
+    if (els.dmInput) els.dmInput.value = "";
+    await Promise.all([loadDmThread({ silent: true }), loadDmConversations({ silent: true })]);
+  } catch (error) {
+    showStatus(error.message || "私信发送失败");
+  }
+}
+window.sendDmMessage = sendDmMessage;
+
+async function startDmFromInput() {
+  await searchDmUsers();
+}
+window.startDmFromInput = startDmFromInput;
+
+async function searchDmUsers() {
+  const keyword = String(els.dmSearchInput?.value || "").trim();
+  if (!els.dmSearchResults) return;
+  if (!keyword) {
+    els.dmSearchResults.hidden = true;
+    els.dmSearchResults.innerHTML = "";
+    return;
+  }
+  els.dmSearchResults.hidden = false;
+  els.dmSearchResults.innerHTML = `<p class="empty-text">正在搜索...</p>`;
+  try {
+    const users = await request(`/messages/users?keyword=${encodeURIComponent(keyword)}`);
+    state.dmUsers = Array.isArray(users) ? users : [];
+    renderDmSearchResults();
+  } catch (error) {
+    els.dmSearchResults.innerHTML = `<p class="empty-text">${escapeHtml(error.message || "用户搜索失败")}</p>`;
+  }
+}
+window.searchDmUsers = searchDmUsers;
+
+function renderDmSearchResults() {
+  if (!els.dmSearchResults) return;
+  if (!state.dmUsers.length) {
+    els.dmSearchResults.innerHTML = `<p class="empty-text">没有找到用户。</p>`;
+    return;
+  }
+  els.dmSearchResults.innerHTML = state.dmUsers.map(user => `
+    <button type="button" class="dm-user-result" data-dm-user-id="${user.id}">
+      <img src="${normalizeImage(user.icon) || fallbackAvatar}" alt="">
+      <span><strong>${escapeHtml(user.nickName || "探店用户")}</strong><small>ID ${user.id}</small></span>
+      <em>私信</em>
+    </button>
+  `).join("");
+}
+window.renderDmSearchResults = renderDmSearchResults;
+
+async function openDmWithUser(userId) {
+  if (!userId || !requireLogin()) return;
+  try {
+    switchMessageArea();
+    switchMessageMode("dm");
+    const conversation = normalizeDmConversation(await request("/messages/conversations", {
+      method: "POST",
+      body: JSON.stringify({ peerUserId: Number(userId) })
+    }));
+    state.activeDmId = conversation.id;
+    state.activeDmConversation = conversation;
+    state.dmMobileChatOpen = true;
+    if (els.dmSearchInput) els.dmSearchInput.value = "";
+    if (els.dmSearchResults) {
+      els.dmSearchResults.hidden = true;
+      els.dmSearchResults.innerHTML = "";
+    }
+    await loadDmConversations({ silent: true });
+    await loadDmThread({ silent: true });
+    startDmThreadPolling();
+  } catch (error) {
+    showStatus(error.message || "无法发起私信");
+  }
+}
+window.openDmWithUser = openDmWithUser;
+
+function startDmFromNotification(item) {
+  const actorUserId = item?.dataset.actorUserId;
+  if (actorUserId) openDmWithUser(actorUserId);
+}
+window.startDmFromNotification = startDmFromNotification;
+
+function clearActiveDmConversation() {
+  state.dmMessages = [];
+  renderDmThread();
+}
+window.clearActiveDmConversation = clearActiveDmConversation;
+
+function closeDmMobileChat() {
+  state.dmMobileChatOpen = false;
+  els.messageArea?.classList.remove("is-dm-chat-open");
+}
+window.closeDmMobileChat = closeDmMobileChat;
+
+function startMessagePolling() {
+  if (!token() || state.mode !== "messages") return;
+  if (!state.messagePollTimer) {
+    state.messagePollTimer = setInterval(() => {
+      if (state.mode === "messages") loadDmConversations({ silent: true });
+    }, 5000);
+  }
+  if (state.messageMode === "dm" && state.activeDmId) startDmThreadPolling();
+}
+window.startMessagePolling = startMessagePolling;
+
+function stopMessagePolling() {
+  if (state.messagePollTimer) clearInterval(state.messagePollTimer);
+  state.messagePollTimer = null;
+  stopDmThreadPolling();
+}
+window.stopMessagePolling = stopMessagePolling;
+
+function startDmThreadPolling() {
+  if (!token() || state.mode !== "messages" || state.messageMode !== "dm" || !state.activeDmId) return;
+  if (state.dmThreadPollTimer) return;
+  state.dmThreadPollTimer = setInterval(() => {
+    if (state.mode === "messages" && state.messageMode === "dm" && state.activeDmId) {
+      loadDmThread({ silent: true });
+    }
+  }, 3000);
+}
+window.startDmThreadPolling = startDmThreadPolling;
+
+function stopDmThreadPolling() {
+  if (state.dmThreadPollTimer) clearInterval(state.dmThreadPollTimer);
+  state.dmThreadPollTimer = null;
+}
+window.stopDmThreadPolling = stopDmThreadPolling;
+
+function normalizeDmConversation(item) {
+  item = item || {};
+  const peer = item.peerUser || {};
+  return {
+    id: item.id,
+    peerUserId: item.peerUserId || peer.id,
+    peerNickName: item.peerNickName || peer.nickName || "探店用户",
+    peerIcon: item.peerIcon || peer.icon || "",
+    lastMessageContent: item.lastMessageContent || "",
+    lastMessageTime: item.lastMessageTime || null,
+    unreadCount: Number(item.unreadCount || 0),
+    updatedAt: item.updatedAt || item.updateTime || item.lastMessageTime || null
+  };
+}
+window.normalizeDmConversation = normalizeDmConversation;
+
+function formatDmTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+}
+window.formatDmTime = formatDmTime;
+
+function isSmallScreen() {
+  return window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
+}
+window.isSmallScreen = isSmallScreen;
+
 async function loadNotificationSettings() {
   if (!token() || !els.notificationSettings) return;
   try {
@@ -442,11 +758,7 @@ function stopNotificationStream() {
 window.stopNotificationStream = stopNotificationStream;
 
 function applyRealtimeNotification(data) {
-  const count = Number(data?.unreadCount || 0);
-  if (els.notificationBadge) {
-    els.notificationBadge.textContent = count > 99 ? "99+" : String(count);
-    els.notificationBadge.hidden = count <= 0;
-  }
+  refreshNotificationBadge();
   if (state.mode === "messages") {
     loadNotifications();
   }
@@ -550,6 +862,7 @@ async function openMyProfile(tab = "works") {
 window.openMyProfile = openMyProfile;
 
 async function openUserProfile(userId, tab = "works") {
+  if (typeof stopMessagePolling === "function") stopMessagePolling();
   showContentArea();
   setFeedTabsVisible(false);
   setMobileTabActive("profile");
@@ -587,6 +900,9 @@ function renderProfileHome(profile) {
   actionButton.hidden = false;
   actionButton.textContent = profile.isMe ? "编辑资料" : (profile.isFollow ? "已关注" : "关注");
   actionButton.classList.toggle("is-following", Boolean(!profile.isMe && profile.isFollow));
+  if (els.profileMessageButton) {
+    els.profileMessageButton.hidden = Boolean(profile.isMe);
+  }
   renderProfileTabs();
 }
 window.renderProfileHome = renderProfileHome;
@@ -671,11 +987,27 @@ function renderProfileUsers(users) {
             <strong>${escapeHtml(user.nickName || "探店用户")}</strong>
             <small>ID ${user.id}</small>
           </span>
+          <div class="profile-user-actions">
+            <button type="button" data-profile-open="${user.id}">主页</button>
+            ${String(user.id) === String(state.currentUser?.id || "") ? "" : `<button type="button" data-profile-dm="${user.id}">私信</button>`}
+          </div>
         </article>
       `).join("")}
     </div>`;
   els.profileHomeResults.querySelectorAll("[data-profile-user]").forEach(row => {
     row.addEventListener("click", () => openUserProfile(row.dataset.profileUser));
+  });
+  els.profileHomeResults.querySelectorAll("[data-profile-open]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      openUserProfile(button.dataset.profileOpen);
+    });
+  });
+  els.profileHomeResults.querySelectorAll("[data-profile-dm]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      openDmWithUser(button.dataset.profileDm);
+    });
   });
 }
 window.renderProfileUsers = renderProfileUsers;

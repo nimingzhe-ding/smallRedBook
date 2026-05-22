@@ -165,19 +165,33 @@
     var button = event.target.closest("[data-dm-id]");
     if (button) selectDmConversation(button.dataset.dmId);
   });
+  els.dmSearchResults?.addEventListener("click", function(event) {
+    var button = event.target.closest("[data-dm-user-id]");
+    if (button) openDmWithUser(button.dataset.dmUserId);
+  });
   els.startDmButton?.addEventListener("click", startDmFromInput);
+  els.dmSearchInput?.addEventListener("input", function() {
+    clearTimeout(state.dmSearchTimer);
+    state.dmSearchTimer = setTimeout(searchDmUsers, 240);
+  });
   els.dmSearchInput?.addEventListener("keydown", function(event) {
     if (event.key === "Enter") {
       event.preventDefault();
       startDmFromInput();
+    } else if (event.key === "Escape" && els.dmSearchResults) {
+      els.dmSearchResults.hidden = true;
     }
   });
   els.dmComposeForm?.addEventListener("submit", function(event) {
     event.preventDefault();
     sendDmMessage(els.dmInput.value);
-    els.dmInput.value = "";
   });
   els.clearDmConversation?.addEventListener("click", clearActiveDmConversation);
+  els.dmBackButton?.addEventListener("click", closeDmMobileChat);
+  els.dmOpenProfile?.addEventListener("click", function() {
+    var userId = state.activeDmConversation?.peerUserId;
+    if (userId) openUserProfile(userId);
+  });
   document.querySelectorAll(".notification-tab").forEach(function(tab) {
     tab.addEventListener("click", function() {
       document.querySelectorAll(".notification-tab").forEach(function(t) { t.classList.remove("is-active"); });
@@ -206,6 +220,10 @@
   });
   els.loginDialog.addEventListener("click", function(e) { if (e.target === els.loginDialog) els.loginDialog.close(); });
   document.querySelector("#editProfileButton").addEventListener("click", openProfileEdit);
+  els.profileMessageButton?.addEventListener("click", function() {
+    var userId = state.currentProfile?.userId;
+    if (userId) openDmWithUser(userId);
+  });
   els.profileEditForm.addEventListener("submit", submitProfileEdit);
   document.querySelectorAll(".profile-home-stats [data-profile-tab]").forEach(function(button) {
     button.addEventListener("click", function() { loadProfileTab(button.dataset.profileTab); });

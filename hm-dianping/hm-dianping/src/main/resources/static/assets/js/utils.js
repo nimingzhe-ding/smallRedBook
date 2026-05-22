@@ -71,7 +71,14 @@ window.state = {
   notificationStreamToken: null,
   messageMode: "dm",
   dmConversations: [],
-  activeDmId: null
+  dmMessages: [],
+  dmUsers: [],
+  activeDmId: null,
+  activeDmConversation: null,
+  dmMobileChatOpen: false,
+  messagePollTimer: null,
+  dmThreadPollTimer: null,
+  dmSearchTimer: null
 };
 
 localStorage.setItem("hmdp_ai_session", state.aiSessionId);
@@ -134,8 +141,12 @@ window.els = {
   dmComposeForm: document.querySelector("#dmComposeForm"),
   dmInput: document.querySelector("#dmInput"),
   dmSearchInput: document.querySelector("#dmSearchInput"),
+  dmSearchResults: document.querySelector("#dmSearchResults"),
   startDmButton: document.querySelector("#startDmButton"),
   clearDmConversation: document.querySelector("#clearDmConversation"),
+  dmBackButton: document.querySelector("#dmBackButton"),
+  dmPeerAvatar: document.querySelector("#dmPeerAvatar"),
+  dmOpenProfile: document.querySelector("#dmOpenProfile"),
   notificationPane: document.querySelector("#notificationPane"),
   accountPopover: document.querySelector("#accountPopover"),
   accountAvatar: document.querySelector("#accountAvatar"),
@@ -151,6 +162,7 @@ window.els = {
   mallVoucherList: document.querySelector("#mallVoucherList"),
   cartList: document.querySelector("#cartList"),
   merchantPanel: document.querySelector("#merchantPanel"),
+  profileMessageButton: document.querySelector("#profileMessageButton"),
   composerForm: document.querySelector("#composerForm"),
   contentTypeInputs: document.querySelectorAll("input[name='contentType']"),
   contentFields: document.querySelectorAll("[data-content-field]"),

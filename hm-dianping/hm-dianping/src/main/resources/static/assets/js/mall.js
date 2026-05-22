@@ -41,6 +41,7 @@ function setVideoActive(active) {
 }
 
 function showContentArea() {
+  if (typeof stopMessagePolling === "function") stopMessagePolling();
   setFeedTabsVisible(true);
   els.contentArea.hidden = false;
   els.mallArea.hidden = true;
@@ -54,6 +55,7 @@ function showContentArea() {
 }
 
 function switchMall() {
+  if (typeof stopMessagePolling === "function") stopMessagePolling();
   state.mode = "mall";
   state.mallQuery = els.search.value.trim();
   setFeedTabsVisible(false);
@@ -72,6 +74,7 @@ function switchMall() {
 }
 
 function switchVideo() {
+  if (typeof stopMessagePolling === "function") stopMessagePolling();
   state.mode = "video";
   setFeedTabsVisible(false);
   els.contentArea.hidden = true;
