@@ -119,16 +119,16 @@ function createNoteCard(note) {
           <span>${escapeHtml(note.name)}</span>
         </span>
         <span class="note-card-score" title="${feedScoreTitle(note)}">${compactCount(feedScore(note))}</span>
-      </div>
-      <div class="note-card-actions">
-        <button class="note-action note-like ${note.isLike ? "is-active" : ""}" type="button" aria-label="${note.isLike ? "取消点赞" : "点赞"}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.2 10.7 20C5.8 15.6 2.6 12.7 2.6 9a5 5 0 0 1 8.7-3.4A5 5 0 0 1 20 9c0 3.7-3.2 6.6-8.1 11l-1.3 1.2Z"/></svg>
-          <span>${compactCount(note.liked)}</span>
-        </button>
-        <button class="note-action note-collect ${note.isCollect ? "is-active" : ""}" type="button" aria-label="${note.isCollect ? "取消收藏" : "收藏"}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-3.6-7 3.6v-16a1 1 0 0 1 1-1Z"/></svg>
-          <span>${compactCount(note.collects)}</span>
-        </button>
+        <span class="note-card-actions">
+          <button class="note-action note-like ${note.isLike ? "is-active" : ""}" type="button" aria-label="${note.isLike ? "取消点赞" : "点赞"}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.2 10.7 20C5.8 15.6 2.6 12.7 2.6 9a5 5 0 0 1 8.7-3.4A5 5 0 0 1 20 9c0 3.7-3.2 6.6-8.1 11l-1.3 1.2Z"/></svg>
+            <span>${compactCount(note.liked)}</span>
+          </button>
+          <button class="note-action note-collect ${note.isCollect ? "is-active" : ""}" type="button" aria-label="${note.isCollect ? "取消收藏" : "收藏"}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-3.6-7 3.6v-16a1 1 0 0 1 1-1Z"/></svg>
+            <span>${compactCount(note.collects)}</span>
+          </button>
+        </span>
       </div>
     </div>
   `;

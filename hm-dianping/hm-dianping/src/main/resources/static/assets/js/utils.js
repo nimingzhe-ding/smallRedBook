@@ -68,7 +68,10 @@ window.state = {
   afterLoginAction: null,
   notificationSettings: null,
   notificationStream: null,
-  notificationStreamToken: null
+  notificationStreamToken: null,
+  messageMode: "dm",
+  dmConversations: [],
+  activeDmId: null
 };
 
 localStorage.setItem("hmdp_ai_session", state.aiSessionId);
@@ -93,8 +96,10 @@ window.els = {
   profileEditDialog: document.querySelector("#profileEditDialog"),
   profileEditForm: document.querySelector("#profileEditForm"),
   contentArea: document.querySelector(".content-area"),
+  feedTabs: document.querySelector(".feed-tabs"),
   mallArea: document.querySelector("#mallArea"),
   videoArea: document.querySelector("#videoArea"),
+  messageArea: document.querySelector("#messageArea"),
   videoFeed: document.querySelector("#videoFeed"),
   productGrid: document.querySelector("#productGrid"),
   drawer: document.querySelector("#detailDrawer"),
@@ -116,10 +121,22 @@ window.els = {
   checkoutDialog: document.querySelector("#checkoutDialog"),
   checkoutBody: document.querySelector("#checkoutBody"),
   cartDialog: document.querySelector("#cartDialog"),
-  notificationDialog: document.querySelector("#notificationDialog"),
   notificationList: document.querySelector("#notificationList"),
   notificationBadge: document.querySelector("#notificationBadge"),
   notificationSettings: document.querySelector("#notificationSettings"),
+  messageModeDm: document.querySelector("#messageModeDm"),
+  messageModeNotify: document.querySelector("#messageModeNotify"),
+  dmConversationList: document.querySelector("#dmConversationList"),
+  dmPane: document.querySelector("#dmPane"),
+  dmChatName: document.querySelector("#dmChatName"),
+  dmChatMeta: document.querySelector("#dmChatMeta"),
+  dmThread: document.querySelector("#dmThread"),
+  dmComposeForm: document.querySelector("#dmComposeForm"),
+  dmInput: document.querySelector("#dmInput"),
+  dmSearchInput: document.querySelector("#dmSearchInput"),
+  startDmButton: document.querySelector("#startDmButton"),
+  clearDmConversation: document.querySelector("#clearDmConversation"),
+  notificationPane: document.querySelector("#notificationPane"),
   accountPopover: document.querySelector("#accountPopover"),
   accountAvatar: document.querySelector("#accountAvatar"),
   accountName: document.querySelector("#accountName"),
@@ -156,6 +173,20 @@ window.els = {
   trendList: document.querySelector("#trendList"),
   toastContainer: document.querySelector("#toastContainer")
 };
+
+function setFeedTabsVisible(visible) {
+  if (els.feedTabs) els.feedTabs.hidden = !visible;
+}
+window.setFeedTabsVisible = setFeedTabsVisible;
+
+function setMessageEntryActive(active) {
+  const entry = document.querySelector("#openNotifications");
+  if (!entry) return;
+  entry.classList.toggle("is-active", active);
+  if (active) entry.setAttribute("aria-current", "page");
+  else entry.removeAttribute("aria-current");
+}
+window.setMessageEntryActive = setMessageEntryActive;
 
 function setMobileTabActive(tab) {
   document.querySelectorAll(".mobile-tabbar [data-mobile-tab]").forEach(button => {

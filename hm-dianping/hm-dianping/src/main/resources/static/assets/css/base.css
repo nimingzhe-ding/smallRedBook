@@ -1,7 +1,7 @@
 :root {
   /* ── 颜色 ── */
   --bg: #fff;
-  --bg-page: #fff;
+  --bg-page: #f8f6f2;
   --surface: #fff;
   --surface-soft: #f7f7f8;
   --surface-hover: #f2f2f3;
@@ -10,13 +10,13 @@
   --text-secondary: #333;
   --text-tertiary: #999;
   --muted: #8a8a8f;
-  --line: #ebebed;
-  --line-strong: #dddde0;
+  --line: #ebe7df;
+  --line-strong: #ded8cd;
 
   --accent: #ff2442;
   --accent-dark: #e61c34;
-  --accent-soft: #fff0f2;
-  --accent-light: #fff5f6;
+  --accent-soft: #fff1f3;
+  --accent-light: #fff6f7;
 
   --success: #00c853;
   --success-soft: #e8f5e9;
@@ -57,7 +57,7 @@
 
   /* ── 阴影 ── */
   --shadow-xs: 0 1px 4px rgba(20, 20, 20, .04);
-  --shadow-soft: 0 4px 20px rgba(20, 20, 20, .06);
+  --shadow-soft: 0 10px 30px rgba(31, 24, 18, .08);
   --shadow-float: 0 12px 48px rgba(20, 20, 20, .12);
   --shadow-accent: 0 8px 20px rgba(255, 36, 66, .20);
   --shadow-card-hover: 0 8px 28px rgba(20, 20, 20, .10);

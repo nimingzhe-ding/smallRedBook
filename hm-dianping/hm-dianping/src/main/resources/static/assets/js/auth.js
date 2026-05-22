@@ -233,6 +233,7 @@ function handleAccountAction(action) {
   }
   if (action === "notifications") {
     openNotificationDialog?.();
+    switchMessageMode?.("notifications");
     if (els.notificationSettings) els.notificationSettings.hidden = false;
     loadNotificationSettings?.();
     return;

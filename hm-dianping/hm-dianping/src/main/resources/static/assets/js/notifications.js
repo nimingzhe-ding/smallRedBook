@@ -25,13 +25,41 @@ async function refreshNotificationBadge() {
 window.refreshNotificationBadge = refreshNotificationBadge;
 
 async function openNotificationDialog() {
-  if (!requireLogin()) return;
+  if (!requireLoginThen("notifications")) return;
   setMobileTabActive("messages");
-  els.notificationList.innerHTML = `<p class="empty-text">正在加载消息...</p>`;
-  els.notificationDialog.showModal();
+  switchMessageArea();
+  loadDmConversations();
+  renderDmConversations();
+  renderDmThread();
+  switchMessageMode(state.messageMode || "dm");
   if (!state.notificationSettings) {
     loadNotificationSettings();
   }
+  loadNotifications();
+}
+window.openNotificationDialog = openNotificationDialog;
+
+function switchMessageArea() {
+  state.mode = "messages";
+  setFeedTabsVisible(false);
+  els.contentArea.hidden = true;
+  els.mallArea.hidden = true;
+  els.videoArea.hidden = true;
+  if (els.messageArea) els.messageArea.hidden = false;
+  setMobileTabActive("messages");
+  setMessageEntryActive(true);
+  setMallActive(false);
+  setVideoActive(false);
+  pauseImmersiveVideos();
+  closeDanmakuSource();
+  hideStatus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+window.switchMessageArea = switchMessageArea;
+
+async function loadNotifications() {
+  if (!els.notificationList) return;
+  els.notificationList.innerHTML = `<p class="empty-text">正在加载消息...</p>`;
   const unreadOnly = state.notificationFilter === "unread";
   const category = ["interaction", "order", "audit", "system"].includes(state.notificationFilter)
     ? state.notificationFilter
@@ -43,7 +71,7 @@ async function openNotificationDialog() {
     els.notificationList.innerHTML = `<p class="empty-text">消息加载失败，请稍后再试。</p>`;
   }
 }
-window.openNotificationDialog = openNotificationDialog;
+window.loadNotifications = loadNotifications;
 
 function renderNotifications(list) {
   if (!list.length) {
@@ -55,14 +83,17 @@ function renderNotifications(list) {
     const noteId = notificationTargetNoteId(item, payload);
     const orderId = notificationTargetOrderId(item, payload);
     const actorUserId = item.actorUserId || payload.actorUserId || "";
+    const actorName = payload.actorName || payload.nickName || payload.nickname || "";
+    const actorIcon = payload.actorIcon || payload.icon || "";
     return `
-    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-note-id="${noteId || ""}" data-order-id="${orderId || ""}" data-actor-user-id="${actorUserId || ""}" data-type="${escapeHtml(item.type || "")}">
+    <article class="notification-item${item.readFlag ? "" : " is-unread"}" data-id="${item.id}" data-note-id="${noteId || ""}" data-order-id="${orderId || ""}" data-actor-user-id="${actorUserId || ""}" data-actor-name="${escapeHtml(actorName)}" data-actor-icon="${escapeHtml(actorIcon)}" data-type="${escapeHtml(item.type || "")}">
       <div class="notification-item-body">
         <strong>${escapeHtml(item.title || notificationTypeLabel(item.type))}</strong>
         <span>${escapeHtml(item.content || "")}</span>
         <small><span class="notification-type-tag tag-${(item.type || "").split("_")[0].toLowerCase()}">${notificationTypeLabel(item.type)}</span> · ${formatTime(item.createTime)}</small>
       </div>
       <div class="notification-item-actions">
+        ${actorUserId ? `<button class="notification-action-btn notification-dm-btn" data-action="dm" title="发私信">私信</button>` : ""}
         ${item.readFlag ? "" : `<button class="notification-action-btn" data-action="read" title="标记已读"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor"/></svg></button>`}
         <button class="notification-action-btn" data-action="delete" title="删除"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z" fill="currentColor"/></svg></button>
       </div>
@@ -127,6 +158,208 @@ function notificationCategoryLabel(type) {
   return "系统";
 }
 window.notificationCategoryLabel = notificationCategoryLabel;
+
+// ------------------------------
+// Direct messages (local first)
+// ------------------------------
+function dmStoreKey() {
+  const userId = state.currentUser?.id || "guest";
+  return `hmdp_dm_${userId}`;
+}
+window.dmStoreKey = dmStoreKey;
+
+function loadDmConversations() {
+  try {
+    state.dmConversations = JSON.parse(localStorage.getItem(dmStoreKey()) || "[]");
+  } catch {
+    state.dmConversations = [];
+  }
+  if (!Array.isArray(state.dmConversations)) state.dmConversations = [];
+  if (!state.dmConversations.length) {
+    state.dmConversations = defaultDmConversations();
+    saveDmConversations();
+  }
+  if (!state.activeDmId || !state.dmConversations.some(item => item.id === state.activeDmId)) {
+    state.activeDmId = state.dmConversations[0]?.id || null;
+  }
+}
+window.loadDmConversations = loadDmConversations;
+
+function defaultDmConversations() {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: "assistant",
+      userId: "",
+      name: "平台小助手",
+      icon: "",
+      unread: 0,
+      messages: [
+        { id: crypto.randomUUID(), from: "them", text: "可以从互动通知里点“私信”，也可以输入用户 ID 开始聊天。", time: now }
+      ],
+      updatedAt: now
+    }
+  ];
+}
+
+function saveDmConversations() {
+  localStorage.setItem(dmStoreKey(), JSON.stringify(state.dmConversations || []));
+}
+window.saveDmConversations = saveDmConversations;
+
+function switchMessageMode(mode) {
+  state.messageMode = mode === "notifications" ? "notifications" : "dm";
+  els.messageArea?.classList.toggle("is-notification-mode", state.messageMode === "notifications");
+  els.messageModeDm?.classList.toggle("is-active", state.messageMode === "dm");
+  els.messageModeNotify?.classList.toggle("is-active", state.messageMode === "notifications");
+  if (els.dmPane) els.dmPane.hidden = state.messageMode !== "dm";
+  if (els.notificationPane) els.notificationPane.hidden = state.messageMode !== "notifications";
+}
+window.switchMessageMode = switchMessageMode;
+
+function findDmConversation(id) {
+  return state.dmConversations.find(item => item.id === id);
+}
+window.findDmConversation = findDmConversation;
+
+function upsertDmConversation(contact) {
+  loadDmConversations();
+  const userId = String(contact?.userId || "").trim();
+  const name = String(contact?.name || contact?.nickName || "").trim();
+  const id = userId ? `user-${userId}` : `contact-${name || Date.now()}`;
+  let conversation = findDmConversation(id);
+  if (!conversation) {
+    conversation = {
+      id,
+      userId,
+      name: name || (userId ? `用户 ${userId}` : "新会话"),
+      icon: contact?.icon || "",
+      unread: 0,
+      messages: [],
+      updatedAt: new Date().toISOString()
+    };
+    state.dmConversations.unshift(conversation);
+  } else {
+    if (name) conversation.name = name;
+    if (contact?.icon) conversation.icon = contact.icon;
+  }
+  state.activeDmId = conversation.id;
+  saveDmConversations();
+  renderDmConversations();
+  renderDmThread();
+  switchMessageMode("dm");
+  return conversation;
+}
+window.upsertDmConversation = upsertDmConversation;
+
+function renderDmConversations() {
+  if (!els.dmConversationList) return;
+  loadDmConversations();
+  if (!state.dmConversations.length) {
+    els.dmConversationList.innerHTML = `<p class="empty-text">还没有私信。</p>`;
+    return;
+  }
+  els.dmConversationList.innerHTML = state.dmConversations
+    .slice()
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+    .map(item => {
+      const latest = item.messages?.[item.messages.length - 1];
+      return `
+        <button class="dm-conversation${item.id === state.activeDmId ? " is-active" : ""}" type="button" data-dm-id="${escapeHtml(item.id)}">
+          <img src="${normalizeImage(item.icon) || fallbackAvatar}" alt="">
+          <span>
+            <strong>${escapeHtml(item.name || "探店用户")}</strong>
+            <small>${escapeHtml(latest?.text || "还没有聊天记录")}</small>
+          </span>
+          ${item.unread ? `<b>${item.unread > 99 ? "99+" : item.unread}</b>` : ""}
+        </button>
+      `;
+    }).join("");
+}
+window.renderDmConversations = renderDmConversations;
+
+function renderDmThread() {
+  if (!els.dmThread) return;
+  const conversation = findDmConversation(state.activeDmId);
+  if (!conversation) {
+    els.dmChatName.textContent = "选择一个会话";
+    els.dmChatMeta.textContent = "从左侧选择私信，或输入用户 ID 新建聊天";
+    els.dmThread.innerHTML = `<div class="dm-empty">还没有选择聊天。</div>`;
+    els.dmInput.disabled = true;
+    return;
+  }
+  conversation.unread = 0;
+  saveDmConversations();
+  els.dmInput.disabled = false;
+  els.dmChatName.textContent = conversation.name || "探店用户";
+  els.dmChatMeta.textContent = conversation.userId ? `用户 ID ${conversation.userId}` : "本地会话";
+  const messages = conversation.messages || [];
+  els.dmThread.innerHTML = messages.length ? messages.map(message => `
+    <div class="dm-message ${message.from === "me" ? "is-me" : "is-them"}">
+      <p>${escapeHtml(message.text)}</p>
+      <span>${formatTime(message.time)}</span>
+    </div>
+  `).join("") : `<div class="dm-empty">还没有聊天记录，先打个招呼。</div>`;
+  els.dmThread.scrollTop = els.dmThread.scrollHeight;
+  renderDmConversations();
+}
+window.renderDmThread = renderDmThread;
+
+function selectDmConversation(id) {
+  state.activeDmId = id;
+  renderDmThread();
+}
+window.selectDmConversation = selectDmConversation;
+
+function sendDmMessage(text) {
+  const value = String(text || "").trim();
+  const conversation = findDmConversation(state.activeDmId);
+  if (!value || !conversation) return;
+  conversation.messages = conversation.messages || [];
+  conversation.messages.push({
+    id: crypto.randomUUID(),
+    from: "me",
+    text: value,
+    time: new Date().toISOString()
+  });
+  conversation.updatedAt = new Date().toISOString();
+  saveDmConversations();
+  renderDmThread();
+}
+window.sendDmMessage = sendDmMessage;
+
+function startDmFromInput() {
+  const raw = String(els.dmSearchInput?.value || "").trim();
+  if (!raw) {
+    showStatus("输入用户 ID 或昵称后再发起私信。");
+    return;
+  }
+  const isId = /^\d+$/.test(raw);
+  upsertDmConversation({ userId: isId ? raw : "", name: isId ? `用户 ${raw}` : raw });
+  if (els.dmSearchInput) els.dmSearchInput.value = "";
+}
+window.startDmFromInput = startDmFromInput;
+
+function startDmFromNotification(item) {
+  const actorUserId = item?.dataset.actorUserId;
+  if (!actorUserId) return;
+  upsertDmConversation({
+    userId: actorUserId,
+    name: item.dataset.actorName || `用户 ${actorUserId}`,
+    icon: item.dataset.actorIcon || ""
+  });
+}
+window.startDmFromNotification = startDmFromNotification;
+
+function clearActiveDmConversation() {
+  const conversation = findDmConversation(state.activeDmId);
+  if (!conversation) return;
+  conversation.messages = [];
+  conversation.updatedAt = new Date().toISOString();
+  saveDmConversations();
+  renderDmThread();
+}
+window.clearActiveDmConversation = clearActiveDmConversation;
 
 async function loadNotificationSettings() {
   if (!token() || !els.notificationSettings) return;
@@ -214,8 +447,8 @@ function applyRealtimeNotification(data) {
     els.notificationBadge.textContent = count > 99 ? "99+" : String(count);
     els.notificationBadge.hidden = count <= 0;
   }
-  if (els.notificationDialog?.open) {
-    openNotificationDialog();
+  if (state.mode === "messages") {
+    loadNotifications();
   }
 }
 window.applyRealtimeNotification = applyRealtimeNotification;
@@ -224,7 +457,7 @@ async function markNotificationsRead() {
   if (!requireLogin()) return;
   await request("/notifications/read", { method: "POST" });
   await refreshNotificationBadge();
-  await openNotificationDialog();
+  await loadNotifications();
 }
 window.markNotificationsRead = markNotificationsRead;
 
@@ -269,10 +502,13 @@ function navigateFromNotification(item) {
   if (item.dataset.id) {
     markSingleNotificationRead(Number(item.dataset.id));
   }
-  els.notificationDialog.close();
+  if (els.messageArea) els.messageArea.hidden = true;
+  setMessageEntryActive(false);
   if (noteId && isNoteNotificationType(type)) {
+    showContentArea();
     openDrawer({ id: Number(noteId) });
   } else if (orderId && type.startsWith("ORDER_")) {
+    switchMall();
     if (typeof openOrderDetail === "function") openOrderDetail(Number(orderId));
     else openOrdersDialog(Number(orderId));
   } else if (actorUserId && type === "FOLLOW") {
@@ -315,6 +551,7 @@ window.openMyProfile = openMyProfile;
 
 async function openUserProfile(userId, tab = "works") {
   showContentArea();
+  setFeedTabsVisible(false);
   setMobileTabActive("profile");
   hideUnifiedSearch();
   state.mode = "profile";

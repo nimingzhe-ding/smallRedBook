@@ -355,6 +355,12 @@
     return topicText ? body + "\n\n" + topicText : body;
   }
 
+  function closeComposer() {
+    if (!els.composer?.open) return;
+    saveComposerDraft();
+    els.composer.close();
+  }
+
   // ------------------------------
   // Composer open / edit / delete
   // ------------------------------
@@ -428,6 +434,7 @@
   window.uploadResultUrl = uploadResultUrl;
   window.submitComposer = submitComposer;
   window.mergeTopics = mergeTopics;
+  window.closeComposer = closeComposer;
   window.openComposer = openComposer;
   window.openComposerForEdit = openComposerForEdit;
   window.deleteCurrentNote = deleteCurrentNote;

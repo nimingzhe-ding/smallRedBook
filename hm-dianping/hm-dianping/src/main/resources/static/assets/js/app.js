@@ -102,6 +102,8 @@
 
   document.querySelector("#openComposer").addEventListener("click", openComposer);
   document.querySelector("#mobilePublish").addEventListener("click", openComposer);
+  document.querySelector("#closeComposerDialog").addEventListener("click", closeComposer);
+  document.querySelector("#cancelComposerDialog").addEventListener("click", closeComposer);
   document.querySelector("#closeShopDialog").addEventListener("click", function() { els.shopDialog.close(); });
   document.querySelector("#mobileMall").addEventListener("click", switchMall);
   var mobileProfile = document.querySelector("#mobileProfile");
@@ -124,7 +126,6 @@
   if (briefVideo) briefVideo.addEventListener("click", switchVideo);
   var briefMall = document.querySelector("[data-brief-action='mall']");
   if (briefMall) briefMall.addEventListener("click", switchMall);
-  document.querySelector("#closeNotificationDialog").addEventListener("click", function() { els.notificationDialog.close(); });
   document.querySelector("#markNotificationsRead").addEventListener("click", markNotificationsRead);
   document.querySelector("#toggleNotificationSettings")?.addEventListener("click", function() {
     if (!els.notificationSettings) return;
@@ -149,16 +150,40 @@
       e.stopPropagation();
       if (actionBtn.dataset.action === "read") markSingleNotificationRead(id);
       else if (actionBtn.dataset.action === "delete") deleteNotification(id);
+      else if (actionBtn.dataset.action === "dm") startDmFromNotification(item);
     } else {
       navigateFromNotification(item);
     }
   });
+  document.querySelectorAll("[data-message-mode]").forEach(function(button) {
+    button.addEventListener("click", function() {
+      switchMessageMode(button.dataset.messageMode);
+      if (button.dataset.messageMode === "notifications") loadNotifications();
+    });
+  });
+  els.dmConversationList?.addEventListener("click", function(event) {
+    var button = event.target.closest("[data-dm-id]");
+    if (button) selectDmConversation(button.dataset.dmId);
+  });
+  els.startDmButton?.addEventListener("click", startDmFromInput);
+  els.dmSearchInput?.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      startDmFromInput();
+    }
+  });
+  els.dmComposeForm?.addEventListener("submit", function(event) {
+    event.preventDefault();
+    sendDmMessage(els.dmInput.value);
+    els.dmInput.value = "";
+  });
+  els.clearDmConversation?.addEventListener("click", clearActiveDmConversation);
   document.querySelectorAll(".notification-tab").forEach(function(tab) {
     tab.addEventListener("click", function() {
       document.querySelectorAll(".notification-tab").forEach(function(t) { t.classList.remove("is-active"); });
       tab.classList.add("is-active");
       state.notificationFilter = tab.dataset.filter;
-      openNotificationDialog();
+      loadNotifications();
     });
   });
   document.querySelector("#closeMerchantDialog").addEventListener("click", function() { els.merchantDialog.close(); });
@@ -238,6 +263,8 @@
   els.profileHome.hidden = true;
   els.feed.hidden = false;
   els.loading.hidden = false;
+  setFeedTabsVisible(true);
+  setMessageEntryActive(false);
   initUser();
   refreshNotificationBadge();
   setInterval(refreshNotificationBadge, 60000);

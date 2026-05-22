@@ -41,9 +41,12 @@ function setVideoActive(active) {
 }
 
 function showContentArea() {
+  setFeedTabsVisible(true);
   els.contentArea.hidden = false;
   els.mallArea.hidden = true;
   els.videoArea.hidden = true;
+  if (els.messageArea) els.messageArea.hidden = true;
+  setMessageEntryActive(false);
   setMallActive(false);
   setVideoActive(false);
   pauseImmersiveVideos();
@@ -53,9 +56,12 @@ function showContentArea() {
 function switchMall() {
   state.mode = "mall";
   state.mallQuery = els.search.value.trim();
+  setFeedTabsVisible(false);
   els.contentArea.hidden = true;
   els.videoArea.hidden = true;
+  if (els.messageArea) els.messageArea.hidden = true;
   els.mallArea.hidden = false;
+  setMessageEntryActive(false);
   setMallActive(true);
   setVideoActive(false);
   pauseImmersiveVideos();
@@ -67,9 +73,12 @@ function switchMall() {
 
 function switchVideo() {
   state.mode = "video";
+  setFeedTabsVisible(false);
   els.contentArea.hidden = true;
   els.mallArea.hidden = true;
+  if (els.messageArea) els.messageArea.hidden = true;
   els.videoArea.hidden = false;
+  setMessageEntryActive(false);
   setMallActive(false);
   setVideoActive(true);
   hideStatus();

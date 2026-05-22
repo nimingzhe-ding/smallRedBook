@@ -78,25 +78,6 @@
     <main class="main-layout">
       <!-- 中央内容区：频道筛选、AI 搜索推荐、瀑布流笔记 -->
       <section class="content-area" aria-label="笔记内容流">
-        <section class="local-life-brief" aria-label="同城种草精选">
-          <div class="brief-copy">
-            <span>今日同城灵感</span>
-            <h1>发现附近值得去、值得买、值得分享的生活点</h1>
-            <p>从探店笔记到优惠券、同款好物和真实评价，把本地生活的决策链路收进一个内容流。</p>
-          </div>
-          <div class="brief-actions" aria-label="快捷探索">
-            <button type="button" data-smart-query="附近高分下午茶">附近高分下午茶</button>
-            <button type="button" data-smart-query="周末探店路线">周末探店路线</button>
-            <button type="button" data-smart-query="今晚可用优惠券">今晚可用优惠券</button>
-            <button type="button" data-brief-action="video">沉浸视频</button>
-            <button type="button" data-brief-action="mall">好物商城</button>
-          </div>
-          <div class="brief-metrics" aria-label="产品能力概览">
-            <span><strong>6</strong>内容频道</span>
-            <span><strong>AI</strong>智能客服</span>
-            <span><strong>券</strong>探店闭环</span>
-          </div>
-        </section>
         <div class="status-banner" id="statusBanner" hidden></div>
         <section class="unified-search" id="unifiedSearch" hidden>
           <div class="unified-search-head">
@@ -158,6 +139,59 @@
           <button class="category-pill" data-mall-category="travel">旅行出行</button>
         </div>
         <div class="product-grid" id="productGrid"></div>
+      </section>
+
+      <section class="message-area" id="messageArea" aria-label="消息中心" hidden>
+        <div class="message-page-head">
+          <div>
+            <strong>消息</strong>
+            <span>私信、互动和订单动态</span>
+          </div>
+        </div>
+        <div class="message-center-shell">
+          <aside class="message-rail">
+            <div class="message-mode-tabs" role="tablist" aria-label="消息类型">
+              <button class="is-active" id="messageModeDm" type="button" data-message-mode="dm">私信</button>
+              <button id="messageModeNotify" type="button" data-message-mode="notifications">通知</button>
+            </div>
+            <div class="message-start-box">
+              <input id="dmSearchInput" type="text" placeholder="搜索或输入用户 ID" autocomplete="off">
+              <button id="startDmButton" type="button">新聊天</button>
+            </div>
+            <div class="dm-conversation-list" id="dmConversationList"></div>
+          </aside>
+          <section class="dm-pane" id="dmPane">
+            <div class="dm-chat-head">
+              <div>
+                <strong id="dmChatName">选择一个会话</strong>
+                <span id="dmChatMeta">支持本地私信草稿，可从互动通知发起聊天</span>
+              </div>
+              <button class="soft-button" id="clearDmConversation" type="button">清空</button>
+            </div>
+            <div class="dm-thread" id="dmThread"></div>
+            <form class="dm-compose" id="dmComposeForm">
+              <input id="dmInput" maxlength="240" placeholder="写一条私信..." autocomplete="off">
+              <button type="submit">发送</button>
+            </form>
+          </section>
+          <section class="notification-pane" id="notificationPane" hidden>
+            <div class="notification-actions">
+              <div class="notification-tabs">
+                <button class="notification-tab is-active" data-filter="all" type="button">全部</button>
+                <button class="notification-tab" data-filter="unread" type="button">未读</button>
+                <button class="notification-tab" data-filter="interaction" type="button">互动</button>
+                <button class="notification-tab" data-filter="order" type="button">订单</button>
+                <button class="notification-tab" data-filter="audit" type="button">审核</button>
+              </div>
+              <div class="notification-toolbar">
+                <button class="soft-button" id="toggleNotificationSettings" type="button">设置</button>
+                <button class="soft-button" id="markNotificationsRead" type="button">全部已读</button>
+              </div>
+            </div>
+            <div class="notification-settings" id="notificationSettings" hidden></div>
+            <div class="notification-list" id="notificationList"></div>
+          </section>
+        </div>
       </section>
 
     </main>
@@ -342,32 +376,6 @@
     </div>
   </dialog>
 
-  <dialog class="shop-dialog" id="notificationDialog">
-    <div class="shop-dialog-panel">
-      <div class="dialog-head">
-        <h2>消息通知</h2>
-        <button class="icon-button" id="closeNotificationDialog" type="button" aria-label="关闭消息通知">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 10.6 4.6-4.6L18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6L6 7.4 7.4 6l4.6 4.6Z"/></svg>
-        </button>
-      </div>
-      <div class="notification-actions">
-        <div class="notification-tabs">
-          <button class="notification-tab is-active" data-filter="all" type="button">全部</button>
-          <button class="notification-tab" data-filter="unread" type="button">未读</button>
-          <button class="notification-tab" data-filter="interaction" type="button">互动</button>
-          <button class="notification-tab" data-filter="order" type="button">订单</button>
-          <button class="notification-tab" data-filter="audit" type="button">审核</button>
-        </div>
-        <div class="notification-toolbar">
-          <button class="soft-button" id="toggleNotificationSettings" type="button">设置</button>
-          <button class="soft-button" id="markNotificationsRead" type="button">全部已读</button>
-        </div>
-      </div>
-      <div class="notification-settings" id="notificationSettings" hidden></div>
-      <div class="notification-list" id="notificationList"></div>
-    </div>
-  </dialog>
-
   <dialog class="shop-dialog customer-service-dialog" id="customerServiceDialog">
     <div class="shop-dialog-panel customer-service-panel">
       <div class="dialog-head">
@@ -407,7 +415,7 @@
     <form method="dialog" class="composer-form" id="composerForm">
       <div class="dialog-head">
         <h2>发布内容</h2>
-        <button class="icon-button" value="cancel" aria-label="关闭发布弹窗">
+        <button class="icon-button" id="closeComposerDialog" type="button" aria-label="关闭发布弹窗">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 10.6 4.6-4.6L18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6L6 7.4 7.4 6l4.6 4.6Z"/></svg>
         </button>
       </div>
@@ -478,7 +486,7 @@
         <textarea name="content" rows="7" required placeholder="分享环境、菜品、价格、路线和适合的人群"></textarea>
       </label>
       <div class="dialog-actions">
-        <button class="ghost-button" value="cancel">取消</button>
+        <button class="ghost-button" id="cancelComposerDialog" type="button">取消</button>
         <button class="publish-button" value="default">发布</button>
       </div>
     </form>

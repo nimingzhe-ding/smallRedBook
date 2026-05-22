@@ -13,6 +13,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
     return;
   }
   showContentArea();
+  setFeedTabsVisible(false);
   state.mode = "search";
   hideProfileHome();
   document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
