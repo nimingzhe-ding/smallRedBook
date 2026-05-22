@@ -7,18 +7,36 @@
 // NOTE: normalizeProduct and normalizeShop are already in utils.js, skipped here to avoid duplication.
 
 function setMallActive(active) {
-  document.querySelectorAll("#mobileMall").forEach(item => item.classList.toggle("is-active", active));
+  document.querySelectorAll("#mobileMall").forEach(item => {
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   if (active) {
     setMobileTabActive("mall");
-    document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
+    document.querySelectorAll("[data-feed]").forEach(item => {
+      const activeFeed = item.dataset.feed === "mall" && !item.closest(".mobile-tabbar");
+      item.classList.toggle("is-active", activeFeed);
+      if (activeFeed) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
   }
 }
 
 function setVideoActive(active) {
-  document.querySelectorAll("#mobileVideo").forEach(item => item.classList.toggle("is-active", active));
+  document.querySelectorAll("#mobileVideo").forEach(item => {
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   if (active) {
     setMobileTabActive(null);
-    document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
+    document.querySelectorAll("[data-feed]").forEach(item => {
+      const activeFeed = item.dataset.feed === "video" && !item.closest(".mobile-tabbar");
+      item.classList.toggle("is-active", activeFeed);
+      if (activeFeed) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
   }
 }
 
@@ -43,6 +61,7 @@ function switchMall() {
   pauseImmersiveVideos();
   closeDanmakuSource();
   hideStatus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
   loadProducts();
 }
 
@@ -54,6 +73,7 @@ function switchVideo() {
   setMallActive(false);
   setVideoActive(true);
   hideStatus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
   renderVideoFeed();
   setTimeout(playCurrentImmersiveVideo, 80);
 }

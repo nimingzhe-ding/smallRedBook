@@ -657,8 +657,12 @@
 
 @media (max-width: 760px) {
   .customer-service-fab {
-    right: 16px;
-    bottom: 86px;
+    right: 14px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0));
+    width: 48px;
+    height: 48px;
+    font-size: 13px;
+    box-shadow: 0 10px 24px rgba(255, 36, 66, .22);
   }
 }
 

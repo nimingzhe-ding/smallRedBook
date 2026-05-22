@@ -480,7 +480,7 @@ function closeDrawer() {
   els.drawer.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
   state.replyTarget = null;
-  els.commentInput.placeholder = "说点什么...";
+  els.commentInput.placeholder = "说点什么…";
 }
 
 // Export cross-module functions

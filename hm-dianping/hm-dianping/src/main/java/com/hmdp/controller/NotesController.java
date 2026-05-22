@@ -51,12 +51,12 @@ public class NotesController {
     // ======================== 信息流与搜索 ========================
 
     /**
-     * 首页信息流：支持 hot（热门）/ follow（关注）/ nearby（附近）三个频道，
+     * 首页信息流：支持 recommend（推荐）/ hot（热门）/ follow（关注）/ nearby（附近）/ video（视频）/ mall（好物）频道，
      * 可选关键词 query 过滤，支持地理位置参数 (x, y) 做附近推荐。
      */
     @GetMapping("/feed")
     public Result feed(
-            @RequestParam(value = "channel", defaultValue = "hot") String channel,
+            @RequestParam(value = "channel", defaultValue = "recommend") String channel,
             @RequestParam(value = "query", required = false) String query,
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "x", required = false) Double x,

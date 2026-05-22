@@ -46,8 +46,12 @@ window.state = {
   currentProfile: null,
   profileTab: "works",
   currentUser: null,
+  pendingNoteActions: new Set(),
+  commentSubmitting: false,
   replyTarget: null,
   commentSort: "hot",
+  nearbyLocation: null,
+  nearbyLocationLoading: false,
   editingNoteId: null,
   trends: [],
   hotSearches: [],
@@ -155,7 +159,10 @@ window.els = {
 
 function setMobileTabActive(tab) {
   document.querySelectorAll(".mobile-tabbar [data-mobile-tab]").forEach(button => {
-    button.classList.toggle("is-active", Boolean(tab) && button.dataset.mobileTab === tab);
+    const active = Boolean(tab) && button.dataset.mobileTab === tab;
+    button.classList.toggle("is-active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
 }
 window.setMobileTabActive = setMobileTabActive;
@@ -179,6 +186,7 @@ window.showToast = showToast;
 // ==================== 骨架屏 ====================
 // 首次加载时显示占位卡片，提升感知性能
 function renderSkeletons(count = 8) {
+  els.feed.classList.remove("is-empty");
   let html = "";
   for (let i = 0; i < count; i++) {
     const ratio = [0.8, 1.0, 1.2, 1.4][i % 4];
@@ -280,29 +288,58 @@ window.checkAiRisk = checkAiRisk;
 
 // 笔记数据标准化：补全图片/视频/作者信息，统一前后端字段差异
 function normalizeNote(note, index = 0) {
+  note = note || {};
+  const id = note.id ?? note.noteId;
   const images = String(note.images || "").split(",").map(item => item.trim()).filter(Boolean);
-  const image = images[0] || defaultNoteImage;
+  const image = note.cover || images[0] || defaultNoteImage;
   const parsedContent = parseVideoContent(note.content || "");
   const videoUrl = normalizeMedia(note.videoUrl || note.video || parsedContent.videoUrl);
-  const contentType = normalizeContentType(note.contentType, videoUrl);
+  const contentType = normalizeContentType(note.mediaType || note.contentType, videoUrl);
+  const likedCount = Number(note.likedCount ?? note.liked ?? 0);
+  const commentCount = Number(note.commentCount ?? note.comments ?? 0);
+  const collectCount = Number(note.collectCount ?? note.collects ?? 0);
+  const isLike = Boolean(note.isLike ?? note.likedByMe ?? false);
+  const isCollect = Boolean(note.isCollect ?? note.collected ?? state.collected.has(String(id)));
+  const isFollow = Boolean(note.isFollow ?? note.followed ?? false);
+  const authorId = note.userId ?? note.authorId;
+  const authorName = note.name || note.authorName || `探店用户 ${authorId || ""}`.trim();
+  const authorIcon = normalizeImage(note.icon || note.authorIcon) || fallbackAvatar;
   return {
     ...note,
+    id,
+    noteId: id,
     image,
     images,
     contentType,
-    name: note.name || `探店用户 ${note.userId || ""}`.trim(),
-    icon: normalizeImage(note.icon) || fallbackAvatar,
-    liked: note.liked || 0,
-    comments: note.comments || 0,
+    mediaType: contentType,
+    userId: authorId,
+    authorId,
+    name: authorName,
+    authorName,
+    icon: authorIcon,
+    authorIcon,
+    liked: likedCount,
+    likedCount,
+    comments: commentCount,
+    commentCount,
+    collects: collectCount,
+    collectCount,
     status: Number(note.status || 0),
     auditRemark: note.auditRemark || "",
     content: parsedContent.content,
     videoUrl,
     isVideo: ["VIDEO", "LIVE"].includes(contentType) && Boolean(videoUrl),
+    isLike,
+    isCollect,
+    isFollow,
+    likedByMe: isLike,
+    collected: isCollect,
+    followed: isFollow,
+    score: Number(note.score || 0),
     products: Array.isArray(note.products) ? note.products.map(normalizeProduct) : [],
     creatorGrowth: note.creatorGrowth || null,
     relatedNotes: Array.isArray(note.relatedNotes) ? note.relatedNotes.map(item => normalizeNote(item)) : [],
-    isOwner: Boolean(note.isOwner || (state.currentUser?.id && Number(note.userId) === Number(state.currentUser.id))),
+    isOwner: Boolean(note.isOwner || (state.currentUser?.id && Number(authorId) === Number(state.currentUser.id))),
     tags: note.tags || "",
     ratio: [0.78, 1, 1.14, 1.28, 0.92][index % 5]
   };

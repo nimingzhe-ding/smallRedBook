@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/mobile.css">
 </head>
 <body>
+  <a class="skip-link" href="#noteFeed">跳到内容流</a>
   <div class="app-shell">
     <!-- 顶部主导航：品牌、搜索、登录发布入口 -->
     <header class="topbar">
@@ -67,13 +68,35 @@
     <!-- 二级频道导航 -->
     <nav class="feed-tabs" aria-label="内容频道">
       <button class="tab" data-feed="follow">关注</button>
-      <button class="tab is-active" data-feed="recommend">推荐</button>
-      <button class="tab" data-feed="nearby">当前城市</button>
+      <button class="tab is-active" data-feed="recommend" aria-current="page">推荐</button>
+      <button class="tab" data-feed="hot">热门</button>
+      <button class="tab" data-feed="nearby">附近</button>
+      <button class="tab" data-feed="video">视频</button>
+      <button class="tab" data-feed="mall">好物</button>
     </nav>
 
     <main class="main-layout">
       <!-- 中央内容区：频道筛选、AI 搜索推荐、瀑布流笔记 -->
       <section class="content-area" aria-label="笔记内容流">
+        <section class="local-life-brief" aria-label="同城种草精选">
+          <div class="brief-copy">
+            <span>今日同城灵感</span>
+            <h1>发现附近值得去、值得买、值得分享的生活点</h1>
+            <p>从探店笔记到优惠券、同款好物和真实评价，把本地生活的决策链路收进一个内容流。</p>
+          </div>
+          <div class="brief-actions" aria-label="快捷探索">
+            <button type="button" data-smart-query="附近高分下午茶">附近高分下午茶</button>
+            <button type="button" data-smart-query="周末探店路线">周末探店路线</button>
+            <button type="button" data-smart-query="今晚可用优惠券">今晚可用优惠券</button>
+            <button type="button" data-brief-action="video">沉浸视频</button>
+            <button type="button" data-brief-action="mall">好物商城</button>
+          </div>
+          <div class="brief-metrics" aria-label="产品能力概览">
+            <span><strong>6</strong>内容频道</span>
+            <span><strong>AI</strong>智能客服</span>
+            <span><strong>券</strong>探店闭环</span>
+          </div>
+        </section>
         <div class="status-banner" id="statusBanner" hidden></div>
         <section class="unified-search" id="unifiedSearch" hidden>
           <div class="unified-search-head">
@@ -141,7 +164,7 @@
 
     <!-- 移动端底部主导航 -->
     <nav class="mobile-tabbar" aria-label="移动端导航">
-      <button class="is-active" type="button" id="mobileHome" data-feed="recommend" data-mobile-tab="home">
+      <button class="is-active" type="button" id="mobileHome" data-feed="recommend" data-mobile-tab="home" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 3.4 10v10h6v-6h5.2v6h6V10L12 3.2Z"/></svg>
         <span>首页</span>
       </button>
@@ -149,7 +172,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Zm3-2a3 3 0 0 1 6 0h-2a1 1 0 0 0-2 0H9Z"/></svg>
         <span>商城</span>
       </button>
-      <button type="button" id="mobilePublish" class="mobile-publish-btn">
+      <button type="button" id="mobilePublish" class="mobile-publish-btn" aria-label="发布内容">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ff2442"/><path d="M11 7h2v10h-2zM7 11h10v2H7z" fill="#fff"/></svg>
       </button>
       <button type="button" id="mobileNotifications" data-mobile-tab="messages">
@@ -237,7 +260,7 @@
         </section>
         <div class="drawer-actions">
           <form class="comment-form" id="commentForm">
-            <input id="commentInput" placeholder="说点什么...">
+            <input id="commentInput" maxlength="255" placeholder="说点什么…" autocomplete="off">
             <button type="submit">发送</button>
           </form>
           <button type="button" id="drawerLike">喜欢</button>
@@ -361,7 +384,7 @@
         <button type="button" data-cs-question="优惠券怎么用？">优惠券</button>
       </div>
       <form class="customer-service-form" id="customerServiceForm">
-        <input id="customerServiceInput" placeholder="问订单、退款、物流、优惠券问题">
+        <input id="customerServiceInput" placeholder="问订单、退款、物流、优惠券问题" autocomplete="off">
         <button class="publish-button" type="submit">发送</button>
       </form>
     </div>
@@ -420,23 +443,23 @@
       <div class="video-preview" id="videoPreview" data-content-field="video"></div>
       <label>
         标题
-        <input name="title" maxlength="80" required placeholder="比如：人均 30 的宝藏茶餐厅">
+        <input name="title" maxlength="80" required placeholder="比如：人均 30 的宝藏茶餐厅" autocomplete="off">
       </label>
       <label>
         图片地址
-        <input name="images" placeholder="多个图片地址用英文逗号分隔，上传后会自动填充">
+        <input name="images" placeholder="多个图片地址用英文逗号分隔，上传后会自动填充" autocomplete="off">
       </label>
       <label data-content-field="video">
         视频/直播地址
-        <input name="videoUrl" placeholder="MP4 或直播回放地址">
+        <input name="videoUrl" placeholder="MP4 或直播回放地址" autocomplete="off">
       </label>
       <label data-content-field="shop">
         关联店铺 ID
-        <input name="shopId" type="number" min="1" placeholder="关联店铺，选填">
+        <input name="shopId" type="number" min="1" placeholder="关联店铺，选填" autocomplete="off">
       </label>
       <label>
         挂载商品 ID
-        <input name="productIds" placeholder="多个商品 ID 用英文逗号分隔，商品种草必填">
+        <input name="productIds" placeholder="多个商品 ID 用英文逗号分隔，商品种草必填" autocomplete="off">
       </label>
       <label>
         话题标签
@@ -448,7 +471,7 @@
           <option value="数码">数码</option>
           <option value="好物">好物</option>
         </select>
-        <input name="topics" maxlength="80" placeholder="如：#周末去哪儿 #人均50 #约会餐厅">
+        <input name="topics" maxlength="80" placeholder="如：#周末去哪儿 #人均50 #约会餐厅" autocomplete="off">
       </label>
       <label>
         正文
@@ -469,9 +492,9 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 10.6 4.6-4.6L18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6L6 7.4 7.4 6l4.6 4.6Z"/></svg>
         </button>
       </div>
-      <label>昵称<input name="nickName" maxlength="30" placeholder="你的昵称"></label>
-      <label>头像地址<input name="icon" placeholder="图片 URL 或 /imgs/..."></label>
-      <label>城市<input name="city" maxlength="32" placeholder="所在城市"></label>
+      <label>昵称<input name="nickName" maxlength="30" placeholder="你的昵称" autocomplete="nickname"></label>
+      <label>头像地址<input name="icon" placeholder="图片 URL 或 /imgs/…" autocomplete="off"></label>
+      <label>城市<input name="city" maxlength="32" placeholder="所在城市" autocomplete="address-level2"></label>
       <label>简介<textarea name="introduce" rows="4" maxlength="128" placeholder="介绍一下你的内容方向"></textarea></label>
       <div class="dialog-actions">
         <button class="ghost-button" value="cancel">取消</button>
@@ -491,12 +514,12 @@
       </div>
       <label>
         手机号
-        <input name="phone" required placeholder="请输入手机号">
+        <input name="phone" required placeholder="请输入手机号" autocomplete="tel">
       </label>
       <div class="code-row">
         <label>
           验证码
-          <input name="code" required placeholder="6 位验证码">
+          <input name="code" required placeholder="6 位验证码" autocomplete="one-time-code">
         </label>
         <button class="ghost-button" id="sendCodeButton" type="button">获取验证码</button>
       </div>

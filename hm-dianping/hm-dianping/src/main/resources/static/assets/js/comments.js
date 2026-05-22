@@ -83,6 +83,11 @@ function updateCommentCount(count) {
   els.commentCount.textContent = nextCount;
   if (state.currentNote) {
     state.currentNote.comments = nextCount;
+    state.currentNote.commentCount = nextCount;
+    applyNoteInteraction?.(state.currentNote, {
+      comments: nextCount,
+      commentCount: nextCount
+    });
   }
 }
 
@@ -132,11 +137,18 @@ async function reportComment(commentId) {
 
 async function submitComment(event) {
   event.preventDefault();
+  if (state.commentSubmitting) return;
   if (!state.currentNote || !requireLogin()) return;
   const content = els.commentInput.value.trim();
   if (!content) return;
-  if (!(await checkAiRisk(content, "comment"))) return;
+  state.commentSubmitting = true;
+  const submitButton = els.commentForm.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "发送中";
+  }
   try {
+    if (!(await checkAiRisk(content, "comment"))) return;
     const payload = {
       noteId: state.currentNote.id,
       content,
@@ -151,10 +163,16 @@ async function submitComment(event) {
     updateCommentCount(data?.comments);
     state.replyTarget = null;
     els.commentInput.value = "";
-    els.commentInput.placeholder = "说点什么...";
+    els.commentInput.placeholder = "说点什么…";
     loadComments(state.currentNote.id);
-  } catch {
-    showStatus("评论失败，请确认已登录。");
+  } catch (error) {
+    showStatus(error.message || "评论失败，请确认已登录。");
+  } finally {
+    state.commentSubmitting = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "发送";
+    }
   }
 }
 

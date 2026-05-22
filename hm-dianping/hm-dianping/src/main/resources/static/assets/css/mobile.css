@@ -45,7 +45,7 @@
   }
 
   .brand::before {
-    content: "小";
+    content: "标";
     color: #fff;
     font-size: 15px;
     font-weight: 900;
@@ -113,7 +113,40 @@
   }
 
   .main-layout {
-    padding: 10px 10px 72px;
+    padding: 10px 10px 82px;
+  }
+
+  .local-life-brief {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 4px 2px 14px;
+  }
+
+  .brief-copy h1 {
+    font-size: 22px;
+    line-height: 1.18;
+  }
+
+  .brief-copy p {
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .brief-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .brief-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .brief-actions button {
+    flex: 0 0 auto;
   }
 
   .masonry-feed {
@@ -122,9 +155,13 @@
     column-gap: 10px;
   }
 
+  .masonry-feed.is-empty {
+    column-count: initial;
+  }
+
   .note-card {
     display: inline-block;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
   }
 
   .note-image {
@@ -132,7 +169,26 @@
   }
 
   .note-title {
-    font-size: 12px;
+    font-size: 12.5px;
+  }
+
+  .note-body {
+    padding: 8px;
+  }
+
+  .note-card-score::before {
+    content: "";
+  }
+
+  .note-action {
+    height: 30px;
+    padding: 0 6px;
+  }
+
+  .feed-empty-state {
+    min-height: 260px;
+    margin-top: 14px;
+    padding: 28px 16px;
   }
 
   /* Video area */
@@ -324,10 +380,11 @@
     z-index: var(--z-sticky);
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    height: 56px;
+    height: calc(62px + env(safe-area-inset-bottom, 0));
     padding-bottom: env(safe-area-inset-bottom, 0);
     background: #fff;
     border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .05);
   }
 
   .mobile-tabbar button {

@@ -119,6 +119,11 @@
       openNotificationDialog();
     });
   });
+
+  var briefVideo = document.querySelector("[data-brief-action='video']");
+  if (briefVideo) briefVideo.addEventListener("click", switchVideo);
+  var briefMall = document.querySelector("[data-brief-action='mall']");
+  if (briefMall) briefMall.addEventListener("click", switchMall);
   document.querySelector("#closeNotificationDialog").addEventListener("click", function() { els.notificationDialog.close(); });
   document.querySelector("#markNotificationsRead").addEventListener("click", markNotificationsRead);
   document.querySelector("#toggleNotificationSettings")?.addEventListener("click", function() {
@@ -199,7 +204,7 @@
     if (event.key === "Escape") {
       if (state.replyTarget) {
         state.replyTarget = null;
-        els.commentInput.placeholder = "说点什么...";
+        els.commentInput.placeholder = "说点什么…";
         return;
       }
       closeDrawer();
@@ -211,6 +216,15 @@
     var nearBottom = window.innerHeight + window.scrollY > document.body.offsetHeight - 620;
     if (nearBottom) loadNotes();
   }, { passive: true });
+
+  if ("IntersectionObserver" in window && els.loading) {
+    var feedObserver = new IntersectionObserver(function(entries) {
+      if (!entries.some(function(entry) { return entry.isIntersecting; })) return;
+      if (state.mode === "mall" || state.mode === "video" || state.mode === "search" || state.mode === "profile") return;
+      loadNotes();
+    }, { rootMargin: "640px 0px" });
+    feedObserver.observe(els.loading);
+  }
 
   // ------------------------------
   // App initialization

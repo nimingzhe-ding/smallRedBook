@@ -38,10 +38,9 @@
     renderShopBridge(note.shop);
     renderNoteProducts(note.products);
     renderRelatedNotes(note.relatedNotes || []);
-    document.querySelector("#drawerLike").innerHTML = `♥ 赞 ${note.liked}`;
+    syncDrawerInteractionButtons(note);
     if (note.isCollect) state.collected.add(String(note.id));
     if (note.isFollow) state.followed.add(String(note.userId));
-    document.querySelector("#drawerCollect").innerHTML = state.collected.has(String(note.id)) ? "★ 已收藏" : "☆ 收藏";
     document.querySelector("#drawerFollow").textContent = state.followed.has(String(note.userId)) ? "已关注" : "关注";
     document.querySelector("#drawerLike").onclick = () => likeNote(note);
     document.querySelector("#drawerCollect").onclick = () => toggleCollect(note);
@@ -323,33 +322,74 @@
   // Like, collect, and follow interactions
   // ------------------------------
   async function likeNote(note) {
-    if (!requireLogin()) return;
+    if (!requireLoginThen(() => likeNote(note))) return;
+    if (!beginNoteAction?.(note.id, "like")) return;
+    const previous = {
+      isLike: Boolean(note.isLike),
+      likedByMe: Boolean(note.likedByMe),
+      liked: Number(note.liked || 0),
+      likedCount: Number(note.likedCount || note.liked || 0),
+      score: Number(note.score || 0)
+    };
+    const nextLiked = !previous.isLike;
+    applyNoteInteraction?.(note, {
+      isLike: nextLiked,
+      likedByMe: nextLiked,
+      liked: Math.max(0, previous.liked + (nextLiked ? 1 : -1)),
+      likedCount: Math.max(0, previous.liked + (nextLiked ? 1 : -1)),
+      score: Math.max(0, previous.score + (nextLiked ? 3 : -3))
+    });
+    syncDrawerInteractionButtons(note);
     try {
       await request(`/notes/${note.id}/like`, { method: "PUT" });
-      trackEvent("like", { noteId: note.id, scene: "detail" });
-      note.liked += note.isLike ? -1 : 1;
-      note.isLike = !note.isLike;
-      document.querySelector("#drawerLike").textContent = `♥ ${note.liked}`;
+      if (nextLiked) trackEvent("like", { noteId: note.id, scene: "detail" });
     } catch {
+      applyNoteInteraction?.(note, previous);
+      syncDrawerInteractionButtons(note);
       showStatus("点赞失败，请稍后再试。");
+    } finally {
+      endNoteAction?.(note.id, "like");
     }
   }
 
-  function toggleCollect(note) {
-    if (!requireLogin()) return;
+  async function toggleCollect(note) {
+    if (!requireLoginThen(() => toggleCollect(note))) return;
+    if (!beginNoteAction?.(note.id, "collect")) return;
     const id = String(note.id);
-    const next = !state.collected.has(id);
-    request(`/notes/${note.id}/collect/${next}`, { method: "PUT" })
-      .then(() => {
-        if (next) state.collected.add(id);
-        else state.collected.delete(id);
-        trackEvent(next ? "collect" : "uncollect", { noteId: note.id, scene: "detail" });
-        localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
-        document.querySelector("#drawerCollect").textContent = next ? "★ 已收藏" : "☆ 收藏";
-        var statCollects = document.querySelector("#statCollects");
-        if (statCollects) statCollects.textContent = state.collected.size;
-      })
-      .catch(() => showStatus("收藏失败，请确认数据库已执行收藏表升级脚本。"));
+    const previous = {
+      isCollect: Boolean(note.isCollect),
+      collected: Boolean(note.collected),
+      collects: Number(note.collects || 0),
+      collectCount: Number(note.collectCount || note.collects || 0),
+      score: Number(note.score || 0)
+    };
+    const next = !previous.isCollect;
+    if (next) state.collected.add(id);
+    else state.collected.delete(id);
+    applyNoteInteraction?.(note, {
+      isCollect: next,
+      collected: next,
+      collects: Math.max(0, previous.collects + (next ? 1 : -1)),
+      collectCount: Math.max(0, previous.collects + (next ? 1 : -1)),
+      score: Math.max(0, previous.score + (next ? 5 : -5))
+    });
+    localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+    syncDrawerInteractionButtons(note);
+    try {
+      await request(`/notes/${note.id}/collect/${next}`, { method: "PUT" });
+      trackEvent(next ? "collect" : "uncollect", { noteId: note.id, scene: "detail" });
+      var statCollects = document.querySelector("#statCollects");
+      if (statCollects) statCollects.textContent = state.collected.size;
+    } catch {
+      if (previous.isCollect) state.collected.add(id);
+      else state.collected.delete(id);
+      applyNoteInteraction?.(note, previous);
+      localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+      syncDrawerInteractionButtons(note);
+      showStatus("收藏失败，请确认数据库已执行收藏表升级脚本。");
+    } finally {
+      endNoteAction?.(note.id, "collect");
+    }
   }
 
   async function loadCollectState(note) {
@@ -359,15 +399,18 @@
       const id = String(note.id);
       if (collected) state.collected.add(id);
       else state.collected.delete(id);
+      note.isCollect = Boolean(collected);
+      note.collected = Boolean(collected);
       localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
-      document.querySelector("#drawerCollect").textContent = collected ? "★ 已收藏" : "☆ 收藏";
+      applyNoteInteraction?.(note, { isCollect: Boolean(collected), collected: Boolean(collected) });
+      syncDrawerInteractionButtons(note);
     } catch {
       // 收藏表未升级时保留本地状态，避免影响浏览主流程。
     }
   }
 
   async function toggleFollow(note) {
-    if (!requireLogin()) return;
+    if (!requireLoginThen(() => toggleFollow(note))) return;
     const id = String(note.userId || "");
     const next = !state.followed.has(id);
     try {
@@ -378,6 +421,20 @@
       document.querySelector("#drawerFollow").textContent = next ? "已关注" : "关注";
     } catch {
       showStatus("关注失败，请稍后再试。");
+    }
+  }
+
+  function syncDrawerInteractionButtons(note) {
+    const likeButton = document.querySelector("#drawerLike");
+    const collectButton = document.querySelector("#drawerCollect");
+    if (likeButton) {
+      likeButton.textContent = `${note.isLike ? "♥ 已赞" : "♡ 喜欢"} ${compactCount?.(note.liked) || note.liked || 0}`;
+      likeButton.classList.toggle("is-active", Boolean(note.isLike));
+    }
+    if (collectButton) {
+      const collected = Boolean(note.isCollect || state.collected.has(String(note.id)));
+      collectButton.textContent = collected ? "★ 已收藏" : "☆ 收藏";
+      collectButton.classList.toggle("is-active", collected);
     }
   }
 
@@ -405,10 +462,7 @@
       await request(`/notes/${note.id}/report`, { method: "PUT" });
       state.notes = state.notes.filter(item => String(item.id) !== String(note.id));
       state.videoNotes = state.videoNotes.filter(item => String(item.id) !== String(note.id));
-      document.querySelectorAll(".note-card").forEach(card => {
-        const title = card.querySelector(".note-title")?.textContent || "";
-        if (title === note.title) card.remove();
-      });
+      document.querySelectorAll(`[data-note-card="${CSS.escape(String(note.id))}"]`).forEach(card => card.remove());
       closeDrawer();
       showStatus("已提交举报，内容将进入运营审核。");
     } catch (error) {
@@ -420,6 +474,7 @@
   window.openDrawer = openDrawer;
   window.renderCreatorGrowth = renderCreatorGrowth;
   window.renderNoteTags = renderNoteTags;
+  window.syncDrawerInteractionButtons = syncDrawerInteractionButtons;
   window.likeNote = likeNote;
   window.toggleCollect = toggleCollect;
   window.loadCollectState = loadCollectState;

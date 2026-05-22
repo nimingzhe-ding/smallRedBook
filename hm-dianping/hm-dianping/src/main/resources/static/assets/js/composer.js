@@ -358,11 +358,15 @@
   // ------------------------------
   // Composer open / edit / delete
   // ------------------------------
-  function openComposer() {
+  function openComposer(preferredType) {
     if (!requireLoginThen("compose")) return;
     resetComposerMode();
     if (!restoreComposerDraft()) {
       els.composerForm.reset();
+      if (preferredType) {
+        var typeInput = [...els.contentTypeInputs].find(function(input) { return input.value === preferredType; });
+        if (typeInput) typeInput.checked = true;
+      }
       els.uploadPreview.innerHTML = "";
       els.videoPreview.innerHTML = "";
       applyComposerType();

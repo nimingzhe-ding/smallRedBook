@@ -1107,6 +1107,12 @@
   border-color: var(--line);
 }
 
+.drawer-actions > button.is-active {
+  border-color: rgba(255, 36, 66, .2);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .drawer-actions > button:active {
   transform: scale(.95);
 }

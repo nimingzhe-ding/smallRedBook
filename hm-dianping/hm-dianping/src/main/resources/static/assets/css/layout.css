@@ -707,6 +707,120 @@
   min-width: 0;
 }
 
+.local-life-brief {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 16px 24px;
+  align-items: end;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 2px 18px;
+}
+
+.brief-copy {
+  min-width: 0;
+}
+
+.brief-copy span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brief-copy h1 {
+  max-width: 680px;
+  margin: 10px 0 8px;
+  color: var(--text);
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.brief-copy p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-self: center;
+}
+
+.brief-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--text-secondary);
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 800;
+  transition: border-color var(--dur-fast) ease, color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+
+.brief-actions button:hover {
+  border-color: rgba(255, 36, 66, .28);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.brief-actions button[data-brief-action] {
+  border-color: rgba(17, 17, 17, .08);
+  background: #111;
+  color: #fff;
+}
+
+.brief-actions button[data-brief-action]:hover {
+  border-color: #111;
+  background: #2a2a2d;
+  color: #fff;
+}
+
+.brief-metrics {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 1px;
+  scrollbar-width: none;
+}
+
+.brief-metrics::-webkit-scrollbar {
+  display: none;
+}
+
+.brief-metrics span {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--muted);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brief-metrics strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
 .video-area {
   min-width: 0;
 }

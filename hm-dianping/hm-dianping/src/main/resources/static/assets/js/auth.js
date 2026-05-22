@@ -195,6 +195,10 @@ function runAfterLoginAction(action) {
     openComposer();
     return;
   }
+  if (action === "compose-video" && typeof openComposer === "function") {
+    openComposer("VIDEO");
+    return;
+  }
   if (action === "orders" && typeof openOrdersDialog === "function") {
     openOrdersDialog();
     return;

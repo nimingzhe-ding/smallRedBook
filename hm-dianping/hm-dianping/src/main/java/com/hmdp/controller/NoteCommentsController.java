@@ -44,6 +44,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/notes/comments")
 public class NoteCommentsController {
 
+    private static final int MAX_COMMENT_LENGTH = 255;
+
     @Resource
     private CommentService commentsService;
 
@@ -74,7 +76,7 @@ public class NoteCommentsController {
         Long resolvedNoteId = resolveNoteId(noteId, blogId);
         QueryChainWrapper<BlogComments> query = commentsService.query()
                 .eq("blog_id", resolvedNoteId)
-                .eq("parent_id", 0)
+                .and(wrapper -> wrapper.eq("parent_id", 0).or().isNull("parent_id"))
                 .and(wrapper -> wrapper.eq("status", 0).or().isNull("status"));
         if ("new".equals(sort)) {
             query.orderByDesc("create_time");
@@ -134,10 +136,19 @@ public class NoteCommentsController {
         if (comment.getBlogId() == null) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "笔记ID不能为空");
         }
-        if (comment.getContent() == null || comment.getContent().trim().isEmpty()) {
+        var note = noteService.getNoteEntity(comment.getBlogId());
+        if (note == null || (note.getStatus() != null && note.getStatus() != 0)) {
+            throw new BusinessException(ErrorCode.BLOG_NOT_EXIST);
+        }
+        String content = comment.getContent() == null ? "" : comment.getContent().trim();
+        if (content.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "评论内容不能为空");
         }
-        contentModerationService.checkText("评论内容", comment.getContent());
+        if (content.length() > MAX_COMMENT_LENGTH) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "评论内容不能超过255字");
+        }
+        comment.setContent(content);
+        contentModerationService.checkText("评论内容", content);
         comment.setId(null);
         comment.setUserId(user.getId());
         Long parentId = comment.getParentId() == null ? 0L : comment.getParentId();
@@ -146,6 +157,25 @@ public class NoteCommentsController {
             BlogComments parentComment = commentsService.getById(parentId);
             if (parentComment == null || !comment.getBlogId().equals(parentComment.getBlogId()) || !isVisible(parentComment)) {
                 throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "回复的评论不存在");
+            }
+            if (parentComment.getParentId() != null && parentComment.getParentId() > 0) {
+                parentId = parentComment.getParentId();
+                if (answerId == null || answerId == 0) {
+                    answerId = parentComment.getId();
+                }
+            }
+            if (answerId == null || answerId == 0) {
+                answerId = parentComment.getId();
+            }
+            BlogComments answerComment = commentsService.getById(answerId);
+            if (answerComment == null || !comment.getBlogId().equals(answerComment.getBlogId()) || !isVisible(answerComment)) {
+                throw new BusinessException(ErrorCode.DATA_NOT_EXIST, "回复的评论不存在");
+            }
+            Long answerRootId = answerComment.getParentId() == null || Objects.equals(answerComment.getParentId(), 0L)
+                    ? answerComment.getId()
+                    : answerComment.getParentId();
+            if (!Objects.equals(answerRootId, parentId)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "回复关系不匹配");
             }
         }
         comment.setParentId(parentId);
@@ -293,7 +323,7 @@ public class NoteCommentsController {
     private long updateCommentThreadStatus(BlogComments comment, int status, String reportReason, Long reporterId) {
         List<Long> ids = new ArrayList<>();
         ids.add(comment.getId());
-        if (comment.getParentId() != null && comment.getParentId() == 0) {
+        if (Objects.equals(comment.getParentId(), 0L)) {
             List<Long> replyIds = commentsService.query()
                     .select("id")
                     .eq("blog_id", comment.getBlogId())

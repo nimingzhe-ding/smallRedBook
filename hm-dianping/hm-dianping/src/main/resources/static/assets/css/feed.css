@@ -114,6 +114,10 @@
   background: #fff8ef;
 }
 
+.status-banner[hidden] + .masonry-feed.is-empty {
+  margin-top: 0;
+}
+
 .text-button {
   min-height: 30px;
   padding: 0 10px;
@@ -450,16 +454,61 @@
   column-gap: 12px;
 }
 
+.masonry-feed.is-empty {
+  column-count: initial;
+  column-width: auto;
+}
+
+@media (min-width: 1180px) {
+  .masonry-feed {
+    column-count: 5;
+    column-width: auto;
+    column-gap: 14px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1179px) {
+  .masonry-feed {
+    column-count: 4;
+    column-width: auto;
+    column-gap: 12px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 899px) {
+  .masonry-feed {
+    column-count: 3;
+    column-width: auto;
+    column-gap: 12px;
+  }
+}
+
 .note-card {
   display: inline-block;
   width: 100%;
   margin: 0 0 14px;
-  overflow: visible;
-  background: transparent;
+  overflow: hidden;
+  border: 1px solid rgba(235, 235, 237, .75);
+  border-radius: 8px;
+  background: #fff;
   break-inside: avoid;
+  box-shadow: 0 1px 0 rgba(15, 15, 15, .02);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-normal) ease, transform var(--dur-normal) var(--ease-smooth);
 }
 
-.note-card button {
+.note-card:focus-within {
+  border-color: rgba(255, 36, 66, .32);
+  box-shadow: 0 0 0 3px rgba(255, 36, 66, .08);
+}
+
+.note-card:hover {
+  border-color: rgba(255, 36, 66, .18);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
+}
+
+.note-open,
+.note-title-button {
   display: block;
   width: 100%;
   padding: 0;
@@ -473,14 +522,13 @@
 .note-cover {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 8px 8px 0 0;
   background: #f0f0f2;
-  transition: transform var(--dur-normal) var(--ease-smooth), box-shadow var(--dur-normal) ease;
+  transition: filter var(--dur-normal) ease;
 }
 
 .note-card:hover .note-cover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-soft);
+  filter: saturate(1.04);
 }
 
 .note-image {
@@ -507,6 +555,28 @@
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 700;
+}
+
+.media-play-indicator {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 1;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .42);
+  color: #fff;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.media-play-indicator svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  transform: translateX(1px);
 }
 
 .audit-badge,
@@ -539,20 +609,21 @@
 }
 
 .note-body {
-  padding: 8px 2px 0;
+  padding: 9px 9px 10px;
 }
 
-.note-title {
+.note-title,
+.note-title-button {
   display: -webkit-box;
   margin: 0 0 6px;
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.42;
   color: var(--text);
   letter-spacing: 0;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 
 .note-meta {
@@ -562,6 +633,80 @@
   justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
+}
+
+.note-card-score::before {
+  content: "热度 ";
+}
+
+.note-card-score {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.note-card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.note-action {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #f7f7f8;
+  color: var(--text-tertiary);
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-spring);
+}
+
+.note-action:focus-visible {
+  outline: 2px solid rgba(255, 36, 66, .38);
+  outline-offset: 2px;
+}
+
+.note-action:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.note-action:active {
+  transform: scale(.96);
+}
+
+.note-action:disabled,
+.note-action.is-busy {
+  cursor: wait;
+  opacity: .62;
+}
+
+.note-action svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.note-action.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.note-action.is-active svg {
+  fill: currentColor;
+  stroke: currentColor;
 }
 
 .author-mini {
@@ -618,6 +763,7 @@
 .feed-loading {
   padding: 30px 0 12px;
   color: var(--muted);
+  font-size: 13px;
   text-align: center;
 }
 
@@ -662,6 +808,58 @@
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: 1.6;
+}
+
+.feed-empty-state {
+  display: grid;
+  width: min(520px, 100%);
+  min-height: 300px;
+  margin: 22px auto 8px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 36, 66, .035), rgba(255, 255, 255, 0) 44%),
+    #fff;
+  padding: 34px 22px;
+  text-align: center;
+}
+
+.feed-empty-state > * {
+  max-width: 360px;
+}
+
+.feed-empty-mark {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.feed-empty-mark svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.feed-empty-state strong {
+  margin-top: 14px;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.feed-empty-state p {
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.feed-empty-state .soft-button {
+  margin-top: 10px;
 }
 
 .skeleton-card {

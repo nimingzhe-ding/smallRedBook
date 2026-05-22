@@ -18,6 +18,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.BlogCollect;
+import com.hmdp.entity.BlogComments;
 import com.hmdp.entity.BlogLike;
 import com.hmdp.entity.BlogProduct;
 import com.hmdp.entity.ContentTopic;
@@ -38,6 +39,7 @@ import com.hmdp.mapper.ContentTopicMapper;
 import com.hmdp.mapper.NoteEventMapper;
 import com.hmdp.service.IBlogCollectService;
 import com.hmdp.service.IBlogService;
+import com.hmdp.service.CommentService;
 import com.hmdp.service.NoteService;
 import com.hmdp.service.IContentService;
 import com.hmdp.service.IFollowService;
@@ -58,6 +60,8 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -99,6 +103,9 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     @Resource
     private IBlogCollectService blogCollectService;
+
+    @Resource
+    private CommentService commentService;
 
     @Resource
     private IMallProductService mallProductService;
@@ -558,7 +565,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
      * recommend → 基于用户兴趣标签 Redis ZSET 的个性化推荐。
      */
     private Page<Blog> buildFeedQuery(String channel, String query, int pageNo, Double x, Double y) {
-        String normalizedChannel = StrUtil.blankToDefault(channel, "hot");
+        String normalizedChannel = StrUtil.blankToDefault(channel, "recommend");
         Page<Blog> page = new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE);
         var wrapper = blogService.query();
         wrapper.eq("status", CONTENT_STATUS_NORMAL);
@@ -986,6 +993,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                 .toList();
         Map<Long, User> authorMap = loadAuthors(authorIds);
         Map<Long, Long> collectCountMap = loadCollectCounts(blogIds);
+        Map<Long, Long> commentCountMap = loadCommentCounts(blogIds);
         Map<Long, List<MallProduct>> blogProductsMap = loadBlogProducts(blogIds);
         UserDTO currentUser = UserHolder.getUser();
         Set<Long> collectedBlogIds = loadCollectedBlogIds(currentUser, blogIds);
@@ -993,7 +1001,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
         return blogs.stream()
                 .map(blog -> toNoteDTO(blog, authorMap, collectCountMap, blogProductsMap,
-                        collectedBlogIds, followedAuthorIds, currentUser))
+                        commentCountMap, collectedBlogIds, followedAuthorIds, currentUser))
                 .toList();
     }
 
@@ -1002,45 +1010,94 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             Map<Long, User> authorMap,
             Map<Long, Long> collectCountMap,
             Map<Long, List<MallProduct>> blogProductsMap,
+            Map<Long, Long> commentCountMap,
             Set<Long> collectedBlogIds,
             Set<Long> followedAuthorIds,
             UserDTO currentUser) {
         ContentNoteDTO dto = new ContentNoteDTO();
         dto.setId(blog.getId());
+        dto.setNoteId(blog.getId());
         dto.setShopId(blog.getShopId());
         dto.setUserId(blog.getUserId());
+        dto.setAuthorId(blog.getUserId());
         dto.setTitle(blog.getTitle());
         dto.setImages(blog.getImages());
+        dto.setCover(firstImage(blog.getImages()));
         dto.setVideoUrl(blog.getVideoUrl());
-        dto.setContentType(blog.getContentType());
+        String contentType = blog.getContentType();
+        dto.setContentType(contentType);
+        dto.setMediaType(contentType);
         dto.setTags(blog.getTags());
         dto.setContent(blog.getContent());
-        dto.setLiked(blog.getLiked() == null ? 0 : blog.getLiked());
-        dto.setComments(blog.getComments() == null ? 0 : blog.getComments());
+        int likedCount = blog.getLiked() == null ? 0 : blog.getLiked();
+        int commentCount = commentCountMap.getOrDefault(blog.getId(), 0L).intValue();
+        long collectCount = collectCountMap.getOrDefault(blog.getId(), 0L);
+        dto.setLiked(likedCount);
+        dto.setLikedCount(likedCount);
+        dto.setComments(commentCount);
+        dto.setCommentCount(commentCount);
         dto.setStatus(statusOf(blog));
         dto.setAuditRemark(blog.getAuditRemark());
         dto.setCreateTime(blog.getCreateTime());
         dto.setShop(buildShopDTO(blog.getShopId()));
 
         User author = authorMap.get(blog.getUserId());
-        dto.setName(author == null ? "探店用户" : author.getNickName());
-        dto.setIcon(author == null ? "" : author.getIcon());
+        String authorName = author == null ? "探店用户" : author.getNickName();
+        String authorIcon = author == null ? "" : author.getIcon();
+        dto.setName(authorName);
+        dto.setAuthorName(authorName);
+        dto.setIcon(authorIcon);
+        dto.setAuthorIcon(authorIcon);
 
         if (currentUser == null) {
             dto.setIsLike(false);
             dto.setIsCollect(false);
             dto.setIsFollow(false);
             dto.setIsOwner(false);
+            dto.setLikedByMe(false);
+            dto.setCollected(false);
+            dto.setFollowed(false);
         } else {
             String likedKey = "blog:liked:" + blog.getId();
-            dto.setIsLike(stringRedisTemplate.opsForZSet().score(likedKey, currentUser.getId().toString()) != null);
-            dto.setIsCollect(collectedBlogIds.contains(blog.getId()));
-            dto.setIsFollow(blog.getUserId() != null && followedAuthorIds.contains(blog.getUserId()));
+            boolean likedByMe = stringRedisTemplate.opsForZSet().score(likedKey, currentUser.getId().toString()) != null;
+            boolean collected = collectedBlogIds.contains(blog.getId());
+            boolean followed = blog.getUserId() != null && followedAuthorIds.contains(blog.getUserId());
+            dto.setIsLike(likedByMe);
+            dto.setIsCollect(collected);
+            dto.setIsFollow(followed);
             dto.setIsOwner(blog.getUserId() != null && blog.getUserId().equals(currentUser.getId()));
+            dto.setLikedByMe(likedByMe);
+            dto.setCollected(collected);
+            dto.setFollowed(followed);
         }
-        dto.setCollects(collectCountMap.getOrDefault(blog.getId(), 0L));
+        dto.setCollects(collectCount);
+        dto.setCollectCount(collectCount);
+        dto.setScore(cardScore(blog, likedCount, commentCount, collectCount));
         dto.setProducts(blogProductsMap.getOrDefault(blog.getId(), List.of()));
         return dto;
+    }
+
+    private String firstImage(String images) {
+        if (StrUtil.isBlank(images)) {
+            return "";
+        }
+        for (String image : images.split(",")) {
+            String trimmed = StrUtil.trim(image);
+            if (StrUtil.isNotBlank(trimmed)) {
+                return trimmed;
+            }
+        }
+        return "";
+    }
+
+    private long cardScore(Blog blog, int likedCount, int commentCount, long collectCount) {
+        long freshScore = 0;
+        LocalDateTime createTime = blog.getCreateTime();
+        if (createTime != null) {
+            long hours = ChronoUnit.HOURS.between(createTime, LocalDateTime.now());
+            freshScore = Math.max(0, 72 - hours);
+        }
+        return likedCount * 3L + commentCount * 4L + collectCount * 5L + freshScore;
     }
 
     private Map<Long, List<MallProduct>> loadBlogProducts(List<Long> blogIds) {
@@ -1197,6 +1254,23 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         Map<Long, Long> countMap = new HashMap<>();
         for (Map<String, Object> row : rows) {
             countMap.put(toLong(row.get("blog_id")), toLong(row.get("collect_count")));
+        }
+        return countMap;
+    }
+
+    private Map<Long, Long> loadCommentCounts(List<Long> blogIds) {
+        if (blogIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Map<String, Object>> rows = commentService.getBaseMapper().selectMaps(
+                new QueryWrapper<BlogComments>()
+                        .select("blog_id", "count(*) AS comment_count")
+                        .in("blog_id", blogIds)
+                        .and(wrapper -> wrapper.eq("status", CONTENT_STATUS_NORMAL).or().isNull("status"))
+                        .groupBy("blog_id"));
+        Map<Long, Long> countMap = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            countMap.put(toLong(row.get("blog_id")), toLong(row.get("comment_count")));
         }
         return countMap;
     }
