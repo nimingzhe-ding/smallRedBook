@@ -11,6 +11,53 @@
     return normalizeContentType(els.composerForm.elements.contentType?.value, "");
   }
 
+  function setComposerSubmitText(text) {
+    var submitButton = els.composerForm.querySelector("[data-composer-submit]");
+    if (!submitButton) submitButton = els.composerForm.querySelector(".publish-button");
+    if (submitButton) submitButton.textContent = text;
+  }
+
+  function splitComposerTags(value) {
+    return String(value || "")
+      .split(/[,，#\s]+/)
+      .map(function(item) { return item.trim().replace(/^#+/, ""); })
+      .filter(Boolean);
+  }
+
+  function normalizeComposerTags(value) {
+    return [...new Set(splitComposerTags(value))]
+      .slice(0, 8)
+      .join(",");
+  }
+
+  function syncComposerTopicPresets() {
+    var tagInput = els.composerForm.elements.tags;
+    if (!tagInput) return;
+    var selected = splitComposerTags(tagInput.value);
+    document.querySelectorAll("[data-topic-preset]").forEach(function(button) {
+      button.classList.toggle("is-active", selected.includes(button.dataset.topicPreset));
+    });
+  }
+
+  function addComposerTopicPreset(topic) {
+    var tagInput = els.composerForm.elements.tags;
+    if (!tagInput || !topic) return;
+    var tags = splitComposerTags(tagInput.value);
+    if (!tags.includes(topic)) tags.push(topic);
+    tagInput.value = tags.slice(0, 8).join(",");
+    syncComposerTopicPresets();
+    saveComposerDraft(true);
+  }
+
+  function saveComposerDraftManually() {
+    if (state.editingNoteId) {
+      showStatus("编辑内容请直接点保存修改。");
+      return;
+    }
+    saveComposerDraft(true);
+    showStatus(hasComposerDraft() ? "草稿已保存。" : "先写一点内容，再保存草稿。");
+  }
+
   function readComposerDraft() {
     try {
       return JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY) || "null");
@@ -22,7 +69,7 @@
   function hasComposerDraft(draft) {
     draft = draft === undefined ? readComposerDraft() : draft;
     if (!draft) return false;
-    return ["title", "images", "videoUrl", "shopId", "productIds", "topics", "content"]
+    return ["title", "images", "videoUrl", "shopId", "productIds", "tags", "topics", "content"]
       .some(key => String(draft[key] || "").trim());
   }
 
@@ -73,6 +120,7 @@
       }
     });
     applyComposerType();
+    syncComposerTopicPresets();
     renderComposerDraftState("已恢复上次未发布的草稿。");
     return true;
   }
@@ -85,6 +133,7 @@
       els.uploadPreview.innerHTML = "";
       els.videoPreview.innerHTML = "";
       applyComposerType();
+      syncComposerTopicPresets();
     }
     renderComposerDraftState();
   }
@@ -179,13 +228,13 @@
     els.uploadPreview.innerHTML = "";
     els.videoPreview.innerHTML = note.videoUrl ? "<video src=\"" + normalizeMedia(note.videoUrl) + "\" controls muted playsinline></video>" : "";
     applyComposerType();
+    syncComposerTopicPresets();
   }
 
   function resetComposerMode() {
     state.editingNoteId = null;
     if (els.composerTitle) els.composerTitle.dataset.mode = "create";
-    var submitButton = els.composerForm.querySelector(".publish-button");
-    if (submitButton) submitButton.textContent = "发布";
+    setComposerSubmitText("发布作品");
   }
 
   function applyComposerType() {
@@ -209,12 +258,6 @@
       els.videoUploadTip.textContent = contentType === "LIVE"
         ? "支持直播预告视频、回放或直播地址"
         : "支持 MP4/WebM/MOV，发布前会自动上传";
-    }
-    var imageInput = els.composerForm.elements.images;
-    if (imageInput) {
-      imageInput.placeholder = isVideoLike
-        ? "视频封面图地址，留空时使用默认封面"
-        : "多个图片地址用英文逗号分隔，上传后会自动填充";
     }
     var shopInput = els.composerForm.elements.shopId;
     if (shopInput) {
@@ -268,24 +311,27 @@
     event.preventDefault();
     if (!requireLogin()) return;
     saveComposerDraft();
-    var submitButton = els.composerForm.querySelector(".publish-button");
+    var submitButton = els.composerForm.querySelector("[data-composer-submit]") || els.composerForm.querySelector(".publish-button");
     submitButton.disabled = true;
     submitButton.textContent = "发布中";
-    var form = new FormData(els.composerForm);
     try {
       var contentType = getComposerContentType();
       var isVideoLike = ["VIDEO", "LIVE"].includes(contentType);
       var isProductNote = contentType === "PRODUCT_NOTE";
+      submitButton.textContent = "上传素材中";
       var uploaded = await uploadSelectedImages();
       var uploadedVideo = isVideoLike ? await uploadSelectedVideo() : "";
       appendComposerImageUrls(uploaded);
       setComposerVideoUrl(uploadedVideo);
+      submitButton.textContent = "发布中";
       saveComposerDraft();
+      var form = new FormData(els.composerForm);
       var manualImages = String(els.composerForm.elements.images?.value || "").trim();
       var videoUrl = isVideoLike ? String(els.composerForm.elements.videoUrl?.value || "").trim() : "";
       var shopId = isProductNote && form.get("shopId") ? Number(form.get("shopId")) : null;
       var productIds = parseProductIds(form.get("productIds"));
       var content = String(form.get("content") || "").trim();
+      var normalizedTags = normalizeComposerTags(form.get("tags"));
       if (!(await checkAiRisk((form.get("title") || "") + "\n" + content, "publish"))) {
         saveComposerDraft(true);
         return;
@@ -322,7 +368,7 @@
         contentType: contentType,
         shopId: shopId,
         productIds: productIds,
-        tags: form.get("tags"),
+        tags: normalizedTags,
         content: mergeTopics(content, form.get("topics"))
       };
       var editingId = state.editingNoteId;
@@ -338,6 +384,7 @@
       els.uploadPreview.innerHTML = "";
       els.videoPreview.innerHTML = "";
       applyComposerType();
+      syncComposerTopicPresets();
       if (state.currentNote) closeDrawer();
       resetAndLoad();
     } catch {
@@ -345,7 +392,7 @@
       showStatus("发布失败，内容已保存到草稿箱。请确认已登录，且图片、店铺信息有效。");
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = state.editingNoteId ? "保存" : "发布";
+      submitButton.textContent = state.editingNoteId ? "保存修改" : "发布作品";
     }
   }
 
@@ -376,6 +423,7 @@
       els.uploadPreview.innerHTML = "";
       els.videoPreview.innerHTML = "";
       applyComposerType();
+      syncComposerTopicPresets();
     }
     els.composer.showModal();
   }
@@ -384,8 +432,7 @@
     if (!note?.isOwner || !requireLogin()) return;
     state.editingNoteId = note.id;
     fillComposerFromNote(note);
-    var submitButton = els.composerForm.querySelector(".publish-button");
-    if (submitButton) submitButton.textContent = "保存";
+    setComposerSubmitText("保存修改");
     renderComposerDraftState();
     els.composer.showModal();
   }
@@ -413,6 +460,11 @@
   // Export cross-module functions
   window.COMPOSER_DRAFT_KEY = COMPOSER_DRAFT_KEY;
   window.getComposerContentType = getComposerContentType;
+  window.splitComposerTags = splitComposerTags;
+  window.normalizeComposerTags = normalizeComposerTags;
+  window.syncComposerTopicPresets = syncComposerTopicPresets;
+  window.addComposerTopicPreset = addComposerTopicPreset;
+  window.saveComposerDraftManually = saveComposerDraftManually;
   window.readComposerDraft = readComposerDraft;
   window.hasComposerDraft = hasComposerDraft;
   window.collectComposerDraft = collectComposerDraft;

@@ -73,11 +73,18 @@
   applyComposerType();
   renderComposerDraftState();
 
-  els.composerForm.addEventListener("input", function() {
+  els.composerForm.addEventListener("input", function(event) {
+    if (event?.target?.name === "tags") syncComposerTopicPresets();
     saveComposerDraft();
     scheduleComposerAssistant();
   });
   els.composerForm.addEventListener("change", function() { saveComposerDraft(); });
+  document.querySelector("#saveComposerDraftButton")?.addEventListener("click", saveComposerDraftManually);
+  document.querySelectorAll("[data-topic-preset]").forEach(function(button) {
+    button.addEventListener("click", function() {
+      addComposerTopicPreset(button.dataset.topicPreset);
+    });
+  });
   els.clearComposerDraft?.addEventListener("click", function() {
     clearComposerDraft(true);
     showStatus("草稿已清空。");
@@ -220,11 +227,21 @@
   });
   els.loginDialog.addEventListener("click", function(e) { if (e.target === els.loginDialog) els.loginDialog.close(); });
   document.querySelector("#editProfileButton").addEventListener("click", openProfileEdit);
+  els.profileBackButton?.addEventListener("click", goBackFromProfile);
   els.profileMessageButton?.addEventListener("click", function() {
     var userId = state.currentProfile?.userId;
     if (userId) openDmWithUser(userId);
   });
   els.profileEditForm.addEventListener("submit", submitProfileEdit);
+  els.profileEditForm.addEventListener("input", updateProfileEditPreview);
+  els.profileEditAvatarButton?.addEventListener("click", function() {
+    els.profileEditAvatarFile?.click();
+  });
+  els.profileEditAvatarFile?.addEventListener("change", handleProfileAvatarChange);
+  els.profileEditDialog?.addEventListener("close", function() {
+    resetProfileAvatarDraft();
+    if (els.profileEditAvatarFile) els.profileEditAvatarFile.value = "";
+  });
   document.querySelectorAll(".profile-home-stats [data-profile-tab]").forEach(function(button) {
     button.addEventListener("click", function() { loadProfileTab(button.dataset.profileTab); });
   });

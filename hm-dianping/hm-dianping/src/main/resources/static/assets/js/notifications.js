@@ -857,12 +857,13 @@ async function openMyProfile(tab = "works") {
   }
   state.query = "";
   els.search.value = "";
-  await openUserProfile(null, tab);
+  await openUserProfile(null, tab, { resetHistory: true });
 }
 window.openMyProfile = openMyProfile;
 
-async function openUserProfile(userId, tab = "works") {
+async function openUserProfile(userId, tab = "works", options = {}) {
   if (typeof stopMessagePolling === "function") stopMessagePolling();
+  rememberProfileReturn(options);
   showContentArea();
   setFeedTabsVisible(false);
   setMobileTabActive("profile");
@@ -903,9 +904,97 @@ function renderProfileHome(profile) {
   if (els.profileMessageButton) {
     els.profileMessageButton.hidden = Boolean(profile.isMe);
   }
+  if (els.profileBackButton) {
+    els.profileBackButton.hidden = !state.profileHistory.length;
+  }
   renderProfileTabs();
 }
 window.renderProfileHome = renderProfileHome;
+
+function rememberProfileReturn(options = {}) {
+  if (options.skipHistory) return;
+  if (options.resetHistory) {
+    state.profileHistory = [];
+    return;
+  }
+  const current = buildProfileHistoryEntry();
+  if (!current) return;
+  const last = state.profileHistory[state.profileHistory.length - 1];
+  if (sameProfileHistory(last, current)) return;
+  state.profileHistory.push(current);
+  if (state.profileHistory.length > 12) {
+    state.profileHistory.shift();
+  }
+}
+window.rememberProfileReturn = rememberProfileReturn;
+
+function buildProfileHistoryEntry() {
+  if (state.mode === "profile" && state.currentProfile?.userId) {
+    return {
+      type: "profile",
+      userId: state.currentProfile.userId,
+      tab: state.profileTab || "works"
+    };
+  }
+  if (state.mode === "messages") {
+    return {
+      type: "messages",
+      messageMode: state.messageMode || "dm",
+      activeDmId: state.activeDmId || null,
+      dmMobileChatOpen: Boolean(state.dmMobileChatOpen)
+    };
+  }
+  if (state.mode === "mall") return { type: "mall" };
+  if (state.mode === "video") return { type: "video" };
+  if (state.mode === "search") return { type: "search", query: state.query || els.search?.value || "" };
+  return { type: "feed", feed: state.feed || "recommend" };
+}
+window.buildProfileHistoryEntry = buildProfileHistoryEntry;
+
+function sameProfileHistory(a, b) {
+  if (!a || !b || a.type !== b.type) return false;
+  if (a.type === "profile") return String(a.userId) === String(b.userId) && a.tab === b.tab;
+  if (a.type === "messages") return a.messageMode === b.messageMode && String(a.activeDmId || "") === String(b.activeDmId || "");
+  if (a.type === "feed") return a.feed === b.feed;
+  if (a.type === "search") return a.query === b.query;
+  return true;
+}
+window.sameProfileHistory = sameProfileHistory;
+
+async function goBackFromProfile() {
+  const target = state.profileHistory.pop();
+  if (!target) return;
+  if (target.type === "profile") {
+    await openUserProfile(target.userId, target.tab || "works", { skipHistory: true });
+    return;
+  }
+  if (target.type === "messages") {
+    switchMessageArea();
+    switchMessageMode(target.messageMode || "dm");
+    state.dmMobileChatOpen = Boolean(target.dmMobileChatOpen);
+    if (target.activeDmId) {
+      await selectDmConversation(target.activeDmId);
+    } else {
+      await loadDmConversations();
+      renderDmThread();
+    }
+    return;
+  }
+  if (target.type === "mall") {
+    switchMall();
+    return;
+  }
+  if (target.type === "video") {
+    switchVideo();
+    return;
+  }
+  if (target.type === "search" && target.query) {
+    runSearchKeyword(target.query);
+    return;
+  }
+  switchFeed(target.feed || "recommend");
+}
+window.goBackFromProfile = goBackFromProfile;
 
 function renderProfileTabs() {
   const tabs = [
@@ -1018,13 +1107,79 @@ function openProfileEdit() {
     toggleProfileFollow();
     return;
   }
+  resetProfileAvatarDraft();
   els.profileEditForm.elements.nickName.value = profile.nickName || "";
-  els.profileEditForm.elements.icon.value = profile.icon || "";
+  if (els.profileEditIconInput) els.profileEditIconInput.value = profile.icon || "";
+  if (els.profileEditAvatarFile) els.profileEditAvatarFile.value = "";
   els.profileEditForm.elements.city.value = profile.city || "";
   els.profileEditForm.elements.introduce.value = profile.introduce || "";
+  updateProfileEditPreview();
   els.profileEditDialog.showModal();
 }
 window.openProfileEdit = openProfileEdit;
+
+function resetProfileAvatarDraft() {
+  if (state.profileAvatarPreviewUrl) {
+    URL.revokeObjectURL(state.profileAvatarPreviewUrl);
+  }
+  state.profileAvatarFile = null;
+  state.profileAvatarPreviewUrl = "";
+}
+window.resetProfileAvatarDraft = resetProfileAvatarDraft;
+
+function updateProfileEditPreview() {
+  if (!els.profileEditForm) return;
+  const form = els.profileEditForm;
+  const name = String(form.elements.nickName?.value || "").trim() || "探店用户";
+  const city = String(form.elements.city?.value || "").trim() || "城市未填写";
+  const icon = String(form.elements.icon?.value || "").trim();
+  const introduce = String(form.elements.introduce?.value || "");
+  const previewSrc = state.profileAvatarPreviewUrl || normalizeImage(icon) || fallbackAvatar;
+  if (els.profileEditPreview) els.profileEditPreview.src = previewSrc;
+  if (els.profileEditPreviewName) els.profileEditPreviewName.textContent = name;
+  if (els.profileEditPreviewMeta) {
+    els.profileEditPreviewMeta.textContent = state.profileAvatarFile
+      ? `${state.profileAvatarFile.name} · 保存后生效`
+      : `${city} · 可上传 JPG/PNG/WebP`;
+  }
+  if (els.profileEditBioCount) els.profileEditBioCount.textContent = `${introduce.length}/128`;
+}
+window.updateProfileEditPreview = updateProfileEditPreview;
+
+function handleProfileAvatarChange() {
+  const file = els.profileEditAvatarFile?.files?.[0];
+  resetProfileAvatarDraft();
+  if (!file) {
+    updateProfileEditPreview();
+    return;
+  }
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    if (els.profileEditAvatarFile) els.profileEditAvatarFile.value = "";
+    showStatus("头像只支持 JPG、PNG、GIF、WebP 图片。");
+    updateProfileEditPreview();
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    if (els.profileEditAvatarFile) els.profileEditAvatarFile.value = "";
+    showStatus("头像图片不能超过 5MB。");
+    updateProfileEditPreview();
+    return;
+  }
+  state.profileAvatarFile = file;
+  state.profileAvatarPreviewUrl = URL.createObjectURL(file);
+  updateProfileEditPreview();
+}
+window.handleProfileAvatarChange = handleProfileAvatarChange;
+
+async function uploadProfileAvatarIfNeeded() {
+  if (!state.profileAvatarFile) return els.profileEditIconInput?.value || "";
+  const formData = new FormData();
+  formData.append("file", state.profileAvatarFile);
+  const result = await request("/upload/note", { method: "POST", body: formData });
+  return uploadResultUrl(result);
+}
+window.uploadProfileAvatarIfNeeded = uploadProfileAvatarIfNeeded;
 
 async function toggleProfileFollow() {
   const profile = state.currentProfile;
@@ -1046,12 +1201,18 @@ async function submitProfileEdit(event) {
   if (event.submitter && event.submitter.value === "cancel") return;
   event.preventDefault();
   const form = new FormData(els.profileEditForm);
+  if (els.profileEditSaveButton) {
+    els.profileEditSaveButton.disabled = true;
+    els.profileEditSaveButton.textContent = state.profileAvatarFile ? "上传中..." : "保存中...";
+  }
   try {
+    const icon = await uploadProfileAvatarIfNeeded();
+    if (els.profileEditSaveButton) els.profileEditSaveButton.textContent = "保存中...";
     const profile = await request("/profiles/me", {
       method: "PUT",
       body: JSON.stringify({
         nickName: form.get("nickName"),
-        icon: form.get("icon"),
+        icon,
         city: form.get("city"),
         introduce: form.get("introduce")
       })
@@ -1061,9 +1222,16 @@ async function submitProfileEdit(event) {
     state.currentUser = { ...(state.currentUser || {}), id: profile.userId, nickName: profile.nickName, icon: profile.icon };
     renderUser(state.currentUser);
     els.profileEditDialog.close();
+    resetProfileAvatarDraft();
+    if (els.profileEditAvatarFile) els.profileEditAvatarFile.value = "";
     showStatus("个人资料已更新。");
   } catch (error) {
     showStatus(error.message || "资料保存失败。");
+  } finally {
+    if (els.profileEditSaveButton) {
+      els.profileEditSaveButton.disabled = false;
+      els.profileEditSaveButton.textContent = "保存资料";
+    }
   }
 }
 window.submitProfileEdit = submitProfileEdit;

@@ -674,6 +674,23 @@
   background: var(--surface);
 }
 
+.composer-form {
+  width: min(680px, 94vw);
+  max-width: 680px;
+  padding: 0;
+}
+
+.composer-form > .dialog-head {
+  margin: 0;
+  padding: 18px 22px;
+  border-bottom: 1px solid #eeeeef;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(14px);
+}
+
 .dialog-head {
   display: flex;
   align-items: center;
@@ -698,9 +715,10 @@
 
 .composer-type-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 16px;
+  padding: 18px 22px 0;
+  margin-bottom: 14px;
 }
 
 .composer-type-tabs label {
@@ -751,6 +769,7 @@
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 800;
+  margin: 0 22px 14px;
 }
 
 .composer-draft-bar button {
@@ -770,6 +789,7 @@
 
 .composer-form input,
 .composer-form textarea,
+.composer-form select,
 .login-form input,
 .login-form textarea {
   width: 100%;
@@ -781,6 +801,7 @@
 }
 
 .composer-form input,
+.composer-form select,
 .login-form input {
   height: 42px;
   padding: 0 12px;
@@ -806,10 +827,19 @@
   background: #fafafa;
   color: #333 !important;
   text-align: center;
+  margin: 0 22px 14px;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, transform var(--dur-fast) var(--ease-spring);
 }
 
 .upload-box input {
   display: none;
+}
+
+.upload-box:hover {
+  border-color: rgba(255, 36, 66, .46);
+  background: #fff8fa;
+  transform: translateY(-1px);
 }
 
 .upload-box span {
@@ -829,7 +859,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
+  margin: 0 22px 14px;
 }
 
 .preview-grid img {
@@ -840,7 +870,7 @@
 }
 
 .video-preview {
-  margin-bottom: 14px;
+  margin: 0 22px 14px;
 }
 
 .video-preview video {
@@ -849,6 +879,102 @@
   max-height: 260px;
   border-radius: 14px;
   background: #000;
+}
+
+.composer-form > label:not(.upload-box),
+.composer-topic-label {
+  margin-inline: 22px;
+}
+
+.composer-form > label[data-content-field="shop"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.composer-topic-label {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 14px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.composer-topic-label > label {
+  margin: 0;
+}
+
+.composer-topic-label input {
+  min-width: 0;
+}
+
+.composer-topic-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-topic-presets button {
+  min-height: 30px;
+  border: 1px solid #eeeeef;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #52525b;
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.composer-topic-presets button:hover,
+.composer-topic-presets button.is-active {
+  border-color: rgba(255, 36, 66, .34);
+  background: #fff3f5;
+  color: #ff2442;
+}
+
+.composer-form .dialog-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: 0;
+  border-top: 1px solid #eeeeef;
+  background: rgba(255, 255, 255, .94);
+  padding: 14px 22px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -10px 24px rgba(24, 24, 27, .04);
+}
+
+.composer-form .composer-actions {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(108px, auto) minmax(132px, auto);
+  justify-content: end;
+  gap: 10px;
+}
+
+.composer-save-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ececef;
+  border-radius: 999px;
+  background: #fff;
+  color: #18181b;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.composer-save-button:hover {
+  background: #f7f7f8;
+}
+
+.composer-form .dialog-actions .publish-button {
+  display: inline-flex;
+  min-width: 124px;
+  align-items: center;
+  justify-content: center;
 }
 
 .code-row {
@@ -883,6 +1009,220 @@
 .login-feedback[data-type="error"] {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.profile-edit-dialog {
+  width: min(620px, calc(100% - 28px));
+}
+
+dialog[open] .profile-edit-form {
+  animation: dialog-slide-up var(--dur-slow) var(--ease-out);
+}
+
+.profile-edit-form {
+  max-width: 620px;
+  width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--shadow-float);
+  scrollbar-gutter: stable;
+}
+
+.profile-edit-form .dialog-head {
+  margin: 0;
+  padding: 18px 22px;
+  border-bottom: 1px solid #eeeeef;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(14px);
+}
+
+.profile-edit-form .dialog-head h2,
+.profile-edit-form .dialog-head p {
+  margin: 0;
+}
+
+.profile-edit-form .dialog-head p {
+  margin-top: 4px;
+  color: #8b8b93;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.profile-edit-avatar-panel {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 26px 22px 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 244, 246, .95), rgba(255, 255, 255, 0) 76%),
+    #fff;
+  text-align: center;
+}
+
+.profile-edit-avatar-button {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4f4f5;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 14px 34px rgba(24, 24, 27, .16), 0 0 0 5px #fff;
+  cursor: pointer;
+}
+
+.profile-edit-avatar-button img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.profile-edit-avatar-button span {
+  position: absolute;
+  inset: auto 0 0;
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  background: rgba(18, 18, 18, .62);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  backdrop-filter: blur(8px);
+}
+
+.profile-edit-avatar-button:hover {
+  transform: translateY(-1px);
+}
+
+.profile-edit-avatar-button:focus-visible {
+  outline: 3px solid rgba(255, 36, 66, .28);
+  outline-offset: 5px;
+}
+
+.profile-edit-avatar-panel strong,
+.profile-edit-avatar-panel p {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-edit-avatar-panel strong {
+  color: #18181b;
+  font-size: 21px;
+  font-weight: 950;
+}
+
+.profile-edit-avatar-panel p {
+  color: #71717a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.profile-edit-fields {
+  display: grid;
+  gap: 12px;
+  padding: 0 22px 20px;
+}
+
+.profile-edit-fields label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  color: #52525b;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.profile-edit-fields label > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-edit-fields input,
+.profile-edit-fields textarea {
+  width: 100%;
+  border: 1px solid #eeeeef;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #18181b;
+  outline: 0;
+  font: inherit;
+  font-weight: 500;
+}
+
+.profile-edit-fields input {
+  height: 44px;
+  padding: 0 13px;
+}
+
+.profile-edit-fields textarea {
+  min-height: 104px;
+  resize: vertical;
+  padding: 12px 13px 28px;
+  line-height: 1.6;
+}
+
+.profile-edit-fields input:focus,
+.profile-edit-fields textarea:focus {
+  border-color: rgba(255, 36, 66, .5);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 36, 66, .08);
+}
+
+.profile-edit-bio {
+  position: relative;
+}
+
+.profile-edit-bio small {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-edit-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0;
+  border-top: 1px solid #eeeeef;
+  background: rgba(255, 255, 255, .94);
+  padding: 14px 22px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -10px 24px rgba(24, 24, 27, .04);
+}
+
+.profile-edit-actions .ghost-button,
+.profile-edit-actions .publish-button {
+  min-height: 42px;
+  border-radius: 999px;
+  padding: 0 20px;
+  font-weight: 900;
+}
+
+.profile-edit-actions .publish-button {
+  min-width: 128px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-edit-actions .publish-button:disabled {
+  opacity: .62;
+  cursor: wait;
 }
 
 .dialog-actions {

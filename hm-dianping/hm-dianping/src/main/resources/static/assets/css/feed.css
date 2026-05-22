@@ -299,6 +299,7 @@
   border: 1px solid #eeeeef;
   border-radius: 8px;
   overflow: hidden;
+  position: relative;
 }
 
 .profile-cover {
@@ -307,6 +308,36 @@
     radial-gradient(circle at 15% 35%, rgba(255, 255, 255, .72) 0 90px, transparent 92px),
     radial-gradient(circle at 82% 18%, rgba(255, 214, 224, .9) 0 124px, transparent 126px),
     linear-gradient(135deg, #ffe2d6 0%, #ffeef3 42%, #dff5ef 100%);
+}
+
+.profile-back-button {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, .68);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .72);
+  color: #18181b;
+  padding: 0 12px 0 8px;
+  font-size: 13px;
+  font-weight: 850;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 24px rgba(24, 24, 27, .12);
+}
+
+.profile-back-button[hidden] {
+  display: none;
+}
+
+.profile-back-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .profile-hero {
