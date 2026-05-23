@@ -69,7 +69,7 @@ window.switchMessageArea = switchMessageArea;
 
 async function loadNotifications() {
   if (!els.notificationList) return;
-  els.notificationList.innerHTML = `<p class="empty-text">正在加载消息...</p>`;
+  els.notificationList.innerHTML = renderMessageEmpty("正在加载消息", "稍等一下，正在同步通知中心。");
   const unreadOnly = state.notificationFilter === "unread";
   const category = ["interaction", "order", "audit", "system"].includes(state.notificationFilter)
     ? state.notificationFilter
@@ -78,14 +78,14 @@ async function loadNotifications() {
     const list = await request(`/notifications?unreadOnly=${unreadOnly}&category=${category}`);
     renderNotifications(Array.isArray(list) ? list : []);
   } catch {
-    els.notificationList.innerHTML = `<p class="empty-text">消息加载失败，请稍后再试。</p>`;
+    els.notificationList.innerHTML = renderMessageEmpty("消息加载失败", "请稍后重试，或切换到私信继续使用。");
   }
 }
 window.loadNotifications = loadNotifications;
 
 function renderNotifications(list) {
   if (!list.length) {
-    els.notificationList.innerHTML = `<p class="empty-text">暂时还没有消息。</p>`;
+    els.notificationList.innerHTML = renderMessageEmpty("暂时还没有消息", "互动、订单、审核和系统通知会出现在这里。");
     return;
   }
   els.notificationList.innerHTML = list.map(item => {
@@ -112,6 +112,16 @@ function renderNotifications(list) {
   }).join("");
 }
 window.renderNotifications = renderNotifications;
+
+function renderMessageEmpty(title, text) {
+  return `
+    <section class="empty-text message-empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(text || "")}</span>
+    </section>
+  `;
+}
+window.renderMessageEmpty = renderMessageEmpty;
 
 function notificationPayload(item) {
   const payload = item?.payload;
@@ -431,7 +441,7 @@ window.findDmConversation = findDmConversation;
 function renderDmConversations() {
   if (!els.dmConversationList) return;
   if (!state.dmConversations.length) {
-    els.dmConversationList.innerHTML = `<p class="empty-text">还没有私信，搜索用户开始聊天。</p>`;
+    els.dmConversationList.innerHTML = renderMessageEmpty("还没有私信", "搜索用户，或从通知里点私信开始一段对话。");
     return;
   }
   els.dmConversationList.innerHTML = state.dmConversations.map(item => `
@@ -798,7 +808,7 @@ async function deleteNotification(id) {
       setTimeout(() => {
         item.remove();
         if (!els.notificationList.querySelector(".notification-item")) {
-          els.notificationList.innerHTML = `<p class="empty-text">暂时还没有消息。</p>`;
+          els.notificationList.innerHTML = renderMessageEmpty("暂时还没有消息", "互动、订单、审核和系统通知会出现在这里。");
         }
       }, 250);
     }
@@ -1051,7 +1061,7 @@ window.profileNotesPath = profileNotesPath;
 
 function renderProfileNotes(notes) {
   if (!notes.length) {
-    els.profileHomeResults.innerHTML = `<p class="empty-text">这里暂时还没有内容。</p>`;
+    els.profileHomeResults.innerHTML = renderMessageEmpty("这里暂时还没有内容", "发布作品、点赞或收藏后，这个页面会更有生命力。");
     return;
   }
   const grid = document.createElement("div");
@@ -1064,7 +1074,7 @@ window.renderProfileNotes = renderProfileNotes;
 
 function renderProfileUsers(users) {
   if (!users.length) {
-    els.profileHomeResults.innerHTML = `<p class="empty-text">这里暂时还没有用户。</p>`;
+    els.profileHomeResults.innerHTML = renderMessageEmpty("这里暂时还没有用户", "关注和粉丝关系建立后会展示在这里。");
     return;
   }
   els.profileHomeResults.innerHTML = `

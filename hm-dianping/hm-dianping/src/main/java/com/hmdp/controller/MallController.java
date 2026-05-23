@@ -3,9 +3,12 @@ package com.hmdp.controller;
 import com.hmdp.dto.MallCartRequest;
 import com.hmdp.dto.MallOrderRequest;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UserDTO;
+import com.hmdp.enums.ErrorCode;
 import com.hmdp.service.IMallCartService;
 import com.hmdp.service.IMallOrderService;
 import com.hmdp.service.IMallProductService;
+import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 商城统一接口。
@@ -69,6 +75,21 @@ public class MallController {
     @GetMapping("/orders")
     public Result orders(@RequestParam(value = "status", required = false) Integer status) {
         return orderService.listMine(status);
+    }
+
+    @GetMapping("/orders/summary")
+    public Result orderSummary() {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) return Result.fail(ErrorCode.USER_NOT_LOGIN);
+        Map<String, Long> summary = new LinkedHashMap<>();
+        summary.put("all", orderService.query().eq("user_id", user.getId()).count());
+        summary.put("pendingPay", orderService.query().eq("user_id", user.getId()).eq("status", 1).count());
+        summary.put("pendingShip", orderService.query().eq("user_id", user.getId()).in("status", 2, 3).count());
+        summary.put("shipped", orderService.query().eq("user_id", user.getId()).eq("status", 4).count());
+        summary.put("completed", orderService.query().eq("user_id", user.getId()).eq("status", 5).count());
+        summary.put("cancelled", orderService.query().eq("user_id", user.getId()).eq("status", 6).count());
+        summary.put("refund", orderService.query().eq("user_id", user.getId()).in("status", 7, 8).count());
+        return Result.ok(summary);
     }
 
     @PostMapping("/orders/{id}/pay")

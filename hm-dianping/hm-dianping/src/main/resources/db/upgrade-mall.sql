@@ -131,6 +131,11 @@ CALL add_index_if_missing('tb_mall_product', 'idx_merchant_status', 'ADD INDEX `
 CALL add_column_if_missing('tb_mall_order', 'merchant_id', '`merchant_id` bigint UNSIGNED NULL COMMENT ''商家id'' AFTER `user_id`');
 CALL add_column_if_missing('tb_mall_order', 'voucher_id', '`voucher_id` bigint UNSIGNED NULL COMMENT ''优惠券id'' AFTER `product_id`');
 CALL add_column_if_missing('tb_mall_order', 'discount_amount', '`discount_amount` bigint NOT NULL DEFAULT 0 COMMENT ''优惠金额，单位分'' AFTER `price`');
+CALL add_column_if_missing('tb_mall_order', 'pay_time', '`pay_time` timestamp NULL DEFAULT NULL COMMENT ''支付时间'' AFTER `create_time`');
+CALL add_column_if_missing('tb_mall_order', 'ship_time', '`ship_time` timestamp NULL DEFAULT NULL COMMENT ''发货时间'' AFTER `pay_time`');
+CALL add_column_if_missing('tb_mall_order', 'receive_time', '`receive_time` timestamp NULL DEFAULT NULL COMMENT ''收货时间'' AFTER `ship_time`');
+CALL add_column_if_missing('tb_mall_order', 'cancel_time', '`cancel_time` timestamp NULL DEFAULT NULL COMMENT ''取消时间'' AFTER `receive_time`');
+CALL add_column_if_missing('tb_mall_order', 'refund_time', '`refund_time` timestamp NULL DEFAULT NULL COMMENT ''退款完成时间'' AFTER `cancel_time`');
 CALL add_index_if_missing('tb_mall_order', 'idx_merchant_time', 'ADD INDEX `idx_merchant_time` (`merchant_id`, `create_time`)');
 
 CALL add_column_if_missing('tb_voucher', 'merchant_id', '`merchant_id` bigint UNSIGNED NULL COMMENT ''商城商家id'' AFTER `shop_id`');

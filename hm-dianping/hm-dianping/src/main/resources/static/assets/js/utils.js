@@ -188,6 +188,11 @@ window.els = {
   contentArea: document.querySelector(".content-area"),
   feedTabs: document.querySelector(".feed-tabs"),
   mallArea: document.querySelector("#mallArea"),
+  commerceWorkspace: document.querySelector("#commerceWorkspace"),
+  commerceWorkspaceKicker: document.querySelector("#commerceWorkspaceKicker"),
+  commerceWorkspaceTitle: document.querySelector("#commerceWorkspaceTitle"),
+  commerceWorkspaceSub: document.querySelector("#commerceWorkspaceSub"),
+  commerceWorkspaceBody: document.querySelector("#commerceWorkspaceBody"),
   videoArea: document.querySelector("#videoArea"),
   messageArea: document.querySelector("#messageArea"),
   videoFeed: document.querySelector("#videoFeed"),
@@ -377,9 +382,23 @@ async function request(url, options = {}) {
     headers.set("Content-Type", "application/json");
   }
   const response = await fetch(apiUrl(url), { ...options, headers });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? "登录已过期，请重新登录。" : `HTTP ${response.status}`);
+    error.status = response.status;
+    if (response.status === 401) {
+      localStorage.removeItem("hmdp_token");
+      localStorage.removeItem("hmdp_token_expire_at");
+      state.currentUser = null;
+      window.renderUser?.(null);
+    }
+    throw error;
+  }
   const result = await response.json();
-  if (result.success === false) throw new Error(result.errorMsg || "请求失败");
+  if (result.success === false) {
+    const error = new Error(result.errorMsg || "请求失败");
+    error.code = result.errorCode || result.code;
+    throw error;
+  }
   if (options.raw) return result;
   return result.data;
 }

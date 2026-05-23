@@ -236,7 +236,11 @@ CALL add_column_if_missing('tb_mall_order', 'logistics_no', 'varchar(80) NULL CO
 CALL add_column_if_missing('tb_mall_order', 'refund_reason', 'varchar(255) NULL COMMENT ''退款原因'' AFTER `logistics_no`');
 CALL add_column_if_missing('tb_mall_order', 'refund_remark', 'varchar(255) NULL COMMENT ''退款处理备注'' AFTER `refund_reason`');
 CALL add_column_if_missing('tb_mall_order', 'promotion_discount_amount', 'bigint UNSIGNED NOT NULL DEFAULT 0 COMMENT ''活动优惠金额'' AFTER `discount_amount`');
-CALL add_column_if_missing('tb_mall_order', 'refund_time', 'timestamp NULL DEFAULT NULL COMMENT ''退款完成时间''');
+CALL add_column_if_missing('tb_mall_order', 'pay_time', 'timestamp NULL DEFAULT NULL COMMENT ''支付时间'' AFTER `create_time`');
+CALL add_column_if_missing('tb_mall_order', 'ship_time', 'timestamp NULL DEFAULT NULL COMMENT ''发货时间'' AFTER `pay_time`');
+CALL add_column_if_missing('tb_mall_order', 'receive_time', 'timestamp NULL DEFAULT NULL COMMENT ''收货时间'' AFTER `ship_time`');
+CALL add_column_if_missing('tb_mall_order', 'cancel_time', 'timestamp NULL DEFAULT NULL COMMENT ''取消时间'' AFTER `receive_time`');
+CALL add_column_if_missing('tb_mall_order', 'refund_time', 'timestamp NULL DEFAULT NULL COMMENT ''退款完成时间'' AFTER `cancel_time`');
 
 CALL add_column_if_missing('tb_voucher', 'scope_type', 'varchar(32) NULL COMMENT ''券作用范围：SHOP/PRODUCT/CATEGORY/PLATFORM'' AFTER `product_id`');
 CALL add_column_if_missing('tb_voucher', 'category_id', 'bigint UNSIGNED NULL COMMENT ''类目券绑定类目id'' AFTER `scope_type`');

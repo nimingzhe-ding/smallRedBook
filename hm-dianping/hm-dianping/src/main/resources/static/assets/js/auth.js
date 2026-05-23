@@ -211,6 +211,10 @@ function runAfterLoginAction(action) {
     openCartDialog();
     return;
   }
+  if (action === "merchant" && typeof openMerchantCenter === "function") {
+    openMerchantCenter();
+    return;
+  }
   if (action === "notifications" && typeof openNotificationDialog === "function") {
     openNotificationDialog();
   }

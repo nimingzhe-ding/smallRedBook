@@ -137,7 +137,7 @@ function renderUnifiedProducts(products) {
         <article class="product-card search-product-card">
           <button type="button" data-unified-product="${product.id}">
             <div class="product-image-wrap">
-              <img class="product-image" src="${normalizeImage(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy">
+              <img class="product-image" src="${commerceImage(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy" onerror="${commerceImageFallbackAttr()}">
               <span>已售 ${product.sold}</span>
             </div>
             <div class="product-body">
@@ -174,7 +174,7 @@ function renderUnifiedShops(shops) {
       ${shops.map(shop => `
         <article class="unified-row">
           <button type="button" data-unified-shop="${shop.id}">
-            <img src="${normalizeImage(shop.image)}" alt="${escapeHtml(shop.name)}">
+            <img src="${normalizeImage(shop.image)}" alt="${escapeHtml(shop.name)}" onerror="this.onerror=null;this.src='${defaultNoteImage}'">
             <span>
               <strong>${escapeHtml(shop.name)}</strong>
               <small>${escapeHtml(shop.area)} · ${shop.avgPrice ? `人均 ¥${shop.avgPrice}` : "价格待补充"} · ${shop.score ? `${(shop.score / 10).toFixed(1)}分` : "暂无评分"}</small>

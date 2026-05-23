@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/assets/css/dialogs.css">
   <link rel="stylesheet" href="/assets/css/search.css">
   <link rel="stylesheet" href="/assets/css/mobile.css">
+  <link rel="stylesheet" href="/assets/css/product-mvp.css">
 </head>
 <body>
   <a class="skip-link" href="#noteFeed">跳到内容流</a>
@@ -139,9 +140,9 @@
             </div>
           </div>
           <div class="mall-actions">
-            <button class="soft-button" id="openMerchantCenter" type="button">商家中心</button>
-            <button class="soft-button" id="openCart" type="button">购物车</button>
-            <button class="soft-button" id="openOrders" type="button">我的订单</button>
+            <button class="soft-button" id="openMerchantCenter" type="button"><b>商家中心</b><small>运营</small></button>
+            <button class="soft-button" id="openCart" type="button"><b>购物车</b><small>结算</small></button>
+            <button class="soft-button" id="openOrders" type="button"><b>我的订单</b><small>售后</small></button>
           </div>
         </div>
         <div class="mall-promo-strip" aria-label="商城服务承诺">
@@ -158,6 +159,28 @@
           <button class="category-pill" data-mall-category="travel">旅行出行</button>
         </div>
         <div class="product-grid" id="productGrid"></div>
+      </section>
+
+      <section class="commerce-workspace" id="commerceWorkspace" aria-label="商城交易工作台" hidden>
+        <div class="commerce-shell">
+          <header class="commerce-head">
+            <button class="commerce-back" id="closeCommerceWorkspace" type="button" aria-label="返回商城">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 5.3 8 12l6.7 6.7 1.4-1.4L10.8 12l5.3-5.3-1.4-1.4Z"/></svg>
+              <span>返回商城</span>
+            </button>
+            <div>
+              <small id="commerceWorkspaceKicker">交易工作台</small>
+              <strong id="commerceWorkspaceTitle">商城工作台</strong>
+              <span id="commerceWorkspaceSub">管理购物车、订单和商家运营。</span>
+            </div>
+          </header>
+          <nav class="commerce-tabs" aria-label="交易工作台导航">
+            <button type="button" data-commerce-view="cart">购物车</button>
+            <button type="button" data-commerce-view="orders">我的订单</button>
+            <button type="button" data-commerce-view="merchant">商家中心</button>
+          </nav>
+          <div class="commerce-body" id="commerceWorkspaceBody"></div>
+        </div>
       </section>
 
       <section class="message-area" id="messageArea" aria-label="消息中心" hidden>
