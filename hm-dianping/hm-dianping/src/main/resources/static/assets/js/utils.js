@@ -283,7 +283,16 @@ window.setFeedTabsVisible = setFeedTabsVisible;
 
 function updateHomeCurationVisibility() {
   if (!els.homeCuration) return;
-  els.homeCuration.hidden = !(state.mode === "feed" && state.feed === "recommend" && !state.query);
+  const onRecommendHome = state.mode === "feed"
+    && state.feed === "recommend"
+    && !state.query
+    && els.feed
+    && !els.feed.hidden
+    && (!els.profileHome || els.profileHome.hidden)
+    && (!els.unifiedSearch || els.unifiedSearch.hidden)
+    && (!els.mallArea || els.mallArea.hidden)
+    && (!els.videoArea || els.videoArea.hidden);
+  els.homeCuration.hidden = !onRecommendHome;
 }
 window.updateHomeCurationVisibility = updateHomeCurationVisibility;
 

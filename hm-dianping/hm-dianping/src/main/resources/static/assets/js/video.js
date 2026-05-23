@@ -81,8 +81,8 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll(".immersive-video").forEach(video => {
     bindVideoPlaybackState(video);
     video.addEventListener("click", () => {
-      if (video.paused) video.play().catch(() => {});
-      else video.pause();
+      const note = videos.find(item => String(item.id) === String(video.closest(".video-slide")?.dataset.videoId));
+      if (note) openVideoFullscreen(note);
     });
   });
   els.videoFeed.querySelectorAll("[data-video-open], [data-video-comment]").forEach(button => {
@@ -200,8 +200,9 @@ async function loadDanmaku(noteId) {
   } catch {
     state.danmakuStore[String(noteId)] = defaultDanmaku(noteId);
   }
-  const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
-  if (layer) layer.hidden = !state.danmakuEnabled;
+  document.querySelectorAll(`[data-danmaku-layer="${CSS.escape(String(noteId))}"]`).forEach(layer => {
+    layer.hidden = !state.danmakuEnabled;
+  });
 }
 
 function subscribeDanmaku(noteId) {
@@ -240,11 +241,11 @@ function receiveRealtimeDanmaku(noteId, item) {
   }
   list.push(item);
   state.danmakuStore[key] = dedupeDanmaku(list);
-  const slide = els.videoFeed.querySelector(`.video-slide[data-video-id="${noteId}"]`);
+  const slide = activeVideoSlide(noteId);
   const video = slide?.querySelector("video");
   const currentSecond = Math.floor(video?.currentTime || 0);
   if (Math.abs(Number(item.videoSecond || 0) - currentSecond) <= 1) {
-    const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
+    const layer = slide?.querySelector(`[data-danmaku-layer="${CSS.escape(String(noteId))}"]`);
     if (layer) shootDanmaku(layer, item.content || "", item.lane, item.id);
     item.__shownAtSecond = Number(item.videoSecond || 0);
   }
@@ -260,8 +261,13 @@ function dedupeDanmaku(list) {
   });
 }
 
-function renderDanmaku(noteId, currentSecond) {
-  const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
+function activeVideoSlide(noteId) {
+  return document.querySelector(`.video-fullscreen.is-open .video-slide[data-video-id="${CSS.escape(String(noteId))}"]`)
+    || els.videoFeed.querySelector(`.video-slide[data-video-id="${CSS.escape(String(noteId))}"]`);
+}
+
+function renderDanmaku(noteId, currentSecond, slide) {
+  const layer = (slide || activeVideoSlide(noteId))?.querySelector(`[data-danmaku-layer="${CSS.escape(String(noteId))}"]`);
   if (!layer || !state.danmakuEnabled) return;
   const list = filterDanmakuList(noteId, state.danmakuStore[String(noteId)] || []);
   list
@@ -421,7 +427,7 @@ async function submitDanmaku(event) {
     list.push(saved || payload);
     state.danmakuStore[noteId] = list;
     input.value = "";
-    const layer = els.videoFeed.querySelector(`[data-danmaku-layer="${noteId}"]`);
+    const layer = slide?.querySelector(`[data-danmaku-layer="${CSS.escape(String(noteId))}"]`);
     if (layer) shootDanmaku(layer, text, payload.lane, saved?.id);
   } catch (error) {
     showStatus(error.message || "弹幕发送失败。");
@@ -448,7 +454,7 @@ function startDanmakuTicker(slide) {
   const timer = window.setInterval(() => {
     const video = slide.querySelector("video");
     if (!video || video.paused) return;
-    renderDanmaku(slide.dataset.videoId, Math.floor(video.currentTime || 0));
+    renderDanmaku(slide.dataset.videoId, Math.floor(video.currentTime || 0), slide);
   }, 500);
   slide.dataset.danmakuTimer = String(timer);
 }
@@ -475,6 +481,100 @@ function pauseImmersiveVideos(except) {
   });
 }
 
+function openVideoFullscreen(note) {
+  if (!note?.videoUrl) return;
+  const host = document.querySelector("#videoFullscreen");
+  if (!host) return;
+  pauseImmersiveVideos();
+  const noteId = String(note.id);
+  host.hidden = false;
+  host.classList.add("is-open");
+  host.setAttribute("aria-hidden", "false");
+  host.innerHTML = `
+    <article class="video-slide video-fullscreen-slide" data-video-id="${noteId}">
+      <video class="immersive-video video-fullscreen-player" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" autoplay playsinline preload="metadata" ${state.videoMuted ? "muted" : ""}></video>
+      <div class="danmaku-layer video-fullscreen-danmaku" data-danmaku-layer="${noteId}"></div>
+      <div class="video-gradient"></div>
+      <button class="video-fullscreen-close" type="button" aria-label="退出全屏">退出</button>
+      <div class="video-info video-fullscreen-info">
+        <div class="video-author">
+          <img src="${normalizeImage(note.icon)}" alt="">
+          <span>${escapeHtml(note.name)}</span>
+        </div>
+        <h2>${escapeHtml(note.title)}</h2>
+        <p>${escapeHtml(note.content || "")}</p>
+      </div>
+      <form class="danmaku-form video-fullscreen-form" data-danmaku-form="${noteId}">
+        <input name="danmaku" maxlength="40" autocomplete="off" placeholder="发条弹幕...">
+        <button type="submit">发送</button>
+      </form>
+      <div class="video-fullscreen-actions">
+        <button type="button" data-fullscreen-toggle-play>${state.videoAutoplay ? "暂停" : "播放"}</button>
+        <button type="button" data-video-mute="${noteId}">${state.videoMuted ? "静音开" : "静音关"}</button>
+        <button type="button" data-danmaku-toggle="${noteId}">${state.danmakuEnabled ? "弹幕开" : "弹幕关"}</button>
+      </div>
+    </article>
+  `;
+  const slide = host.querySelector(".video-slide");
+  const video = slide.querySelector("video");
+  bindVideoPlaybackState(video);
+  loadDanmaku(noteId).then(() => {
+    slide.querySelector("[data-danmaku-layer]").hidden = !state.danmakuEnabled;
+  });
+  subscribeDanmaku(noteId);
+  startDanmakuTicker(slide);
+  video.play().catch(() => {});
+  video.addEventListener("click", () => {
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+  });
+  host.querySelector(".video-fullscreen-close").addEventListener("click", closeVideoFullscreen);
+  host.querySelector("[data-fullscreen-toggle-play]").addEventListener("click", button => {
+    if (video.paused) {
+      video.play().catch(() => {});
+      button.currentTarget.textContent = "暂停";
+    } else {
+      video.pause();
+      button.currentTarget.textContent = "播放";
+    }
+  });
+  host.querySelector("[data-video-mute]").addEventListener("click", button => {
+    state.videoMuted = !state.videoMuted;
+    localStorage.setItem("hmdp_video_muted", JSON.stringify(state.videoMuted));
+    video.muted = state.videoMuted;
+    button.currentTarget.textContent = state.videoMuted ? "静音开" : "静音关";
+  });
+  host.querySelector("[data-danmaku-toggle]").addEventListener("click", button => {
+    state.danmakuEnabled = !state.danmakuEnabled;
+    localStorage.setItem("hmdp_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
+    slide.querySelector("[data-danmaku-layer]").hidden = !state.danmakuEnabled;
+    button.currentTarget.textContent = state.danmakuEnabled ? "弹幕开" : "弹幕关";
+  });
+  host.querySelector("[data-danmaku-form]").addEventListener("submit", submitDanmaku);
+  document.body.style.overflow = "hidden";
+}
+
+function closeVideoFullscreen() {
+  const host = document.querySelector("#videoFullscreen");
+  if (!host || host.hidden) return;
+  const slide = host.querySelector(".video-slide");
+  const video = host.querySelector("video");
+  if (video) {
+    reportVideoMetric(video);
+    video.pause();
+  }
+  if (slide) stopDanmakuTicker(slide);
+  host.classList.remove("is-open");
+  host.setAttribute("aria-hidden", "true");
+  host.hidden = true;
+  host.innerHTML = "";
+  document.body.style.overflow = "";
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeVideoFullscreen();
+});
+
 function closeDrawer() {
   els.drawer.classList.remove("is-open");
   els.drawer.setAttribute("aria-hidden", "true");
@@ -494,6 +594,7 @@ window.closeDanmakuSource = closeDanmakuSource;
 window.receiveRealtimeDanmaku = receiveRealtimeDanmaku;
 window.dedupeDanmaku = dedupeDanmaku;
 window.renderDanmaku = renderDanmaku;
+window.activeVideoSlide = activeVideoSlide;
 window.shootDanmaku = shootDanmaku;
 window.reportDanmaku = reportDanmaku;
 window.filterDanmakuList = filterDanmakuList;
@@ -507,6 +608,8 @@ window.startDanmakuTicker = startDanmakuTicker;
 window.stopDanmakuTicker = stopDanmakuTicker;
 window.playCurrentImmersiveVideo = playCurrentImmersiveVideo;
 window.pauseImmersiveVideos = pauseImmersiveVideos;
+window.openVideoFullscreen = openVideoFullscreen;
+window.closeVideoFullscreen = closeVideoFullscreen;
 window.closeDrawer = closeDrawer;
 
 })();

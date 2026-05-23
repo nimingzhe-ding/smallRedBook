@@ -133,6 +133,9 @@
   if (briefVideo) briefVideo.addEventListener("click", switchVideo);
   var briefMall = document.querySelector("[data-brief-action='mall']");
   if (briefMall) briefMall.addEventListener("click", switchMall);
+  document.querySelector("#videoBackHome")?.addEventListener("click", function() {
+    switchFeed("recommend");
+  });
   document.querySelector("#markNotificationsRead").addEventListener("click", markNotificationsRead);
   document.querySelector("#toggleNotificationSettings")?.addEventListener("click", function() {
     if (!els.notificationSettings) return;

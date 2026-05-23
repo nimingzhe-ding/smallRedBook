@@ -23,15 +23,17 @@ function renderComments(comments) {
   }
   els.commentList.innerHTML = comments.map(comment => `
     <article class="comment-item">
-      <img src="${normalizeImage(comment.icon) || fallbackAvatar}" alt="">
-      <div>
-        <strong>${escapeHtml(comment.name || "探店用户")}</strong>
-        <p>${escapeHtml(comment.content)}</p>
-        <span>
-          ${formatTime(comment.createTime)} ·
-          <button class="comment-like" type="button" data-comment-id="${comment.id}">♡ ${comment.liked || 0}</button>
-          · <button class="comment-reply" type="button" data-comment-id="${comment.id}" data-parent-id="${comment.id}" data-name="${escapeHtml(comment.name || "探店用户")}">回复</button>
-        </span>
+      <img class="comment-avatar" src="${normalizeImage(comment.icon) || fallbackAvatar}" alt="">
+      <div class="comment-main">
+        <div class="comment-head">
+          <strong>${escapeHtml(comment.name || "探店用户")}</strong>
+          <span>${formatTime(comment.createTime)}</span>
+        </div>
+        <p class="comment-copy">${escapeHtml(comment.content)}</p>
+        <div class="comment-meta">
+          <button class="comment-like" type="button" data-comment-id="${comment.id}">喜欢 ${comment.liked || 0}</button>
+          <button class="comment-reply" type="button" data-comment-id="${comment.id}" data-parent-id="${comment.id}" data-name="${escapeHtml(comment.name || "探店用户")}">回复</button>
+        </div>
         <div class="comment-tools">${renderCommentActions(comment)}</div>
         ${renderReplies(comment.replies || [], comment.id)}
       </div>
@@ -57,13 +59,15 @@ function renderReplies(replies, rootId) {
     <div class="reply-list">
       ${replies.map(reply => `
         <article class="reply-item">
-          <strong>${escapeHtml(reply.name || "探店用户")}</strong>
-          <p>${escapeHtml(reply.content)}</p>
-          <span>
-            ${formatTime(reply.createTime)} ·
-            <button class="comment-like" type="button" data-comment-id="${reply.id}">♡ ${reply.liked || 0}</button>
-            · <button class="comment-reply" type="button" data-comment-id="${reply.id}" data-parent-id="${rootId}" data-name="${escapeHtml(reply.name || "探店用户")}">回复</button>
-          </span>
+          <div class="comment-head">
+            <strong>${escapeHtml(reply.name || "探店用户")}</strong>
+            <span>${formatTime(reply.createTime)}</span>
+          </div>
+          <p class="comment-copy">${escapeHtml(reply.content)}</p>
+          <div class="comment-meta">
+            <button class="comment-like" type="button" data-comment-id="${reply.id}">喜欢 ${reply.liked || 0}</button>
+            <button class="comment-reply" type="button" data-comment-id="${reply.id}" data-parent-id="${rootId}" data-name="${escapeHtml(reply.name || "探店用户")}">回复</button>
+          </div>
           <div class="comment-tools">${renderCommentActions(reply)}</div>
         </article>
       `).join("")}

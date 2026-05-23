@@ -83,8 +83,8 @@
         <section class="home-curation" id="homeCuration" aria-label="发现精选">
           <div class="home-curation-main">
             <small>今日发现</small>
-            <strong>内容种草、视频灵感和本地好物都在这里</strong>
-            <span>按热度、新鲜度和交易数据混合推荐，适合移动端快速浏览。</span>
+            <strong>热门内容和本地好物</strong>
+            <span>按新鲜度、互动和交易数据推荐。</span>
           </div>
           <div class="home-curation-actions">
             <button type="button" data-feed="hot">热门笔记</button>
@@ -142,6 +142,13 @@
       </section>
 
       <section class="video-area" id="videoArea" aria-label="视频流" hidden>
+        <div class="video-topbar">
+          <button class="video-back-button" id="videoBackHome" type="button" aria-label="返回首页">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 5.3 8 12l6.7 6.7 1.4-1.4L10.8 12l5.3-5.3-1.4-1.4Z"/></svg>
+            <span>首页</span>
+          </button>
+          <strong>视频</strong>
+        </div>
         <div class="video-feed" id="videoFeed"></div>
       </section>
 
@@ -377,6 +384,8 @@
       </div>
     </article>
   </div>
+
+  <div class="video-fullscreen" id="videoFullscreen" aria-hidden="true" hidden></div>
 
   <!-- 发布弹窗：图片上传 + 图文笔记表单 -->
   <dialog class="shop-dialog" id="shopDialog">

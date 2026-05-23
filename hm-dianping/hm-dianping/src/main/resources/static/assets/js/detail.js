@@ -286,9 +286,15 @@
   function renderDrawerImages(note) {
     if (note.isVideo && note.videoUrl) {
       els.drawerMedia.innerHTML = `
-        <video class="drawer-video" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" controls autoplay playsinline preload="metadata"></video>
+        <div class="drawer-video-wrap">
+          <video class="drawer-video" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" controls autoplay playsinline preload="metadata"></video>
+          <button class="drawer-video-fullscreen" type="button" data-open-video-fullscreen="${note.id}">全屏弹幕</button>
+        </div>
       `;
       els.drawerThumbs.innerHTML = "";
+      els.drawerMedia.querySelector("[data-open-video-fullscreen]")?.addEventListener("click", () => {
+        if (typeof openVideoFullscreen === "function") openVideoFullscreen(note);
+      });
       return;
     }
     const images = (note.images.length ? note.images : [note.image]).slice(0, 9);

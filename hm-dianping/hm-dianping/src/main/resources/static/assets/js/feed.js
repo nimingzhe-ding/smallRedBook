@@ -132,7 +132,10 @@ function createNoteCard(note) {
       </div>
     </div>
   `;
-  card.querySelector(".note-open").addEventListener("click", () => openDrawer(note));
+  card.querySelector(".note-open").addEventListener("click", () => {
+    if (note.isVideo && typeof openVideoFullscreen === "function") openVideoFullscreen(note);
+    else openDrawer(note);
+  });
   card.querySelector(".note-title-button").addEventListener("click", () => openDrawer(note));
   card.querySelector(".note-like").addEventListener("click", event => {
     event.stopPropagation();
@@ -341,6 +344,7 @@ function hideUnifiedSearch() {
   els.unifiedSearch.hidden = true;
   els.feed.hidden = false;
   els.loading.hidden = false;
+  updateHomeCurationVisibility();
 }
 window.hideUnifiedSearch = hideUnifiedSearch;
 
@@ -349,6 +353,7 @@ function hideProfileHome() {
   els.profileHome.hidden = true;
   els.feed.hidden = false;
   els.loading.hidden = false;
+  updateHomeCurationVisibility();
 }
 window.hideProfileHome = hideProfileHome;
 

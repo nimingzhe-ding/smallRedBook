@@ -147,8 +147,10 @@ function renderProducts(products) {
         </div>
       </button>
       <div class="product-card-actions">
-        <button class="ghost-button" type="button" data-quick-cart="${product.id}" ${soldOut ? "disabled" : ""}>加购</button>
-        <button class="publish-button" type="button" data-quick-buy="${product.id}" ${soldOut ? "disabled" : ""}>${soldOut ? "售罄" : "购买"}</button>
+        <button class="product-cart-icon" type="button" data-quick-cart="${product.id}" ${soldOut ? "disabled" : ""} aria-label="加入购物车">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-1.2 7.2a2 2 0 0 1-2 1.8H9.1a2 2 0 0 1-2-1.7L5.8 4H3V2h4.6L8 5h12.4L20 7H7Zm2.2 7h6.6l.8-5H8.5l.7 5ZM9 21a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm7 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
+        </button>
+        <button class="product-view-button" type="button" data-product-id="${product.id}" ${soldOut ? "disabled" : ""}>${soldOut ? "已售罄" : "去看看"}</button>
       </div>
     </article>
   `;
@@ -158,9 +160,6 @@ function renderProducts(products) {
   });
   els.productGrid.querySelectorAll("[data-quick-cart]").forEach(button => {
     button.addEventListener("click", () => addToCart(button.dataset.quickCart, 1, button));
-  });
-  els.productGrid.querySelectorAll("[data-quick-buy]").forEach(button => {
-    button.addEventListener("click", () => buyProductNow(button.dataset.quickBuy));
   });
 }
 

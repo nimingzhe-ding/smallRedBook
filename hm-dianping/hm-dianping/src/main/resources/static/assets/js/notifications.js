@@ -884,6 +884,7 @@ async function openUserProfile(userId, tab = "works", options = {}) {
   els.feed.hidden = true;
   els.loading.hidden = true;
   els.profileHome.hidden = false;
+  updateHomeCurationVisibility();
   els.profileHomeResults.innerHTML = `<p class="empty-text">正在加载主页...</p>`;
   document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
   try {
