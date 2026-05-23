@@ -91,16 +91,18 @@ function switchVideo() {
 }
 
 async function loadProducts() {
-  els.productGrid.innerHTML = `<p class="empty-text mall-empty">正在加载商城商品...</p>`;
+  els.productGrid.innerHTML = renderProductSkeletons();
   const params = new URLSearchParams({ current: "1", category: state.mallCategory });
   if (state.mallQuery) params.set("query", state.mallQuery);
   try {
     const data = await request(`/mall/products?${params.toString()}`);
     const products = Array.isArray(data) ? data.map(normalizeProduct) : [];
     state.mallProducts = products;
+    updateMallSummary(products);
     renderProducts(products);
   } catch {
     state.mallProducts = [];
+    updateMallSummary([]);
     els.productGrid.innerHTML = `<p class="empty-text mall-empty">商城接口暂时不可用，请先执行商城数据库脚本并重启后端。</p>`;
   }
 }
@@ -113,25 +115,78 @@ function renderProducts(products) {
   }
   els.productGrid.innerHTML = products.map(product => `
     <article class="product-card">
-      <button type="button" data-product-id="${product.id}">
+      <button class="product-open" type="button" data-product-id="${product.id}">
         <div class="product-image-wrap">
           <img class="product-image" src="${normalizeImage(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy">
-          <span>已售 ${product.sold}</span>
+          <span class="product-badge">${escapeHtml(productBadge(product))}</span>
         </div>
         <div class="product-body">
+          <div class="product-meta-row">
+            <span>${escapeHtml(product.category || "精选")}</span>
+            ${product.score ? `<span>${formatProductScore(product.score)} 分</span>` : `<span>新品</span>`}
+          </div>
           <h2>${escapeHtml(product.title)}</h2>
           <p>${escapeHtml(product.subTitle)}</p>
           <div class="product-row">
             <strong>¥${formatMoney(product.price)}</strong>
             ${product.originPrice ? `<small>¥${formatMoney(product.originPrice)}</small>` : ""}
           </div>
+          <div class="product-footnote">
+            <span>已售 ${product.sold}</span>
+            <span>库存 ${product.stock}</span>
+          </div>
         </div>
       </button>
+      <div class="product-card-actions">
+        <button class="ghost-button" type="button" data-quick-cart="${product.id}">加购</button>
+        <button class="publish-button" type="button" data-quick-buy="${product.id}">立即买</button>
+      </div>
     </article>
   `).join("");
   els.productGrid.querySelectorAll("[data-product-id]").forEach(button => {
     button.addEventListener("click", () => openProduct(button.dataset.productId));
   });
+  els.productGrid.querySelectorAll("[data-quick-cart]").forEach(button => {
+    button.addEventListener("click", () => addToCart(button.dataset.quickCart));
+  });
+  els.productGrid.querySelectorAll("[data-quick-buy]").forEach(button => {
+    button.addEventListener("click", () => buyProductNow(button.dataset.quickBuy));
+  });
+}
+
+function updateMallSummary(products) {
+  const count = document.querySelector("#mallProductCount");
+  if (!count) return;
+  const totalSold = products.reduce((sum, product) => sum + Number(product.sold || 0), 0);
+  count.textContent = products.length
+    ? `${products.length} 件在售 · ${totalSold} 次购买`
+    : "-- 件在售";
+}
+
+function renderProductSkeletons() {
+  return Array.from({ length: 8 }).map(() => `
+    <article class="product-card product-card-skeleton" aria-hidden="true">
+      <div class="product-image-wrap"></div>
+      <div class="product-body">
+        <i></i>
+        <i></i>
+        <i></i>
+      </div>
+    </article>
+  `).join("");
+}
+
+function productBadge(product) {
+  if (Number(product.sold || 0) >= 100) return "热卖";
+  if (Number(product.stock || 0) <= 10 && Number(product.stock || 0) > 0) return "少量";
+  if (product.originPrice && Number(product.originPrice) > Number(product.price)) return "优惠";
+  return "精选";
+}
+
+function formatProductScore(score) {
+  const value = Number(score || 0);
+  if (!value) return "5.0";
+  return (value / 10).toFixed(1);
 }
 
 function ensureProductGuide(product) {
