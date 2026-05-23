@@ -121,7 +121,7 @@ async function sendCode() {
     const data = await request(`/user/code?phone=${encodeURIComponent(phone)}`, { method: "POST" });
     if (data?.debugCode) {
       els.loginForm.elements.code.value = data.debugCode;
-      setLoginFeedback(`本地调试验证码已自动填入，有效期 ${Math.round((data.ttlSeconds || 120) / 60)} 分钟。`, "success");
+      setLoginFeedback(`验证码已填入，有效期 ${Math.round((data.ttlSeconds || 120) / 60)} 分钟。`, "success");
     } else {
       setLoginFeedback("验证码已发送，请注意查收。", "success");
     }

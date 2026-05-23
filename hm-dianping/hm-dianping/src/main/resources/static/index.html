@@ -277,9 +277,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 3.4 10v10h6v-6h5.2v6h6V10L12 3.2Z"/></svg>
         <span>首页</span>
       </button>
-      <button type="button" id="mobileVideo" data-mobile-tab="video">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>
-        <span>视频</span>
+      <button type="button" id="mobileMall" data-mobile-tab="mall">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Zm3-2a3 3 0 0 1 6 0h-2a1 1 0 0 0-2 0H9Z"/></svg>
+        <span>商城</span>
       </button>
       <button type="button" id="mobilePublish" class="mobile-publish-btn" aria-label="发布内容">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ff2442"/><path d="M11 7h2v10h-2zM7 11h10v2H7z" fill="#fff"/></svg>
@@ -376,7 +376,6 @@
           <button type="button" id="drawerCollect">收藏</button>
           <button type="button" id="drawerShare">分享</button>
           <button type="button" id="drawerReport">举报</button>
-          <button type="button" id="drawerAnalyze">总结</button>
           <button type="button" id="drawerEdit" hidden>编辑</button>
           <button type="button" id="drawerDelete" hidden>删除</button>
         </div>
@@ -621,7 +620,7 @@
     </form>
   </dialog>
 
-  <!-- 登录弹窗：本地调试使用验证码登录 -->
+  <!-- 登录弹窗：手机号验证码登录 -->
   <dialog class="login-dialog" id="loginDialog">
     <form method="dialog" class="login-form" id="loginForm">
       <div class="dialog-head">
@@ -641,7 +640,7 @@
         </label>
         <button class="ghost-button" id="sendCodeButton" type="button">获取验证码</button>
       </div>
-      <p class="login-tip">验证码会输出在后端日志里，适合本地调试。</p>
+      <p class="login-tip">登录后可发布、评论、下单和查看订单。</p>
       <p class="login-feedback" id="loginFeedback" hidden></p>
       <button class="wide-button" id="loginSubmitButton" value="default">登录</button>
     </form>

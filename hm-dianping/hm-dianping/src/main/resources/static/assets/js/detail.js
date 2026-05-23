@@ -25,8 +25,8 @@
     document.querySelectorAll("[data-comment-sort]").forEach(button => {
       button.classList.toggle("is-active", button.dataset.commentSort === "hot");
     });
-    els.noteSmart.hidden = false;
-    els.noteSmartText.textContent = "正在生成笔记亮点、避雷点、适合人群和推荐理由...";
+    els.noteSmart.hidden = true;
+    els.noteSmartText.textContent = "";
     renderDrawerImages(note);
     document.querySelector("#drawerAvatar").src = normalizeImage(note.icon);
     document.querySelector("#drawerAuthor").textContent = note.name;
@@ -52,8 +52,6 @@
       reportButton.hidden = Boolean(note.isOwner);
       reportButton.onclick = () => reportNote(note);
     }
-    document.querySelector("#drawerAnalyze").hidden = true;
-    document.querySelector("#drawerAnalyze").onclick = () => analyzeCurrentNote(note);
     const editButton = document.querySelector("#drawerEdit");
     const deleteButton = document.querySelector("#drawerDelete");
     editButton.hidden = !note.isOwner;
@@ -188,8 +186,31 @@
     `;
   }
 
+  function relatedTagSet(note) {
+    return new Set(String(note?.tags || "")
+      .split(/[,，#\s]+/)
+      .map(item => item.trim())
+      .filter(Boolean));
+  }
+
+  function rankRelatedNotes(baseNote, notes) {
+    const baseTags = relatedTagSet(baseNote);
+    return [...notes].sort((a, b) => {
+      const score = note => {
+        const tags = relatedTagSet(note);
+        const tagHit = [...tags].filter(tag => baseTags.has(tag)).length;
+        const sameShop = baseNote?.shop?.id && note?.shop?.id && String(baseNote.shop.id) === String(note.shop.id) ? 4 : 0;
+        const sameAuthor = baseNote?.userId && note?.userId && String(baseNote.userId) === String(note.userId) ? 2 : 0;
+        return tagHit * 3 + sameShop + sameAuthor + Math.min(Number(note.liked || 0) / 300, 2);
+      };
+      return score(b) - score(a);
+    });
+  }
+
   function renderRelatedNotes(notes = []) {
-    const list = Array.isArray(notes) ? notes.map(normalizeNote).filter(note => note.id !== state.currentNote?.id) : [];
+    const list = Array.isArray(notes)
+      ? rankRelatedNotes(state.currentNote, notes.map(normalizeNote).filter(note => note.id !== state.currentNote?.id)).slice(0, 6)
+      : [];
     if (!list.length) {
       els.noteRelated.hidden = true;
       els.noteRelatedList.innerHTML = "";
@@ -197,10 +218,13 @@
     }
     els.noteRelatedList.innerHTML = list.map(note => `
       <button class="related-note" type="button" data-related-note="${note.id}">
-        <img src="${normalizeImage(note.image)}" alt="${escapeHtml(note.title)}">
+        <span class="related-note-cover">
+          <img src="${normalizeImage(note.image)}" alt="${escapeHtml(note.title)}">
+          ${note.isVideo ? `<i>视频</i>` : ""}
+        </span>
         <span>
           <strong>${escapeHtml(note.title)}</strong>
-          <small>${escapeHtml(note.name || "探店用户")} · ${note.liked || 0} 赞</small>
+          <small>${escapeHtml(note.name || "探店用户")} · ${compactCount?.(note.liked) || note.liked || 0} 赞</small>
         </span>
       </button>
     `).join("");

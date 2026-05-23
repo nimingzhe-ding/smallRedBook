@@ -89,7 +89,9 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-video-open], [data-video-comment]").forEach(button => {
     button.addEventListener("click", () => {
       const note = videos.find(item => String(item.id) === String(button.dataset.videoOpen || button.dataset.videoComment));
-      if (note) openDrawer(note);
+      if (!note) return;
+      if (button.dataset.videoComment) openVideoFullscreen(note, { comments: true });
+      else openDrawer(note);
     });
   });
   els.videoFeed.querySelectorAll("[data-video-like]").forEach(button => {
@@ -498,7 +500,212 @@ function pauseImmersiveVideos(except) {
   });
 }
 
-function openVideoFullscreen(note) {
+function videoCount(value, fallback = 0) {
+  const count = Number(value || fallback || 0);
+  if (typeof compactCount === "function") return compactCount(count);
+  return String(count);
+}
+
+function syncFullscreenInteractionButtons(host, note) {
+  const likeButton = host.querySelector("[data-fullscreen-like]");
+  const collectButton = host.querySelector("[data-fullscreen-collect]");
+  const commentButton = host.querySelector("[data-fullscreen-comment]");
+  const danmakuButton = host.querySelector("[data-danmaku-toggle]");
+  if (likeButton) {
+    likeButton.classList.toggle("is-active", Boolean(note.isLike || note.likedByMe));
+    likeButton.querySelector("span").textContent = note.isLike || note.likedByMe ? "♥" : "♡";
+    likeButton.querySelector("small").textContent = videoCount(note.liked, note.likedCount);
+  }
+  if (collectButton) {
+    collectButton.classList.toggle("is-active", Boolean(note.isCollect || note.collected));
+    collectButton.querySelector("span").textContent = note.isCollect || note.collected ? "★" : "☆";
+    collectButton.querySelector("small").textContent = videoCount(note.collects, note.collectCount);
+  }
+  if (commentButton) {
+    commentButton.querySelector("small").textContent = videoCount(note.comments, note.commentCount);
+  }
+  if (danmakuButton) {
+    danmakuButton.classList.toggle("is-active", state.danmakuEnabled);
+    danmakuButton.querySelector("small").textContent = state.danmakuEnabled ? "开" : "关";
+    danmakuButton.setAttribute("aria-label", state.danmakuEnabled ? "关闭弹幕" : "打开弹幕");
+  }
+}
+
+function closeVideoComments() {
+  const host = document.querySelector("#videoFullscreen");
+  host?.classList.remove("is-commenting");
+  const sheet = host?.querySelector(".video-comment-sheet");
+  if (sheet) sheet.remove();
+  state.videoCommentReply = null;
+}
+
+async function openVideoComments(note) {
+  const host = document.querySelector("#videoFullscreen");
+  const slide = host?.querySelector(".video-fullscreen-slide");
+  if (!host || !slide) return;
+  let sheet = host.querySelector(".video-comment-sheet");
+  if (!sheet) {
+    slide.insertAdjacentHTML("beforeend", `
+      <section class="video-comment-sheet" aria-label="视频评论">
+        <div class="video-comment-grabber"></div>
+        <header>
+          <strong>评论</strong>
+          <button type="button" data-video-comments-close aria-label="关闭评论">关闭</button>
+        </header>
+        <div class="video-comment-list" data-video-comment-list>
+          <p class="empty-text">正在加载评论...</p>
+        </div>
+        <div class="video-comment-reply" data-video-comment-reply hidden>
+          <span></span>
+          <button type="button" data-video-reply-clear>取消</button>
+        </div>
+        <form class="video-comment-form" data-video-comment-form>
+          <input name="content" maxlength="255" autocomplete="off" placeholder="说点什么...">
+          <button type="submit">发送</button>
+        </form>
+      </section>
+    `);
+    sheet = host.querySelector(".video-comment-sheet");
+    sheet.querySelector("[data-video-comments-close]")?.addEventListener("click", closeVideoComments);
+    sheet.querySelector("[data-video-reply-clear]")?.addEventListener("click", () => {
+      state.videoCommentReply = null;
+      updateVideoCommentReply(sheet);
+      sheet.querySelector("input")?.focus();
+    });
+    sheet.querySelector("[data-video-comment-form]")?.addEventListener("submit", event => submitVideoComment(event, note));
+  }
+  host.classList.add("is-commenting");
+  state.currentNote = note;
+  state.videoCommentReply = null;
+  updateVideoCommentReply(sheet);
+  await loadVideoComments(note, sheet);
+}
+
+async function loadVideoComments(note, sheet = document.querySelector(".video-comment-sheet")) {
+  const list = sheet?.querySelector("[data-video-comment-list]");
+  if (!list) return;
+  list.innerHTML = `<p class="empty-text">正在加载评论...</p>`;
+  try {
+    const result = await request(`/notes/comments/of/note?noteId=${note.id}&sort=hot`, { raw: true });
+    const comments = Array.isArray(result.data) ? result.data : [];
+    const total = Number(result.total ?? comments.length);
+    note.comments = total;
+    note.commentCount = total;
+    applyNoteInteraction?.(note, { comments: total, commentCount: total });
+    const fullscreenHost = document.querySelector("#videoFullscreen");
+    if (fullscreenHost) syncFullscreenInteractionButtons(fullscreenHost, note);
+    renderVideoComments(note, comments, list, sheet);
+  } catch {
+    list.innerHTML = `<p class="empty-text">评论暂时加载失败，稍后再试。</p>`;
+  }
+}
+
+function renderVideoComments(note, comments, list, sheet) {
+  const hydrated = typeof hydrateReplyTargets === "function" ? hydrateReplyTargets(comments) : comments;
+  if (!hydrated.length) {
+    list.innerHTML = `<p class="empty-text">还没有评论，来抢第一条。</p>`;
+    return;
+  }
+  list.innerHTML = hydrated.map(comment => renderVideoCommentItem(comment, comment.id)).join("");
+  list.querySelectorAll("[data-video-comment-like]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (!requireLogin()) return;
+      try {
+        await request(`/notes/comments/like/${button.dataset.videoCommentLike}`, { method: "PUT" });
+        loadVideoComments(note, sheet);
+      } catch {
+        showStatus("评论点赞失败，请稍后再试。");
+      }
+    });
+  });
+  list.querySelectorAll("[data-video-comment-reply]").forEach(button => {
+    button.addEventListener("click", () => {
+      if (!requireLogin()) return;
+      state.videoCommentReply = {
+        parentId: Number(button.dataset.parentId),
+        answerId: Number(button.dataset.videoCommentReply),
+        name: button.dataset.name || "用户"
+      };
+      updateVideoCommentReply(sheet);
+      sheet.querySelector("input")?.focus();
+    });
+  });
+}
+
+function renderVideoCommentItem(comment, rootId) {
+  const replies = (comment.replies || []).slice(0, 2);
+  return `
+    <article class="video-comment-item">
+      <img src="${normalizeImage(comment.icon) || fallbackAvatar}" alt="">
+      <div>
+        <header>
+          <strong>${escapeHtml(comment.name || "探店用户")}</strong>
+          <span>${formatTime(comment.createTime)}</span>
+        </header>
+        <p>${typeof renderReplyTarget === "function" ? renderReplyTarget(comment, rootId) : ""}${escapeHtml(comment.content || "")}</p>
+        <div class="video-comment-meta">
+          <button type="button" data-video-comment-like="${comment.id}">喜欢 ${comment.liked || 0}</button>
+          <button type="button" data-video-comment-reply="${comment.id}" data-parent-id="${rootId}" data-name="${escapeHtml(comment.name || "探店用户")}">回复</button>
+        </div>
+        ${replies.length ? `<div class="video-comment-replies">${replies.map(reply => renderVideoCommentItem(reply, rootId)).join("")}</div>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function updateVideoCommentReply(sheet) {
+  const bar = sheet?.querySelector("[data-video-comment-reply]");
+  const input = sheet?.querySelector("input[name='content']");
+  if (!bar || !input) return;
+  if (state.videoCommentReply?.name) {
+    bar.hidden = false;
+    bar.querySelector("span").textContent = `回复 @${state.videoCommentReply.name}`;
+    input.placeholder = `回复 @${state.videoCommentReply.name}`;
+  } else {
+    bar.hidden = true;
+    input.placeholder = "说点什么...";
+  }
+}
+
+async function submitVideoComment(event, note) {
+  event.preventDefault();
+  if (!requireLogin()) return;
+  const form = event.currentTarget;
+  const input = form.querySelector("input[name='content']");
+  const content = input.value.trim();
+  if (!content) return;
+  const button = form.querySelector("button[type='submit']");
+  button.disabled = true;
+  button.textContent = "发送中";
+  try {
+    if (typeof checkAiRisk === "function" && !(await checkAiRisk(content, "comment"))) return;
+    const data = await request("/notes/comments", {
+      method: "POST",
+      body: JSON.stringify({
+        noteId: note.id,
+        content,
+        parentId: state.videoCommentReply?.parentId || 0,
+        answerId: state.videoCommentReply?.answerId || 0
+      })
+    });
+    note.comments = Number(data?.comments || note.comments || 0);
+    note.commentCount = note.comments;
+    applyNoteInteraction?.(note, { comments: note.comments, commentCount: note.commentCount });
+    state.videoCommentReply = null;
+    input.value = "";
+    trackEvent("comment", { noteId: note.id, scene: "video" });
+    const sheet = form.closest(".video-comment-sheet");
+    updateVideoCommentReply(sheet);
+    loadVideoComments(note, sheet);
+  } catch (error) {
+    showStatus(error.message || "评论失败，请确认已登录。");
+  } finally {
+    button.disabled = false;
+    button.textContent = "发送";
+  }
+}
+
+function openVideoFullscreen(note, options = {}) {
   if (!note?.videoUrl) return;
   const host = document.querySelector("#videoFullscreen");
   if (!host) return;
@@ -514,6 +721,7 @@ function openVideoFullscreen(note) {
       <div class="danmaku-live-pill video-fullscreen-live" data-danmaku-live="${noteId}">实时弹幕连接中</div>
       <div class="video-gradient"></div>
       <button class="video-fullscreen-close" type="button" aria-label="退出全屏">退出</button>
+      <button class="video-fullscreen-sound" type="button" data-video-mute="${noteId}" aria-label="${state.videoMuted ? "打开声音" : "静音"}">${state.videoMuted ? "静音" : "声音"}</button>
       <div class="video-info video-fullscreen-info">
         <div class="video-author">
           <img src="${normalizeImage(note.icon)}" alt="">
@@ -526,11 +734,23 @@ function openVideoFullscreen(note) {
         <input name="danmaku" maxlength="40" autocomplete="off" placeholder="发条弹幕...">
         <button type="submit">发送</button>
       </form>
-      <div class="video-fullscreen-actions">
-        <button type="button" data-fullscreen-toggle-play>${state.videoAutoplay ? "暂停" : "播放"}</button>
-        <button type="button" data-video-mute="${noteId}">${state.videoMuted ? "静音开" : "静音关"}</button>
-        <button type="button" data-danmaku-toggle="${noteId}">${state.danmakuEnabled ? "弹幕开" : "弹幕关"}</button>
-        <button type="button" data-fullscreen-comment="${noteId}">评论</button>
+      <div class="video-fullscreen-actions" aria-label="视频互动">
+        <button class="video-fullscreen-action ${note.isLike || note.likedByMe ? "is-active" : ""}" type="button" data-fullscreen-like="${noteId}" aria-label="点赞">
+          <span>${note.isLike || note.likedByMe ? "♥" : "♡"}</span>
+          <small>${videoCount(note.liked, note.likedCount)}</small>
+        </button>
+        <button class="video-fullscreen-action ${note.isCollect || note.collected ? "is-active" : ""}" type="button" data-fullscreen-collect="${noteId}" aria-label="收藏">
+          <span>${note.isCollect || note.collected ? "★" : "☆"}</span>
+          <small>${videoCount(note.collects, note.collectCount)}</small>
+        </button>
+        <button class="video-fullscreen-action" type="button" data-fullscreen-comment="${noteId}" aria-label="查看评论">
+          <span>评</span>
+          <small>${videoCount(note.comments, note.commentCount)}</small>
+        </button>
+        <button class="video-fullscreen-action ${state.danmakuEnabled ? "is-active" : ""}" type="button" data-danmaku-toggle="${noteId}" aria-label="${state.danmakuEnabled ? "关闭弹幕" : "打开弹幕"}">
+          <span>弹</span>
+          <small>${state.danmakuEnabled ? "开" : "关"}</small>
+        </button>
       </div>
     </article>
   `;
@@ -548,32 +768,44 @@ function openVideoFullscreen(note) {
     else video.pause();
   });
   host.querySelector(".video-fullscreen-close").addEventListener("click", closeVideoFullscreen);
-  host.querySelector("[data-fullscreen-toggle-play]").addEventListener("click", button => {
-    if (video.paused) {
-      video.play().catch(() => {});
-      button.currentTarget.textContent = "暂停";
-    } else {
-      video.pause();
-      button.currentTarget.textContent = "播放";
-    }
-  });
   host.querySelector("[data-video-mute]").addEventListener("click", button => {
     state.videoMuted = !state.videoMuted;
     localStorage.setItem("hmdp_video_muted", JSON.stringify(state.videoMuted));
     video.muted = state.videoMuted;
-    button.currentTarget.textContent = state.videoMuted ? "静音开" : "静音关";
+    button.currentTarget.textContent = state.videoMuted ? "静音" : "声音";
+    button.currentTarget.setAttribute("aria-label", state.videoMuted ? "打开声音" : "静音");
   });
   host.querySelector("[data-danmaku-toggle]").addEventListener("click", button => {
     state.danmakuEnabled = !state.danmakuEnabled;
     localStorage.setItem("hmdp_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
     slide.querySelector("[data-danmaku-layer]").hidden = !state.danmakuEnabled;
-    button.currentTarget.textContent = state.danmakuEnabled ? "弹幕开" : "弹幕关";
+    syncFullscreenInteractionButtons(host, note);
+  });
+  host.querySelector("[data-fullscreen-like]")?.addEventListener("click", async button => {
+    button.currentTarget.disabled = true;
+    try {
+      if (typeof toggleCardLike === "function") await toggleCardLike(note);
+      else if (typeof likeNote === "function") await likeNote(note);
+      syncFullscreenInteractionButtons(host, note);
+    } finally {
+      button.currentTarget.disabled = false;
+    }
+  });
+  host.querySelector("[data-fullscreen-collect]")?.addEventListener("click", async button => {
+    button.currentTarget.disabled = true;
+    try {
+      if (typeof toggleCardCollect === "function") await toggleCardCollect(note);
+      else if (typeof toggleCollect === "function") await toggleCollect(note);
+      syncFullscreenInteractionButtons(host, note);
+    } finally {
+      button.currentTarget.disabled = false;
+    }
   });
   host.querySelector("[data-fullscreen-comment]")?.addEventListener("click", () => {
-    closeVideoFullscreen();
-    openDrawer(note);
+    openVideoComments(note);
   });
   host.querySelector("[data-danmaku-form]").addEventListener("submit", submitDanmaku);
+  if (options.comments) window.setTimeout(() => openVideoComments(note), 120);
   document.body.style.overflow = "hidden";
 }
 
@@ -588,14 +820,19 @@ function closeVideoFullscreen() {
   }
   if (slide) stopDanmakuTicker(slide);
   host.classList.remove("is-open");
+  host.classList.remove("is-commenting");
   host.setAttribute("aria-hidden", "true");
   host.hidden = true;
   host.innerHTML = "";
+  state.videoCommentReply = null;
   document.body.style.overflow = "";
 }
 
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") closeVideoFullscreen();
+  if (event.key !== "Escape") return;
+  const host = document.querySelector("#videoFullscreen");
+  if (host?.classList.contains("is-commenting")) closeVideoComments();
+  else closeVideoFullscreen();
 });
 
 function closeDrawer() {

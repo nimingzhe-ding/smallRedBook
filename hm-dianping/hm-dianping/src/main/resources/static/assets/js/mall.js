@@ -7,8 +7,13 @@
 // NOTE: normalizeProduct and normalizeShop are already in utils.js, skipped here to avoid duplication.
 
 function setMallActive(active) {
+  document.querySelectorAll("#mobileMall").forEach(item => {
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   if (active) {
-    setMobileTabActive(null);
+    setMobileTabActive("mall");
     document.querySelectorAll("[data-feed]").forEach(item => {
       const activeFeed = item.dataset.feed === "mall" && !item.closest(".mobile-tabbar");
       item.classList.toggle("is-active", activeFeed);
@@ -19,13 +24,8 @@ function setMallActive(active) {
 }
 
 function setVideoActive(active) {
-  document.querySelectorAll("#mobileVideo").forEach(item => {
-    item.classList.toggle("is-active", active);
-    if (active) item.setAttribute("aria-current", "page");
-    else item.removeAttribute("aria-current");
-  });
   if (active) {
-    setMobileTabActive("video");
+    setMobileTabActive(null);
     document.querySelectorAll("[data-feed]").forEach(item => {
       const activeFeed = item.dataset.feed === "video" && !item.closest(".mobile-tabbar");
       item.classList.toggle("is-active", activeFeed);

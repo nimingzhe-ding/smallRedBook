@@ -301,19 +301,24 @@ async function loadSmartRecommendation(question) {
   }
 }
 
-// Note: this is the SECOND (and authoritative) definition of analyzeCurrentNote
 async function analyzeCurrentNote(note) {
-  els.noteSmart.hidden = false;
-  els.noteSmartText.textContent = "正在总结这篇笔记的亮点、避雷点、价格和适合人群...";
+  if (!els.noteSmart || !els.noteSmartText) return;
+  els.noteSmart.hidden = true;
+  els.noteSmartText.textContent = "";
   try {
     const data = await aiFlow("/ai/flow/note-summary", {
       noteId: note.id,
       title: note.title,
       content: note.content
     });
-    els.noteSmartText.textContent = data.answer || data.content || "暂时没有生成有效总结。";
+    const answer = data.answer || data.content || "";
+    if (answer) {
+      els.noteSmartText.textContent = answer;
+      els.noteSmart.hidden = false;
+    }
   } catch {
-    els.noteSmartText.textContent = "智能看点暂时不可用，正文内容仍可正常查看。";
+    els.noteSmart.hidden = true;
+    els.noteSmartText.textContent = "";
   }
 }
 
