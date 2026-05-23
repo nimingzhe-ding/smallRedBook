@@ -159,7 +159,8 @@
     opacity: .72;
   }
 
-  .product-badge {
+  .product-badge,
+  .mall-product-badge {
     left: 7px;
     top: 7px;
     bottom: auto;

@@ -127,7 +127,7 @@ function renderProducts(products) {
       <button class="product-open" type="button" data-product-id="${product.id}">
         <div class="product-image-wrap">
           <img class="product-image" src="${commerceImage(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy" onerror="${commerceImageFallbackAttr()}">
-          <span class="product-badge">${escapeHtml(productBadge(product))}</span>
+          <span class="mall-product-badge">${escapeHtml(productBadge(product))}</span>
         </div>
         <div class="product-body">
           <div class="product-meta-row">

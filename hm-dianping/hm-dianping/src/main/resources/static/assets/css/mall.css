@@ -168,7 +168,8 @@
   object-fit: cover;
 }
 
-.product-badge {
+.product-badge,
+.mall-product-badge {
   position: absolute;
   left: 10px;
   top: 10px;
@@ -1293,7 +1294,8 @@
   opacity: .68;
 }
 
-.product-card.is-sold-out .product-badge {
+.product-card.is-sold-out .product-badge,
+.product-card.is-sold-out .mall-product-badge {
   background: rgba(24, 24, 27, .84);
 }
 
