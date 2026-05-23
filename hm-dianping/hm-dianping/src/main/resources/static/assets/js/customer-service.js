@@ -17,8 +17,8 @@ function renderCustomerWelcome() {
   els.customerServiceMessages.dataset.ready = "true";
   els.customerServiceMessages.innerHTML = `
     <article class="cs-message cs-assistant">
-      <strong>智能客服</strong>
-      <p>我可以帮你查订单状态、退款规则、物流进度、优惠券和商品库存。涉及个人订单时，请先登录。</p>
+      <strong>客服助手</strong>
+      <p>你好，我可以帮你看订单、退款、物流、优惠券和库存。涉及个人订单时会先确认登录状态。</p>
     </article>`;
 }
 
@@ -101,19 +101,19 @@ function renderCustomerServiceContext(context = {}) {
   const server = context.serverContext || {};
   const chips = [];
   const scenario = server.pageScenario || context.scenario || "customer-service";
-  chips.push(`场景：${customerScenarioLabel(scenario)}`);
-  if (server.loggedIn === false) chips.push("用户：未登录");
-  else if (server.loggedIn === true || state.currentUser) chips.push("用户：已登录");
+  chips.push(customerScenarioLabel(scenario));
+  if (server.loggedIn === false) chips.push("未登录");
+  else if (server.loggedIn === true || state.currentUser) chips.push("已登录");
   const orderId = server.orderId || context.orderId;
-  if (orderId) chips.push(`订单：#${orderId}`);
-  if (server.orderStatus || context.orderStatus) chips.push(`状态：${server.orderStatus || context.orderStatus}`);
+  if (orderId) chips.push(`订单 #${orderId}`);
+  if (server.orderStatus || context.orderStatus) chips.push(server.orderStatus || context.orderStatus);
   const productTitle = server.productTitle || context.productTitle;
   const productId = server.productId || context.productId;
-  if (productTitle) chips.push(`商品：${productTitle}`);
-  else if (productId) chips.push(`商品：#${productId}`);
+  if (productTitle) chips.push(productTitle);
+  else if (productId) chips.push(`商品 #${productId}`);
   const stock = server.productStock ?? context.productStock;
-  if (stock !== null && stock !== undefined) chips.push(`库存：${stock}`);
-  if (server.voucherTitle) chips.push(`优惠：${server.voucherTitle}`);
+  if (stock !== null && stock !== undefined) chips.push(`库存 ${stock}`);
+  if (server.voucherTitle) chips.push(server.voucherTitle);
   els.customerServiceContext.innerHTML = chips.map(chip => `<span>${escapeHtml(chip)}</span>`).join("");
 }
 
@@ -170,7 +170,7 @@ function appendCustomerMessage(role, text) {
   const item = document.createElement("article");
   item.className = `cs-message cs-${role}`;
   item.innerHTML = `
-    <strong>${role === "user" ? "我" : "智能客服"}</strong>
+    <strong>${role === "user" ? "我" : "客服助手"}</strong>
     <p>${escapeHtml(text)}</p>
   `;
   els.customerServiceMessages.appendChild(item);

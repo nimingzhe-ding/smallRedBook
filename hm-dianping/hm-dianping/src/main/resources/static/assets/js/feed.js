@@ -100,7 +100,7 @@ function createNoteCard(note) {
   card.dataset.noteCard = String(note.id);
   const badge = note.contentType === "IMAGE" ? "" : `<span class="video-badge">${contentTypeLabel(note.contentType)}</span>`;
   const auditBadge = renderNoteAuditBadge(note);
-  const productBadge = note.products?.length ? `<span class="product-badge">挂载 ${note.products.length} 件商品</span>` : "";
+  const productBadge = "";
   const playIndicator = note.isVideo ? `<span class="media-play-indicator" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z"/></svg></span>` : "";
   const cover = note.isVideo
     ? `<video class="note-image note-video-cover" style="--ratio:${note.ratio}" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" muted playsinline preload="metadata"></video>${playIndicator}${badge}${auditBadge}${productBadge}`

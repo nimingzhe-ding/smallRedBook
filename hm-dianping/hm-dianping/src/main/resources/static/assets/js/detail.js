@@ -20,6 +20,7 @@
     pauseFeedVideos();
     state.currentNote = note;
     state.replyTarget = null;
+    window.updateReplyComposer?.();
     state.commentSort = "hot";
     document.querySelectorAll("[data-comment-sort]").forEach(button => {
       button.classList.toggle("is-active", button.dataset.commentSort === "hot");

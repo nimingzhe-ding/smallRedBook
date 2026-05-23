@@ -233,7 +233,6 @@ function renderSearchReason(reason) {
 function buildSearchReason(type, item) {
   const keyword = String(state.query || "").trim();
   if (type === "note") {
-    if (item.products?.length) return `关联了 ${item.products.length} 件同款商品，适合边看内容边比较`;
     if (keyword && String(item.tags || "").includes(keyword)) return `标签命中「${keyword}」，按互动热度排序`;
     if (keyword && String(item.title || "").includes(keyword)) return `标题直接匹配「${keyword}」`;
     if (item.isVideo) return "视频内容优先展示，适合快速判断现场体验";

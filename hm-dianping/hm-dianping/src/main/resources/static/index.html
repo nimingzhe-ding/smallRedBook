@@ -83,13 +83,12 @@
         <section class="home-curation" id="homeCuration" aria-label="发现精选">
           <div class="home-curation-main">
             <small>今日发现</small>
-            <strong>热门内容和本地好物</strong>
-            <span>按新鲜度、互动和交易数据推荐。</span>
+            <strong>今天值得看的笔记</strong>
+            <span>按新鲜度和互动推荐，先看内容再做决定。</span>
           </div>
           <div class="home-curation-actions">
             <button type="button" data-feed="hot">热门笔记</button>
             <button type="button" data-brief-action="video">刷视频</button>
-            <button type="button" data-brief-action="mall">逛商城</button>
           </div>
           <div class="home-topic-strip">
             <button type="button" data-smart-query="通勤穿搭">通勤穿搭</button>
@@ -155,25 +154,25 @@
       <section class="mall-area" id="mallArea" aria-label="商城" hidden>
         <div class="mall-head">
           <div>
-            <small class="mall-kicker">内容同款 · 本地商家精选</small>
-            <strong>好物商城</strong>
-            <span>把探店笔记里的种草商品，变成可直接下单的消费清单。</span>
+            <small class="mall-kicker">同款好物</small>
+            <strong>商城</strong>
+            <span>笔记同款、本地好店，直接下单。</span>
             <div class="mall-proof">
               <b id="mallProductCount">-- 件在售</b>
-              <b>优惠券自动匹配</b>
-              <b>订单售后闭环</b>
+              <b>优惠自动用</b>
+              <b>订单可追踪</b>
             </div>
           </div>
           <div class="mall-actions">
-            <button class="soft-button" id="openMerchantCenter" type="button"><b>商家中心</b><small>运营</small></button>
+            <button class="soft-button" id="openMerchantCenter" type="button"><b>商家</b><small>运营</small></button>
             <button class="soft-button" id="openCart" type="button"><b>购物车</b><small>结算</small></button>
-            <button class="soft-button" id="openOrders" type="button"><b>我的订单</b><small>售后</small></button>
+            <button class="soft-button" id="openOrders" type="button"><b>订单</b><small>售后</small></button>
           </div>
         </div>
         <div class="mall-promo-strip" aria-label="商城服务承诺">
-          <span>今日推荐按销量与新鲜度排序</span>
-          <span>商品详情支持 SKU、评价、优惠券和 AI 导购</span>
-          <span>下单后可查看物流、退款和客服问答</span>
+          <span>按销量与新鲜度推荐</span>
+          <span>优惠券自动匹配</span>
+          <span>物流售后可查</span>
         </div>
         <div class="mall-tabs">
           <button class="category-pill is-active" data-mall-category="all">推荐</button>
@@ -278,9 +277,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 3.4 10v10h6v-6h5.2v6h6V10L12 3.2Z"/></svg>
         <span>首页</span>
       </button>
-      <button type="button" id="mobileMall" data-mobile-tab="mall">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Zm3-2a3 3 0 0 1 6 0h-2a1 1 0 0 0-2 0H9Z"/></svg>
-        <span>商城</span>
+      <button type="button" id="mobileVideo" data-mobile-tab="video">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>
+        <span>视频</span>
       </button>
       <button type="button" id="mobilePublish" class="mobile-publish-btn" aria-label="发布内容">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ff2442"/><path d="M11 7h2v10h-2zM7 11h10v2H7z" fill="#fff"/></svg>
@@ -294,7 +293,7 @@
         <span>我</span>
       </button>
     </nav>
-    <button class="customer-service-fab" id="openCustomerService" type="button">客服</button>
+    <button class="customer-service-fab" id="openCustomerService" type="button" aria-label="打开智能客服" title="智能客服">客服</button>
   </div>
 
   <!-- 笔记详情层：图片浏览、正文、评论和互动操作 -->
@@ -457,7 +456,7 @@
   <dialog class="shop-dialog customer-service-dialog" id="customerServiceDialog">
     <div class="shop-dialog-panel customer-service-panel">
       <div class="dialog-head">
-        <h2>智能客服</h2>
+        <h2>客服助手</h2>
         <button class="icon-button" id="closeCustomerService" type="button" aria-label="关闭智能客服">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 10.6 4.6-4.6L18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6L6 7.4 7.4 6l4.6 4.6Z"/></svg>
         </button>
@@ -470,8 +469,8 @@
         <button type="button" data-cs-question="优惠券怎么用？">优惠券</button>
       </div>
       <form class="customer-service-form" id="customerServiceForm">
-        <input id="customerServiceInput" placeholder="问订单、退款、物流、优惠券问题" autocomplete="off">
-        <button class="publish-button" type="submit">发送</button>
+        <input id="customerServiceInput" placeholder="问订单、物流、退款" autocomplete="off">
+        <button class="publish-button" type="submit">发</button>
       </form>
     </div>
   </dialog>

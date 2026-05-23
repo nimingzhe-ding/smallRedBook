@@ -16,6 +16,7 @@ function renderVideoFeed() {
     <article class="video-slide" data-video-id="${note.id}">
       <video class="immersive-video" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" loop playsinline preload="metadata" ${state.videoMuted ? "muted" : ""}></video>
       <div class="danmaku-layer" data-danmaku-layer="${note.id}"></div>
+      <div class="danmaku-live-pill" data-danmaku-live="${note.id}">实时弹幕连接中</div>
       <div class="video-gradient"></div>
       <div class="video-info">
         <div class="video-author">
@@ -209,9 +210,11 @@ function subscribeDanmaku(noteId) {
   if (!noteId || state.danmakuSourceNoteId === String(noteId)) return;
   closeDanmakuSource();
   if (typeof EventSource === "undefined") return;
+  updateDanmakuLiveStatus(noteId, "connecting");
   const source = new EventSource(apiUrl(`/video-danmaku/stream/${noteId}`));
   state.danmakuSource = source;
   state.danmakuSourceNoteId = String(noteId);
+  source.onopen = () => updateDanmakuLiveStatus(noteId, "open");
   source.addEventListener("danmaku", event => {
     try {
       receiveRealtimeDanmaku(noteId, JSON.parse(event.data));
@@ -220,6 +223,7 @@ function subscribeDanmaku(noteId) {
     }
   });
   source.onerror = () => {
+    updateDanmakuLiveStatus(noteId, "offline");
     closeDanmakuSource();
   };
 }
@@ -241,6 +245,7 @@ function receiveRealtimeDanmaku(noteId, item) {
   }
   list.push(item);
   state.danmakuStore[key] = dedupeDanmaku(list);
+  updateDanmakuLiveStatus(noteId, "open");
   const slide = activeVideoSlide(noteId);
   const video = slide?.querySelector("video");
   const currentSecond = Math.floor(video?.currentTime || 0);
@@ -249,6 +254,18 @@ function receiveRealtimeDanmaku(noteId, item) {
     if (layer) shootDanmaku(layer, item.content || "", item.lane, item.id);
     item.__shownAtSecond = Number(item.videoSecond || 0);
   }
+}
+
+function updateDanmakuLiveStatus(noteId, status) {
+  const text = {
+    connecting: "实时弹幕连接中",
+    open: "实时弹幕已开启",
+    offline: "实时弹幕已断开"
+  }[status] || "实时弹幕";
+  document.querySelectorAll(`[data-danmaku-live="${CSS.escape(String(noteId))}"]`).forEach(item => {
+    item.textContent = text;
+    item.dataset.status = status;
+  });
 }
 
 function dedupeDanmaku(list) {
@@ -494,6 +511,7 @@ function openVideoFullscreen(note) {
     <article class="video-slide video-fullscreen-slide" data-video-id="${noteId}">
       <video class="immersive-video video-fullscreen-player" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" autoplay playsinline preload="metadata" ${state.videoMuted ? "muted" : ""}></video>
       <div class="danmaku-layer video-fullscreen-danmaku" data-danmaku-layer="${noteId}"></div>
+      <div class="danmaku-live-pill video-fullscreen-live" data-danmaku-live="${noteId}">实时弹幕连接中</div>
       <div class="video-gradient"></div>
       <button class="video-fullscreen-close" type="button" aria-label="退出全屏">退出</button>
       <div class="video-info video-fullscreen-info">
@@ -512,6 +530,7 @@ function openVideoFullscreen(note) {
         <button type="button" data-fullscreen-toggle-play>${state.videoAutoplay ? "暂停" : "播放"}</button>
         <button type="button" data-video-mute="${noteId}">${state.videoMuted ? "静音开" : "静音关"}</button>
         <button type="button" data-danmaku-toggle="${noteId}">${state.danmakuEnabled ? "弹幕开" : "弹幕关"}</button>
+        <button type="button" data-fullscreen-comment="${noteId}">评论</button>
       </div>
     </article>
   `;
@@ -550,6 +569,10 @@ function openVideoFullscreen(note) {
     slide.querySelector("[data-danmaku-layer]").hidden = !state.danmakuEnabled;
     button.currentTarget.textContent = state.danmakuEnabled ? "弹幕开" : "弹幕关";
   });
+  host.querySelector("[data-fullscreen-comment]")?.addEventListener("click", () => {
+    closeVideoFullscreen();
+    openDrawer(note);
+  });
   host.querySelector("[data-danmaku-form]").addEventListener("submit", submitDanmaku);
   document.body.style.overflow = "hidden";
 }
@@ -581,6 +604,7 @@ function closeDrawer() {
   document.body.style.overflow = "";
   state.replyTarget = null;
   els.commentInput.placeholder = "说点什么…";
+  window.updateReplyComposer?.();
 }
 
 // Export cross-module functions
@@ -592,6 +616,7 @@ window.loadDanmaku = loadDanmaku;
 window.subscribeDanmaku = subscribeDanmaku;
 window.closeDanmakuSource = closeDanmakuSource;
 window.receiveRealtimeDanmaku = receiveRealtimeDanmaku;
+window.updateDanmakuLiveStatus = updateDanmakuLiveStatus;
 window.dedupeDanmaku = dedupeDanmaku;
 window.renderDanmaku = renderDanmaku;
 window.activeVideoSlide = activeVideoSlide;

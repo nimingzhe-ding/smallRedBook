@@ -112,7 +112,7 @@
   document.querySelector("#closeComposerDialog").addEventListener("click", closeComposer);
   document.querySelector("#cancelComposerDialog").addEventListener("click", closeComposer);
   document.querySelector("#closeShopDialog").addEventListener("click", function() { els.shopDialog.close(); });
-  document.querySelector("#mobileMall").addEventListener("click", switchMall);
+  document.querySelector("#mobileVideo")?.addEventListener("click", switchVideo);
   var mobileProfile = document.querySelector("#mobileProfile");
   if (mobileProfile) mobileProfile.addEventListener("click", function() { openMyProfile(); });
   document.querySelector("#openCart").addEventListener("click", openCartDialog);

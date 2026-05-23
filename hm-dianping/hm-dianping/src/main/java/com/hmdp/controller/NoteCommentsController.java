@@ -110,11 +110,13 @@ public class NoteCommentsController {
                 ? Map.of()
                 : userService.listByIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity(), (first, second) -> first));
+        Map<Long, BlogComments> commentMap = allComments.stream()
+                .collect(Collectors.toMap(BlogComments::getId, Function.identity(), (first, second) -> first));
         Map<Long, List<Map<String, Object>>> replyMap = replies.stream()
-                .map(reply -> toCommentMap(reply, userMap, List.of()))
+                .map(reply -> toCommentMap(reply, userMap, List.of(), commentMap))
                 .collect(Collectors.groupingBy(reply -> (Long) reply.get("parentId"), LinkedHashMap::new, Collectors.toList()));
         List<Map<String, Object>> records = comments.stream()
-                .map(comment -> toCommentMap(comment, userMap, replyMap.getOrDefault(comment.getId(), List.of())))
+                .map(comment -> toCommentMap(comment, userMap, replyMap.getOrDefault(comment.getId(), List.of()), commentMap))
                 .toList();
         return Result.ok(records, countVisibleComments(resolvedNoteId));
     }
@@ -270,8 +272,13 @@ public class NoteCommentsController {
         return Result.ok(commentResult(commentId, comment.getBlogId()));
     }
 
-    private Map<String, Object> toCommentMap(BlogComments comment, Map<Long, User> userMap, List<Map<String, Object>> replies) {
+    private Map<String, Object> toCommentMap(BlogComments comment, Map<Long, User> userMap, List<Map<String, Object>> replies,
+                                             Map<Long, BlogComments> commentMap) {
         User user = userMap.get(comment.getUserId());
+        BlogComments answer = comment.getAnswerId() != null && comment.getAnswerId() > 0
+                ? commentMap.get(comment.getAnswerId())
+                : null;
+        User answerUser = answer == null ? null : userMap.get(answer.getUserId());
         UserDTO current = UserHolder.getUser();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", comment.getId());
@@ -279,6 +286,8 @@ public class NoteCommentsController {
         result.put("userId", comment.getUserId());
         result.put("parentId", comment.getParentId());
         result.put("answerId", comment.getAnswerId());
+        result.put("answerUserId", answer == null ? null : answer.getUserId());
+        result.put("answerName", answerUser == null ? null : answerUser.getNickName());
         result.put("name", user == null ? "探店用户" : user.getNickName());
         result.put("icon", user == null ? "" : Objects.toString(user.getIcon(), ""));
         result.put("content", comment.getContent());

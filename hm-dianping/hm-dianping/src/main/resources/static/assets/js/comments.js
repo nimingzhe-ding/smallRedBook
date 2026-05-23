@@ -19,8 +19,10 @@ async function loadComments(noteId) {
 function renderComments(comments) {
   if (!comments.length) {
     els.commentList.innerHTML = `<p class="empty-text">还没有评论，来抢第一条。</p>`;
+    updateReplyComposer();
     return;
   }
+  comments = hydrateReplyTargets(comments);
   els.commentList.innerHTML = comments.map(comment => `
     <article class="comment-item">
       <img class="comment-avatar" src="${normalizeImage(comment.icon) || fallbackAvatar}" alt="">
@@ -51,6 +53,24 @@ function renderComments(comments) {
   els.commentList.querySelectorAll("[data-comment-report]").forEach(button => {
     button.addEventListener("click", () => reportComment(button.dataset.commentReport));
   });
+  updateReplyComposer();
+}
+
+function hydrateReplyTargets(comments) {
+  const nameMap = new Map();
+  comments.forEach(comment => {
+    nameMap.set(String(comment.id), comment.name || "探店用户");
+    (comment.replies || []).forEach(reply => {
+      nameMap.set(String(reply.id), reply.name || "探店用户");
+    });
+  });
+  return comments.map(comment => ({
+    ...comment,
+    replies: (comment.replies || []).map(reply => ({
+      ...reply,
+      answerName: reply.answerName || nameMap.get(String(reply.answerId || "")) || ""
+    }))
+  }));
 }
 
 function renderReplies(replies, rootId) {
@@ -63,7 +83,7 @@ function renderReplies(replies, rootId) {
             <strong>${escapeHtml(reply.name || "探店用户")}</strong>
             <span>${formatTime(reply.createTime)}</span>
           </div>
-          <p class="comment-copy">${escapeHtml(reply.content)}</p>
+          <p class="comment-copy">${renderReplyTarget(reply, rootId)}${escapeHtml(reply.content)}</p>
           <div class="comment-meta">
             <button class="comment-like" type="button" data-comment-id="${reply.id}">喜欢 ${reply.liked || 0}</button>
             <button class="comment-reply" type="button" data-comment-id="${reply.id}" data-parent-id="${rootId}" data-name="${escapeHtml(reply.name || "探店用户")}">回复</button>
@@ -73,6 +93,12 @@ function renderReplies(replies, rootId) {
       `).join("")}
     </div>
   `;
+}
+
+function renderReplyTarget(reply, rootId) {
+  const answerName = reply.answerName || "";
+  if (!answerName || String(reply.answerId || "") === String(rootId || "")) return "";
+  return `<span class="reply-target">回复 @${escapeHtml(answerName)}</span>`;
 }
 
 function renderCommentActions(comment) {
@@ -102,8 +128,37 @@ function startReply(button) {
     answerId: Number(button.dataset.commentId),
     name: button.dataset.name
   };
-  els.commentInput.placeholder = `回复 ${state.replyTarget.name}`;
+  updateReplyComposer();
   els.commentInput.focus();
+}
+
+function clearReplyTarget() {
+  state.replyTarget = null;
+  updateReplyComposer();
+  els.commentInput.focus();
+}
+
+function updateReplyComposer() {
+  if (!els.commentForm || !els.commentInput) return;
+  let bar = document.querySelector("#commentReplyBar");
+  if (!bar) {
+    els.commentForm.insertAdjacentHTML("beforebegin", `
+      <div class="comment-reply-bar" id="commentReplyBar" hidden>
+        <span></span>
+        <button type="button" data-comment-reply-cancel>取消</button>
+      </div>
+    `);
+    bar = document.querySelector("#commentReplyBar");
+    bar.querySelector("[data-comment-reply-cancel]")?.addEventListener("click", clearReplyTarget);
+  }
+  if (state.replyTarget?.name) {
+    bar.hidden = false;
+    bar.querySelector("span").textContent = `正在回复 @${state.replyTarget.name}`;
+    els.commentInput.placeholder = `回复 @${state.replyTarget.name}`;
+  } else {
+    bar.hidden = true;
+    els.commentInput.placeholder = "说点什么…";
+  }
 }
 
 async function likeComment(commentId) {
@@ -167,7 +222,7 @@ async function submitComment(event) {
     updateCommentCount(data?.comments);
     state.replyTarget = null;
     els.commentInput.value = "";
-    els.commentInput.placeholder = "说点什么…";
+    updateReplyComposer();
     loadComments(state.currentNote.id);
   } catch (error) {
     showStatus(error.message || "评论失败，请确认已登录。");
@@ -227,10 +282,14 @@ function renderCommentSuggestions(answer) {
 // Export cross-module functions
 window.loadComments = loadComments;
 window.renderComments = renderComments;
+window.hydrateReplyTargets = hydrateReplyTargets;
 window.renderReplies = renderReplies;
+window.renderReplyTarget = renderReplyTarget;
 window.renderCommentActions = renderCommentActions;
 window.updateCommentCount = updateCommentCount;
 window.startReply = startReply;
+window.clearReplyTarget = clearReplyTarget;
+window.updateReplyComposer = updateReplyComposer;
 window.likeComment = likeComment;
 window.deleteComment = deleteComment;
 window.reportComment = reportComment;

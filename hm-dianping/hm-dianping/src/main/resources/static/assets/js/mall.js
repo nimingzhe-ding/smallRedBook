@@ -7,13 +7,8 @@
 // NOTE: normalizeProduct and normalizeShop are already in utils.js, skipped here to avoid duplication.
 
 function setMallActive(active) {
-  document.querySelectorAll("#mobileMall").forEach(item => {
-    item.classList.toggle("is-active", active);
-    if (active) item.setAttribute("aria-current", "page");
-    else item.removeAttribute("aria-current");
-  });
   if (active) {
-    setMobileTabActive("mall");
+    setMobileTabActive(null);
     document.querySelectorAll("[data-feed]").forEach(item => {
       const activeFeed = item.dataset.feed === "mall" && !item.closest(".mobile-tabbar");
       item.classList.toggle("is-active", activeFeed);
@@ -30,7 +25,7 @@ function setVideoActive(active) {
     else item.removeAttribute("aria-current");
   });
   if (active) {
-    setMobileTabActive(null);
+    setMobileTabActive("video");
     document.querySelectorAll("[data-feed]").forEach(item => {
       const activeFeed = item.dataset.feed === "video" && !item.closest(".mobile-tabbar");
       item.classList.toggle("is-active", activeFeed);
@@ -150,7 +145,7 @@ function renderProducts(products) {
         <button class="product-cart-icon" type="button" data-quick-cart="${product.id}" ${soldOut ? "disabled" : ""} aria-label="加入购物车">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-1.2 7.2a2 2 0 0 1-2 1.8H9.1a2 2 0 0 1-2-1.7L5.8 4H3V2h4.6L8 5h12.4L20 7H7Zm2.2 7h6.6l.8-5H8.5l.7 5ZM9 21a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm7 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
         </button>
-        <button class="product-view-button" type="button" data-product-id="${product.id}" ${soldOut ? "disabled" : ""}>${soldOut ? "已售罄" : "去看看"}</button>
+        <button class="product-view-button" type="button" data-product-id="${product.id}" ${soldOut ? "disabled" : ""}>${soldOut ? "已售罄" : "立即购买"}</button>
       </div>
     </article>
   `;
@@ -424,15 +419,18 @@ function renderCartItems(items) {
           const price = item.price ?? item.productPrice ?? 0;
           const quantity = Number(item.quantity || 1);
           const subtotal = Number(item.totalAmount ?? price * quantity);
+          const productId = item.productId || item.product?.id || "";
           return `
           <article class="commerce-line-item">
-            <img src="${commerceImage(image)}" alt="${escapeHtml(title)}" onerror="${commerceImageFallbackAttr()}">
-            <div class="commerce-item-main">
-              <strong>${escapeHtml(title)}</strong>
-              <span>¥${formatMoney(price)}</span>
-              <small>x${quantity}</small>
-              <b>小计 ¥${formatMoney(subtotal)}</b>
-            </div>
+            <button class="commerce-line-product" type="button" data-cart-product="${productId}" aria-label="查看${escapeHtml(title)}详情">
+              <img src="${commerceImage(image)}" alt="${escapeHtml(title)}" onerror="${commerceImageFallbackAttr()}">
+              <span class="commerce-item-main">
+                <strong>${escapeHtml(title)}</strong>
+                <span>¥${formatMoney(price)}</span>
+                <small>x${quantity}</small>
+                <b>小计 ¥${formatMoney(subtotal)}</b>
+              </span>
+            </button>
             <div class="commerce-line-actions">
               <button class="publish-button" type="button" data-cart-order="${item.id}">结算</button>
               <button class="ghost-button" type="button" data-cart-remove="${item.id}">删除</button>
@@ -455,6 +453,11 @@ function renderCartItems(items) {
   });
   els.commerceWorkspaceBody.querySelectorAll("[data-cart-remove]").forEach(button => {
     button.addEventListener("click", () => removeCartItem(button.dataset.cartRemove));
+  });
+  els.commerceWorkspaceBody.querySelectorAll("[data-cart-product]").forEach(button => {
+    button.addEventListener("click", () => {
+      if (button.dataset.cartProduct) openProduct(button.dataset.cartProduct);
+    });
   });
   els.commerceWorkspaceBody.querySelector("[data-commerce-action='continue-shopping']")?.addEventListener("click", closeCommerceWorkspace);
 }
