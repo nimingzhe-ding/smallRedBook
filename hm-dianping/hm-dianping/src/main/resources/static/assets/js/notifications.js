@@ -879,6 +879,7 @@ async function openUserProfile(userId, tab = "works", options = {}) {
   setMobileTabActive("profile");
   hideUnifiedSearch();
   state.mode = "profile";
+  updateHomeCurationVisibility();
   state.profileTab = tab;
   els.feed.hidden = true;
   els.loading.hidden = true;

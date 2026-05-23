@@ -172,6 +172,7 @@ window.els = {
   unifiedSearchSummary: document.querySelector("#unifiedSearchSummary"),
   unifiedSearchTabs: document.querySelector("#unifiedSearchTabs"),
   unifiedSearchResults: document.querySelector("#unifiedSearchResults"),
+  homeCuration: document.querySelector("#homeCuration"),
   profileHome: document.querySelector("#profileHome"),
   profileHomeResults: document.querySelector("#profileHomeResults"),
   profileHomeTabs: document.querySelector("#profileHomeTabs"),
@@ -279,6 +280,12 @@ function setFeedTabsVisible(visible) {
   if (els.feedTabs) els.feedTabs.hidden = !visible;
 }
 window.setFeedTabsVisible = setFeedTabsVisible;
+
+function updateHomeCurationVisibility() {
+  if (!els.homeCuration) return;
+  els.homeCuration.hidden = !(state.mode === "feed" && state.feed === "recommend" && !state.query);
+}
+window.updateHomeCurationVisibility = updateHomeCurationVisibility;
 
 function setMessageEntryActive(active) {
   const entry = document.querySelector("#openNotifications");

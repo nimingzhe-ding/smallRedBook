@@ -52,6 +52,100 @@ body {
   color: #8a2d39;
 }
 
+.home-curation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  border: 1px solid #f4dce1;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: 0 10px 26px rgba(37, 20, 24, .045);
+}
+
+.home-curation[hidden] {
+  display: none;
+}
+
+.home-curation-main {
+  min-width: 0;
+}
+
+.home-curation-main small,
+.home-curation-main strong,
+.home-curation-main span {
+  display: block;
+}
+
+.home-curation-main small {
+  width: fit-content;
+  margin-bottom: 5px;
+  border-radius: 999px;
+  background: #fff1f3;
+  color: #ff2442;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.home-curation-main strong {
+  color: #1f1719;
+  font-size: 18px;
+  line-height: 1.28;
+}
+
+.home-curation-main span {
+  margin-top: 5px;
+  color: #8d7a7f;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.home-curation-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.home-curation-actions button,
+.home-topic-strip button {
+  min-height: 34px;
+  border: 1px solid #f3d8de;
+  border-radius: 999px;
+  background: #fff8f9;
+  color: #3f3034;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.home-curation-actions button:first-child {
+  border-color: #ff2442;
+  background: #ff2442;
+  color: #fff;
+}
+
+.home-topic-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 2px;
+  scrollbar-width: none;
+}
+
+.home-topic-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.home-topic-strip button {
+  flex: 0 0 auto;
+  background: #fff;
+  color: #7f6268;
+}
+
 .empty-text {
   display: grid;
   min-height: 128px;
@@ -305,6 +399,38 @@ body {
 
   .main-layout {
     padding: 8px 10px calc(88px + env(safe-area-inset-bottom, 0));
+  }
+
+  .home-curation {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 0 0 12px;
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  .home-curation-main strong {
+    font-size: 16px;
+  }
+
+  .home-curation-main span {
+    font-size: 12px;
+  }
+
+  .home-curation-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .home-curation-actions button {
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .home-topic-strip {
+    margin-inline: -2px;
+    padding: 1px 2px 2px;
   }
 
   .mobile-tabbar {

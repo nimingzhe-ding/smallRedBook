@@ -299,6 +299,7 @@
   els.feed.hidden = false;
   els.loading.hidden = false;
   setFeedTabsVisible(true);
+  updateHomeCurationVisibility();
   setMessageEntryActive(false);
   initUser();
   refreshNotificationBadge();

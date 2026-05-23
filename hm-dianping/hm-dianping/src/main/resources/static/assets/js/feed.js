@@ -325,6 +325,7 @@ window.renderNoteAuditBadge = renderNoteAuditBadge;
 function resetAndLoad(clearStatus = true) {
   hideUnifiedSearch();
   hideProfileHome();
+  updateHomeCurationVisibility();
   state.page = 1;
   state.hasMore = true;
   state.notes = [];
@@ -358,6 +359,8 @@ function switchFeed(feed) {
   setMobileTabActive("home");
   state.mode = "feed";
   state.feed = feed;
+  state.query = "";
+  if (els.search) els.search.value = "";
   updateFeedNavState(feed);
   resetAndLoad();
 }

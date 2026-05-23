@@ -15,6 +15,7 @@ async function enterUnifiedSearch(query, preferredTab = "notes", loadAi = true) 
   showContentArea();
   setFeedTabsVisible(false);
   state.mode = "search";
+  updateHomeCurationVisibility();
   hideProfileHome();
   document.querySelectorAll("[data-feed]").forEach(item => item.classList.remove("is-active"));
   state.query = keyword;

@@ -80,6 +80,24 @@
       <!-- 中央内容区：频道筛选、AI 搜索推荐、瀑布流笔记 -->
       <section class="content-area" aria-label="笔记内容流">
         <div class="status-banner" id="statusBanner" hidden></div>
+        <section class="home-curation" id="homeCuration" aria-label="发现精选">
+          <div class="home-curation-main">
+            <small>今日发现</small>
+            <strong>内容种草、视频灵感和本地好物都在这里</strong>
+            <span>按热度、新鲜度和交易数据混合推荐，适合移动端快速浏览。</span>
+          </div>
+          <div class="home-curation-actions">
+            <button type="button" data-feed="hot">热门笔记</button>
+            <button type="button" data-brief-action="video">刷视频</button>
+            <button type="button" data-brief-action="mall">逛商城</button>
+          </div>
+          <div class="home-topic-strip">
+            <button type="button" data-smart-query="通勤穿搭">通勤穿搭</button>
+            <button type="button" data-smart-query="小户型收纳">小户型收纳</button>
+            <button type="button" data-smart-query="桌面改造">桌面改造</button>
+            <button type="button" data-smart-query="城市漫游">城市漫游</button>
+          </div>
+        </section>
         <section class="unified-search" id="unifiedSearch" hidden>
           <div class="unified-search-head">
             <div>
@@ -153,10 +171,13 @@
         <div class="mall-tabs">
           <button class="category-pill is-active" data-mall-category="all">推荐</button>
           <button class="category-pill" data-mall-category="food">精选美食</button>
+          <button class="category-pill" data-mall-category="coffee">咖啡甜点</button>
           <button class="category-pill" data-mall-category="beauty">美妆个护</button>
           <button class="category-pill" data-mall-category="home">家居生活</button>
           <button class="category-pill" data-mall-category="fashion">潮流装备</button>
           <button class="category-pill" data-mall-category="travel">旅行出行</button>
+          <button class="category-pill" data-mall-category="gear">拍摄装备</button>
+          <button class="category-pill" data-mall-category="digital">数码效率</button>
         </div>
         <div class="product-grid" id="productGrid"></div>
       </section>
