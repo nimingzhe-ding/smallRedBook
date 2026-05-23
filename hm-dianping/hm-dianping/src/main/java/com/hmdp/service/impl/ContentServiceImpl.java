@@ -51,6 +51,7 @@ import com.hmdp.service.IUserService;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.service.ProfileService;
 import com.hmdp.service.RecommendationService;
+import com.hmdp.service.SearchIndexService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -130,6 +131,8 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     @Resource
     private INoteEventService noteEventService;
+    @Resource
+    private SearchIndexService searchIndexService;
 
     // ==================== 信息流与搜索 ====================
 
@@ -158,23 +161,12 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         saveSearchHistory(currentUser, keyword);
         noteEventService.track(currentUser == null ? null : currentUser.getId(), null, EventType.SEARCH, "search", keyword);
         int pageNo = normalizePage(current);
-        Page<Blog> notePage = buildFeedQuery("hot", keyword, pageNo, null, null);
-        List<ContentNoteDTO> notes = toNoteDTOs(notePage.getRecords());
-        List<ContentNoteDTO> videos = notes.stream()
-                .filter(this::isVideoNote)
-                .toList();
-
-        ContentSearchResult result = new ContentSearchResult();
-        result.setQuery(keyword);
-        result.setNotes(notes);
-        result.setVideos(videos);
-        result.setProducts(searchProducts(keyword, pageNo));
-        result.setProductNotes(loadProductRelatedNotes(result.getProducts()));
-        result.setShops(searchShops(keyword, pageNo));
-        result.setTopics(searchTopics(keyword));
-        result.setRelatedQueries(buildRelatedQueries(keyword, notes, result.getProducts(), result.getShops(), result.getTopics()));
-        result.setSummary(buildSearchSummary(keyword, notes, videos, result.getProducts(), result.getShops(), result.getTopics()));
-        return Result.ok(result);
+        ContentSearchResult esResult = searchIndexService.search(keyword, pageNo);
+        if (esResult != null) {
+            esResult.setProductNotes(loadProductRelatedNotes(esResult.getProducts()));
+            return Result.ok(esResult);
+        }
+        return Result.ok(mysqlSearch(keyword, pageNo));
     }
 
     // ==================== 笔记详情 ====================
@@ -207,17 +199,29 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     @Override
     public Result publish(Blog note) {
-        return blogService.saveBlog(note);
+        Result result = blogService.saveBlog(note);
+        if (result.getSuccess() && result.getData() != null) {
+            indexNoteById(toLong(result.getData()));
+        }
+        return result;
     }
 
     @Override
     public Result updateOwnNote(Long noteId, Blog note) {
-        return blogService.updateOwnBlog(noteId, note);
+        Result result = blogService.updateOwnBlog(noteId, note);
+        if (result.getSuccess()) {
+            indexNoteById(noteId);
+        }
+        return result;
     }
 
     @Override
     public Result deleteOwnNote(Long noteId) {
-        return blogService.deleteOwnBlog(noteId);
+        Result result = blogService.deleteOwnBlog(noteId);
+        if (result.getSuccess()) {
+            searchIndexService.deleteBlog(noteId);
+        }
+        return result;
     }
 
     @Override
@@ -631,7 +635,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                     return new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE);
                 }
             } else {
-                wrapper.last("ORDER BY CASE WHEN shop_id IS NULL THEN 1 ELSE 0 END ASC, create_time DESC");
+                wrapper.last("ORDER BY CASE WHEN shop_id IS NULL OR shop_id <= 0 THEN 1 ELSE 0 END ASC, create_time DESC");
             }
         } else {
             wrapper.orderByDesc("create_time");
@@ -726,7 +730,8 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                 .ne("id", source.getId())
                 .eq("status", CONTENT_STATUS_NORMAL);
         List<String> tags = splitTags(source.getTags());
-        if (!tags.isEmpty() || StrUtil.isNotBlank(source.getContentType()) || source.getShopId() != null) {
+        boolean hasRealShop = source.getShopId() != null && source.getShopId() > 0;
+        if (!tags.isEmpty() || StrUtil.isNotBlank(source.getContentType()) || hasRealShop) {
             wrapper.and(w -> {
                 int[] conditionCount = {0};
                 for (String tag : tags) {
@@ -737,7 +742,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
                     if (conditionCount[0]++ > 0) w.or();
                     w.eq("content_type", source.getContentType());
                 }
-                if (source.getShopId() != null) {
+                if (hasRealShop) {
                     if (conditionCount[0] > 0) w.or();
                     w.eq("shop_id", source.getShopId());
                 }
@@ -775,6 +780,42 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
 
     private int statusOf(Blog blog) {
         return blog == null || blog.getStatus() == null ? CONTENT_STATUS_NORMAL : blog.getStatus();
+    }
+
+    private ContentSearchResult mysqlSearch(String keyword, int pageNo) {
+        Page<Blog> notePage = buildFeedQuery("hot", keyword, pageNo, null, null);
+        List<ContentNoteDTO> notes = toNoteDTOs(notePage.getRecords());
+        List<ContentNoteDTO> videos = notes.stream()
+                .filter(this::isVideoNote)
+                .toList();
+
+        ContentSearchResult result = new ContentSearchResult();
+        result.setQuery(keyword);
+        result.setNotes(notes);
+        result.setVideos(videos);
+        result.setProducts(searchProducts(keyword, pageNo));
+        result.setProductNotes(loadProductRelatedNotes(result.getProducts()));
+        result.setShops(searchShops(keyword, pageNo));
+        result.setTopics(searchTopics(keyword));
+        result.setRelatedQueries(buildRelatedQueries(keyword, notes, result.getProducts(), result.getShops(), result.getTopics()));
+        result.setSummary(buildSearchSummary(keyword, notes, videos, result.getProducts(), result.getShops(), result.getTopics()));
+        return result;
+    }
+
+    private void indexNoteById(Long noteId) {
+        if (noteId == null) {
+            return;
+        }
+        try {
+            Blog latest = blogService.getById(noteId);
+            if (latest != null && statusOf(latest) == CONTENT_STATUS_NORMAL) {
+                searchIndexService.indexBlog(latest);
+            } else {
+                searchIndexService.deleteBlog(noteId);
+            }
+        } catch (RuntimeException e) {
+            // 搜索索引同步失败不影响主业务写入，搜索会自动降级到 MySQL。
+        }
     }
 
     private List<MallProduct> searchProducts(String keyword, int pageNo) {

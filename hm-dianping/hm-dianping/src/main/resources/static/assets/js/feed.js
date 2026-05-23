@@ -265,7 +265,7 @@ async function toggleCardCollect(note) {
     await request(`/notes/${note.id}/collect/${nextCollected}`, { method: "PUT" });
     if (nextCollected) state.collected.add(String(note.id));
     else state.collected.delete(String(note.id));
-    localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+    saveScopedSet("hmdp_collected", state.collected);
     trackEvent(nextCollected ? "collect" : "uncollect", { noteId: note.id, scene: "feed" });
   } catch {
     applyNoteInteraction(note, previous);

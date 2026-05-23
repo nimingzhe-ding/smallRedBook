@@ -7,6 +7,10 @@
   // ------------------------------
   var COMPOSER_DRAFT_KEY = "hmdp_composer_draft";
 
+  function composerDraftKey() {
+    return scopedStorageKey(COMPOSER_DRAFT_KEY);
+  }
+
   function getComposerContentType() {
     return normalizeContentType(els.composerForm.elements.contentType?.value, "");
   }
@@ -60,7 +64,7 @@
 
   function readComposerDraft() {
     try {
-      return JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY) || "null");
+      return JSON.parse(localStorage.getItem(composerDraftKey()) || "null");
     } catch {
       return null;
     }
@@ -94,11 +98,11 @@
     if (state.editingNoteId) return;
     var draft = collectComposerDraft();
     if (!hasComposerDraft(draft)) {
-      localStorage.removeItem(COMPOSER_DRAFT_KEY);
+      localStorage.removeItem(composerDraftKey());
       renderComposerDraftState();
       return;
     }
-    localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft));
+    localStorage.setItem(composerDraftKey(), JSON.stringify(draft));
     renderComposerDraftState(showTip ? "草稿已保存，发布失败也不会丢。" : "");
   }
 
@@ -127,7 +131,7 @@
 
   function clearComposerDraft(resetForm) {
     resetForm = resetForm || false;
-    localStorage.removeItem(COMPOSER_DRAFT_KEY);
+    localStorage.removeItem(composerDraftKey());
     if (resetForm) {
       els.composerForm.reset();
       els.uploadPreview.innerHTML = "";
@@ -376,10 +380,10 @@
         method: editingId ? "PUT" : "POST",
         body: JSON.stringify(payload)
       });
-      showStatus(editingId ? "内容已保存。" : "发布成功，已同步到内容流。");
       if (!editingId) clearComposerDraft();
       resetComposerMode();
       els.composer.close();
+      showStatus(editingId ? "保存成功，作品已更新。" : "发布成功，作品已展示到内容流。", "success");
       els.composerForm.reset();
       els.uploadPreview.innerHTML = "";
       els.videoPreview.innerHTML = "";
@@ -387,9 +391,9 @@
       syncComposerTopicPresets();
       if (state.currentNote) closeDrawer();
       resetAndLoad();
-    } catch {
+    } catch (error) {
       saveComposerDraft(true);
-      showStatus("发布失败，内容已保存到草稿箱。请确认已登录，且图片、店铺信息有效。");
+      showStatus(error.message || "发布失败，内容已保存到草稿箱。请确认已登录，且图片、店铺信息有效。");
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = state.editingNoteId ? "保存修改" : "发布作品";
@@ -459,6 +463,7 @@
 
   // Export cross-module functions
   window.COMPOSER_DRAFT_KEY = COMPOSER_DRAFT_KEY;
+  window.composerDraftKey = composerDraftKey;
   window.getComposerContentType = getComposerContentType;
   window.splitComposerTags = splitComposerTags;
   window.normalizeComposerTags = normalizeComposerTags;

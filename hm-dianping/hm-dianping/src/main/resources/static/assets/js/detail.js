@@ -270,7 +270,7 @@
         showStatus(`抢购成功，订单号：${orderId}`);
       } else {
         state.wallet.add(String(voucherId));
-        localStorage.setItem("hmdp_wallet", JSON.stringify([...state.wallet]));
+        saveScopedSet("hmdp_wallet", state.wallet);
         button.firstChild.textContent = "已领取";
         showStatus("优惠券已放入本地卡包，后续可接入正式券包表。");
       }
@@ -373,7 +373,7 @@
       collectCount: Math.max(0, previous.collects + (next ? 1 : -1)),
       score: Math.max(0, previous.score + (next ? 5 : -5))
     });
-    localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+    saveScopedSet("hmdp_collected", state.collected);
     syncDrawerInteractionButtons(note);
     try {
       await request(`/notes/${note.id}/collect/${next}`, { method: "PUT" });
@@ -384,7 +384,7 @@
       if (previous.isCollect) state.collected.add(id);
       else state.collected.delete(id);
       applyNoteInteraction?.(note, previous);
-      localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+      saveScopedSet("hmdp_collected", state.collected);
       syncDrawerInteractionButtons(note);
       showStatus("收藏失败，请确认数据库已执行收藏表升级脚本。");
     } finally {
@@ -401,7 +401,7 @@
       else state.collected.delete(id);
       note.isCollect = Boolean(collected);
       note.collected = Boolean(collected);
-      localStorage.setItem("hmdp_collected", JSON.stringify([...state.collected]));
+      saveScopedSet("hmdp_collected", state.collected);
       applyNoteInteraction?.(note, { isCollect: Boolean(collected), collected: Boolean(collected) });
       syncDrawerInteractionButtons(note);
     } catch {
@@ -417,7 +417,7 @@
       if (note.userId) await request(`/follow/${note.userId}/${next}`, { method: "PUT" });
       if (next) state.followed.add(id);
       else state.followed.delete(id);
-      localStorage.setItem("hmdp_followed", JSON.stringify([...state.followed]));
+      saveScopedSet("hmdp_followed", state.followed);
       document.querySelector("#drawerFollow").textContent = next ? "已关注" : "关注";
     } catch {
       showStatus("关注失败，请稍后再试。");

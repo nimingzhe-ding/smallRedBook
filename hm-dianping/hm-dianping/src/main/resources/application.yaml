@@ -57,3 +57,8 @@ hmdp:
   moderation:
     enabled: ${HMDP_MODERATION_ENABLED:true}
     sensitive-words: "${HMDP_SENSITIVE_WORDS:}"
+  search:
+    elasticsearch:
+      enabled: ${HMDP_ELASTICSEARCH_ENABLED:true}
+      uris: "${HMDP_ELASTICSEARCH_URIS:http://localhost:9200}"
+      index: "${HMDP_ELASTICSEARCH_INDEX:hmdp_search}"

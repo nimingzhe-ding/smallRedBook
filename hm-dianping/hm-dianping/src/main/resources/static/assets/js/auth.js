@@ -11,11 +11,13 @@ async function initUser() {
   if (!token()) {
     stopNotificationStream?.();
     renderUser(null);
+    reloadScopedLocalState?.();
     return;
   }
   try {
     const user = await loadAccount();
     state.currentUser = user;
+    reloadScopedLocalState?.();
     renderUser(user);
     loadProfileStats();
     loadNotificationSettings?.();
@@ -24,6 +26,7 @@ async function initUser() {
     localStorage.removeItem("hmdp_token");
     stopNotificationStream?.();
     renderUser(null);
+    reloadScopedLocalState?.();
   }
 }
 window.initUser = initUser;
@@ -159,6 +162,7 @@ async function submitLogin(event) {
     els.loginDialog.close();
     if (response?.user) {
       renderUser(response.user);
+      reloadScopedLocalState?.();
     } else {
       await initUser();
     }
@@ -256,6 +260,7 @@ async function logout() {
   localStorage.removeItem("hmdp_token_expire_at");
   stopNotificationStream?.();
   renderUser(null);
+  reloadScopedLocalState?.();
   state.currentProfile = null;
   showStatus("已退出登录。");
 }

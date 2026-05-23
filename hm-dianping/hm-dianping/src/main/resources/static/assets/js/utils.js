@@ -1,6 +1,78 @@
 // utils.js — 全局状态、DOM 引用、共享工具函数
 // 加载顺序：第一个加载，auth.js / feed.js / detail.js 等都依赖它
 (function() {
+function tokenStorageScope() {
+  const raw = localStorage.getItem("hmdp_token") || "";
+  if (!raw) return "guest";
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+  }
+  return "token_" + Math.abs(hash).toString(36);
+}
+window.tokenStorageScope = tokenStorageScope;
+
+function userStorageScope() {
+  const userId = window.state?.currentUser?.id;
+  return userId ? "user_" + userId : tokenStorageScope();
+}
+window.userStorageScope = userStorageScope;
+
+function scopedStorageKey(base, scope) {
+  return base + ":" + (scope || userStorageScope());
+}
+window.scopedStorageKey = scopedStorageKey;
+
+function readJsonStorage(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+window.readJsonStorage = readJsonStorage;
+
+function readScopedJson(base, fallback, scope) {
+  return readJsonStorage(scopedStorageKey(base, scope), fallback);
+}
+window.readScopedJson = readScopedJson;
+
+function writeScopedJson(base, value, scope) {
+  localStorage.setItem(scopedStorageKey(base, scope), JSON.stringify(value));
+}
+window.writeScopedJson = writeScopedJson;
+
+function removeScopedStorage(base, scope) {
+  localStorage.removeItem(scopedStorageKey(base, scope));
+}
+window.removeScopedStorage = removeScopedStorage;
+
+function readScopedValue(base, fallback, scope) {
+  const value = localStorage.getItem(scopedStorageKey(base, scope));
+  return value == null ? fallback : value;
+}
+window.readScopedValue = readScopedValue;
+
+function writeScopedValue(base, value, scope) {
+  localStorage.setItem(scopedStorageKey(base, scope), String(value));
+}
+window.writeScopedValue = writeScopedValue;
+
+function saveScopedSet(base, set, scope) {
+  writeScopedJson(base, [...(set || [])], scope);
+}
+window.saveScopedSet = saveScopedSet;
+
+function reloadScopedLocalState() {
+  if (!window.state) return;
+  state.wallet = new Set(readScopedJson("hmdp_wallet", []));
+  state.collected = new Set(readScopedJson("hmdp_collected", []));
+  state.followed = new Set(readScopedJson("hmdp_followed", []));
+  state.aiSessionId = readScopedValue("hmdp_ai_session", crypto.randomUUID());
+  writeScopedValue("hmdp_ai_session", state.aiSessionId);
+}
+window.reloadScopedLocalState = reloadScopedLocalState;
 // ==================== 全局状态 ====================
 // 集中管理所有页面的运行时状态，避免分散在各模块中难以追踪
 window.state = {
@@ -60,10 +132,10 @@ window.state = {
   hotSearches: [],
   searchHistory: [],
   suggestionTimer: null,
-  wallet: new Set(JSON.parse(localStorage.getItem("hmdp_wallet") || "[]")),
-  collected: new Set(JSON.parse(localStorage.getItem("hmdp_collected") || "[]")),
-  followed: new Set(JSON.parse(localStorage.getItem("hmdp_followed") || "[]")),
-  aiSessionId: localStorage.getItem("hmdp_ai_session") || crypto.randomUUID(),
+  wallet: new Set(readScopedJson("hmdp_wallet", [])),
+  collected: new Set(readScopedJson("hmdp_collected", [])),
+  followed: new Set(readScopedJson("hmdp_followed", [])),
+  aiSessionId: readScopedValue("hmdp_ai_session", crypto.randomUUID()),
   notificationFilter: "all",
   aiSearchInsight: "",
   aiComposerTimer: null,
@@ -84,7 +156,7 @@ window.state = {
   dmSearchTimer: null
 };
 
-localStorage.setItem("hmdp_ai_session", state.aiSessionId);
+writeScopedValue("hmdp_ai_session", state.aiSessionId);
 
 // ==================== DOM 引用缓存 ====================
 // 页面加载时一次性获取所有 DOM 元素的引用，避免各处重复 querySelector
@@ -453,9 +525,19 @@ function stripHtml(value) {
 }
 window.stripHtml = stripHtml;
 
-function showStatus(message) {
+function statusTypeFromMessage(message) {
+  var text = String(message || "");
+  if (/失败|错误|风险|不能|请先|至少|需要|不可用/.test(text)) return "error";
+  if (/成功|已保存|已更新|已发布|已同步|已清空|已删除|已提交|已创建|已开通/.test(text)) return "success";
+  return "info";
+}
+window.statusTypeFromMessage = statusTypeFromMessage;
+
+function showStatus(message, type) {
+  if (!message) return;
   els.status.textContent = message;
   els.status.hidden = false;
+  showToast?.(message, type || statusTypeFromMessage(message), 3200);
 }
 window.showStatus = showStatus;
 

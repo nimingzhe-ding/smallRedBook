@@ -116,6 +116,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             throw new BusinessException(ErrorCode.PRODUCT_NOT_ONLINE);
         }
         blog.setContentType(contentType);
+        normalizeBlogShopId(blog, contentType);
         blog.setTags(normalizeTags(blog.getTags()));
         //获取登录用户
         UserDTO currentUser = UserHolder.getUser();
@@ -171,6 +172,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (!productIds.isEmpty() && !allProductsOnline(productIds)) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_ONLINE);
         }
+        normalizeBlogShopId(blog, contentType);
         update()
                 .set("shop_id", blog.getShopId())
                 .set("title", StrUtil.trim(blog.getTitle()))
@@ -281,6 +283,16 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .distinct()
                 .limit(6)
                 .collect(Collectors.joining(","));
+    }
+
+    private void normalizeBlogShopId(Blog blog, String contentType) {
+        if (blog == null) {
+            return;
+        }
+        if (!ContentType.PRODUCT_NOTE.name().equals(contentType)
+                && (blog.getShopId() == null || blog.getShopId() <= 0)) {
+            blog.setShopId(0L);
+        }
     }
 
     private boolean isLowQualityText(String title, String content) {
