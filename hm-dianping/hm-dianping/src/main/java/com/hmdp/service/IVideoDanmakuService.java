@@ -16,4 +16,6 @@ public interface IVideoDanmakuService extends IService<VideoDanmaku> {
     Result report(Long danmakuId);
 
     SseEmitter stream(Long blogId);
+
+    boolean canUseDanmaku(Long blogId);
 }

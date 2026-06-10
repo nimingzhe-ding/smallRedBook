@@ -27,6 +27,24 @@ spring:
           time-between-eviction-runs: 10s
   jackson:
     default-property-inclusion: non_null
+  kafka:
+    bootstrap-servers: "${HMDP_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+        compression.type: lz4
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: manual_immediate
 
 mybatis-plus:
   type-aliases-package: com.hmdp.entity
@@ -62,3 +80,27 @@ hmdp:
       enabled: ${HMDP_ELASTICSEARCH_ENABLED:true}
       uris: "${HMDP_ELASTICSEARCH_URIS:http://localhost:9200}"
       index: "${HMDP_ELASTICSEARCH_INDEX:hmdp_search}"
+  seckill:
+    kafka:
+      order-topic: "${HMDP_SECKILL_ORDER_TOPIC:seckill-order}"
+      order-dlt-topic: "${HMDP_SECKILL_ORDER_DLT_TOPIC:seckill-order.DLT}"
+      order-consumer-group: "${HMDP_SECKILL_ORDER_CONSUMER_GROUP:seckill-order-consumer-group}"
+      partitions: ${HMDP_SECKILL_ORDER_PARTITIONS:3}
+      replicas: ${HMDP_SECKILL_ORDER_REPLICAS:1}
+      listener-concurrency: ${HMDP_SECKILL_ORDER_CONCURRENCY:3}
+  danmaku:
+    websocket:
+      enabled: ${HMDP_DANMAKU_WS_ENABLED:true}
+      port: ${HMDP_DANMAKU_WS_PORT:8090}
+      path: "${HMDP_DANMAKU_WS_PATH:/ws/danmaku}"
+      reader-idle-seconds: ${HMDP_DANMAKU_WS_READER_IDLE_SECONDS:75}
+      max-frame-payload-length: ${HMDP_DANMAKU_WS_MAX_FRAME_PAYLOAD_LENGTH:1024}
+    kafka:
+      topic: "${HMDP_DANMAKU_TOPIC:video-danmaku}"
+      dlt-topic: "${HMDP_DANMAKU_DLT_TOPIC:video-danmaku.DLT}"
+      consumer-group: "${HMDP_DANMAKU_CONSUMER_GROUP:video-danmaku-consumer-group}"
+      partitions: ${HMDP_DANMAKU_PARTITIONS:3}
+      replicas: ${HMDP_DANMAKU_REPLICAS:1}
+      listener-concurrency: ${HMDP_DANMAKU_CONCURRENCY:2}
+      cache-limit: ${HMDP_DANMAKU_CACHE_LIMIT:300}
+      cache-ttl-hours: ${HMDP_DANMAKU_CACHE_TTL_HOURS:48}

@@ -1,0 +1,39 @@
+spring:
+  kafka:
+    bootstrap-servers: "${HMDP_KAFKA_BOOTSTRAP_SERVERS:kafka-1:9092,kafka-2:9092,kafka-3:9092}"
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 120000
+        request.timeout.ms: 30000
+        linger.ms: 5
+        compression.type: lz4
+    consumer:
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      max-poll-records: 100
+      properties:
+        max.poll.interval.ms: 300000
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+    listener:
+      ack-mode: manual_immediate
+
+logging:
+  level:
+    com.hmdp: info
+
+hmdp:
+  auth:
+    debug-code-response: false
+  seckill:
+    kafka:
+      order-topic: "${HMDP_SECKILL_ORDER_TOPIC:seckill-order}"
+      order-dlt-topic: "${HMDP_SECKILL_ORDER_DLT_TOPIC:seckill-order.DLT}"
+      order-consumer-group: "${HMDP_SECKILL_ORDER_CONSUMER_GROUP:seckill-order-consumer-group}"
+      partitions: ${HMDP_SECKILL_ORDER_PARTITIONS:12}
+      replicas: ${HMDP_SECKILL_ORDER_REPLICAS:3}
+      listener-concurrency: ${HMDP_SECKILL_ORDER_CONCURRENCY:6}

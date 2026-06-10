@@ -4,7 +4,6 @@ local orderId = ARGV[3]
 
 local stockKey = 'seckill:stock:' .. voucherId
 local orderKey = 'seckill:order:' .. voucherId
-local streamKey = 'stream.orders'
 
 local stock = redis.call('GET', stockKey)
 if (stock == false or tonumber(stock) <= 0) then
@@ -17,5 +16,4 @@ end
 
 redis.call('INCRBY', stockKey, -1)
 redis.call('SADD', orderKey, userId)
-redis.call('XADD', streamKey, '*', 'orderId', orderId, 'userId', userId, 'voucherId', voucherId)
 return 0

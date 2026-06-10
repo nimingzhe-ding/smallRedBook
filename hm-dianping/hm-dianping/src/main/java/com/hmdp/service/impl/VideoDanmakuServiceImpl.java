@@ -2,6 +2,9 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.config.DanmakuKafkaProperties;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
@@ -13,8 +16,11 @@ import com.hmdp.mapper.VideoDanmakuMapper;
 import com.hmdp.service.ContentModerationService;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IVideoDanmakuService;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -23,12 +29,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 视频弹幕领域服务。
  * 弹幕读取允许匿名访问，发送弹幕要求用户已登录且笔记支持视频互动。
  */
 @Service
+@Slf4j
 public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, VideoDanmaku> implements IVideoDanmakuService {
 
     public static final int STATUS_NORMAL = 0;
@@ -41,6 +49,12 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
     private IBlogService blogService;
     @Resource
     private ContentModerationService contentModerationService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private ObjectMapper objectMapper;
+    @Resource
+    private DanmakuKafkaProperties danmakuKafkaProperties;
 
     @Override
     public Result listByBlog(Long blogId) {
@@ -49,6 +63,10 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         }
         if (!canUseDanmaku(blogId)) {
             return Result.ok(List.of());
+        }
+        List<Map<String, Object>> cached = listCachedDanmaku(blogId);
+        if (!cached.isEmpty()) {
+            return Result.ok(cached);
         }
         List<Map<String, Object>> list = query()
                 .eq("blog_id", blogId)
@@ -59,6 +77,7 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
                 .stream()
                 .map(this::toView)
                 .toList();
+        cacheDanmakuViews(blogId, list);
         return Result.ok(list);
     }
 
@@ -88,6 +107,7 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         danmaku.setStatus(STATUS_NORMAL);
         save(danmaku);
         Map<String, Object> view = toView(danmaku);
+        cacheDanmakuViews(danmaku.getBlogId(), List.of(view));
         broadcast(danmaku.getBlogId(), view);
         return Result.ok(view);
     }
@@ -140,7 +160,8 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         return emitter;
     }
 
-    private boolean canUseDanmaku(Long blogId) {
+    @Override
+    public boolean canUseDanmaku(Long blogId) {
         Blog blog = blogService.getById(blogId);
         return blog != null && ContentType.supportsDanmaku(blog.getContentType(), blog.getVideoUrl());
     }
@@ -149,10 +170,96 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("id", danmaku.getId());
         view.put("blogId", danmaku.getBlogId());
+        view.put("videoId", danmaku.getBlogId());
         view.put("content", danmaku.getContent());
         view.put("videoSecond", danmaku.getVideoSecond() == null ? 0 : danmaku.getVideoSecond());
         view.put("lane", danmaku.getLane() == null ? 0 : danmaku.getLane());
         return view;
+    }
+
+    private List<Map<String, Object>> listCachedDanmaku(Long blogId) {
+        try {
+            Set<String> values = stringRedisTemplate.opsForZSet()
+                    .range(RedisConstants.VIDEO_DANMAKU_ZSET_KEY + blogId, 0, 299);
+            if (values == null || values.isEmpty()) {
+                return List.of();
+            }
+            return values.stream()
+                    .map(value -> {
+                        try {
+                            Map<String, Object> source = objectMapper.readValue(
+                                    value,
+                                    new TypeReference<Map<String, Object>>() {
+                                    }
+                            );
+                            return toCacheView(blogId, source);
+                        } catch (Exception e) {
+                            log.warn("Parse cached danmaku failed, blogId={}, value={}", blogId, value, e);
+                            return null;
+                        }
+                    })
+                    .filter(item -> item != null)
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Read danmaku Redis ZSet failed, blogId={}", blogId, e);
+            return List.of();
+        }
+    }
+
+    private Map<String, Object> toCacheView(Long blogId, Map<String, Object> source) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("id", source.get("id"));
+        view.put("messageId", source.get("messageId"));
+        view.put("blogId", source.getOrDefault("blogId", blogId));
+        view.put("videoId", source.getOrDefault("videoId", blogId));
+        view.put("content", source.get("content"));
+        view.put("videoSecond", source.getOrDefault("videoSecond", 0));
+        view.put("lane", source.getOrDefault("lane", 0));
+        view.put("createTime", source.get("createTime"));
+        return view;
+    }
+
+    private void cacheDanmakuViews(Long blogId, List<Map<String, Object>> views) {
+        if (views == null || views.isEmpty()) {
+            return;
+        }
+        String key = RedisConstants.VIDEO_DANMAKU_ZSET_KEY + blogId;
+        try {
+            for (Map<String, Object> view : views) {
+                stringRedisTemplate.opsForZSet().add(
+                        key,
+                        objectMapper.writeValueAsString(view),
+                        scoreOf(view.get("videoSecond"))
+                );
+            }
+            stringRedisTemplate.expire(key, danmakuKafkaProperties.getCacheTtlHours(), TimeUnit.HOURS);
+            trimCache(key);
+        } catch (Exception e) {
+            log.warn("Warm up danmaku Redis ZSet failed, blogId={}", blogId, e);
+        }
+    }
+
+    private double scoreOf(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value == null) {
+            return 0D;
+        }
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return 0D;
+        }
+    }
+
+    private void trimCache(String key) {
+        Long size = stringRedisTemplate.opsForZSet().zCard(key);
+        if (size == null || size <= danmakuKafkaProperties.getCacheLimit()) {
+            return;
+        }
+        long overflow = size - danmakuKafkaProperties.getCacheLimit();
+        stringRedisTemplate.opsForZSet().removeRange(key, 0, overflow - 1);
     }
 
     private void broadcast(Long blogId, Map<String, Object> view) {
