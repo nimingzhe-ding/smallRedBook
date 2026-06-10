@@ -12,6 +12,8 @@ import com.hmdp.entity.Blog;
 import com.hmdp.entity.ContentTopic;
 import com.hmdp.entity.MallProduct;
 import com.hmdp.entity.Shop;
+import com.hmdp.entity.User;
+import com.hmdp.entity.VideoDanmaku;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IMallProductService;
 import com.hmdp.service.IShopService;
@@ -52,6 +54,8 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     private static final String TYPE_PRODUCT = "product";
     private static final String TYPE_SHOP = "shop";
     private static final String TYPE_TOPIC = "topic";
+    private static final String TYPE_USER = "user";
+    private static final String TYPE_DANMAKU = "danmaku";
 
     @Value("${hmdp.search.elasticsearch.enabled:false}")
     private boolean enabled;
@@ -196,29 +200,91 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     }
 
     @Override
-    public void indexBlog(Blog blog) {
-        if (!enabled || blog == null || blog.getId() == null || !isAvailable()) {
-            return;
+    public boolean indexBlog(Blog blog) {
+        if (!enabled || blog == null || blog.getId() == null) {
+            return true;
+        }
+        if (!isAvailable()) {
+            return false;
         }
         try {
             createIndex();
             exchangeJson("/" + indexName + "/_doc/" + documentId(TYPE_NOTE, blog.getId()),
                     HttpMethod.PUT, blogDocument(blog));
+            return true;
         } catch (RuntimeException e) {
             log.warn("Index blog failed. blogId={}", blog.getId(), e);
+            return false;
         }
     }
 
     @Override
-    public void deleteBlog(Long blogId) {
-        if (!enabled || blogId == null || !isAvailable()) {
-            return;
+    public boolean deleteBlog(Long blogId) {
+        return deleteDocument(TYPE_NOTE, blogId);
+    }
+
+    @Override
+    public boolean indexUser(User user) {
+        if (!enabled || user == null || user.getId() == null) {
+            return true;
+        }
+        if (!isAvailable()) {
+            return false;
         }
         try {
-            restTemplate.exchange(endpoint("/" + indexName + "/_doc/" + documentId(TYPE_NOTE, blogId)),
+            createIndex();
+            exchangeJson("/" + indexName + "/_doc/" + documentId(TYPE_USER, user.getId()),
+                    HttpMethod.PUT, userDocument(user));
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("Index user failed. userId={}", user.getId(), e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean deleteUser(Long userId) {
+        return deleteDocument(TYPE_USER, userId);
+    }
+
+    @Override
+    public boolean indexDanmaku(VideoDanmaku danmaku) {
+        if (!enabled || danmaku == null || danmaku.getId() == null) {
+            return true;
+        }
+        if (!isAvailable()) {
+            return false;
+        }
+        try {
+            createIndex();
+            exchangeJson("/" + indexName + "/_doc/" + documentId(TYPE_DANMAKU, danmaku.getId()),
+                    HttpMethod.PUT, danmakuDocument(danmaku));
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("Index danmaku failed. danmakuId={}", danmaku.getId(), e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean deleteDanmaku(Long danmakuId) {
+        return deleteDocument(TYPE_DANMAKU, danmakuId);
+    }
+
+    private boolean deleteDocument(String type, Object id) {
+        if (!enabled || id == null) {
+            return true;
+        }
+        if (!isAvailable()) {
+            return false;
+        }
+        try {
+            restTemplate.exchange(endpoint("/" + indexName + "/_doc/" + documentId(type, id)),
                     HttpMethod.DELETE, HttpEntity.EMPTY, String.class);
+            return true;
         } catch (RestClientException e) {
-            log.warn("Delete blog index failed. blogId={}", blogId, e);
+            log.warn("Delete search index failed. type={}, id={}", type, id, e);
+            return false;
         }
     }
 
@@ -285,14 +351,22 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
     private Map<String, Object> searchBody(String keyword, int pageNo) {
         int size = SystemConstants.MAX_PAGE_SIZE * 4;
         int from = Math.max(0, pageNo - 1) * size;
+        Map<String, Object> matchQuery = Map.of(
+                "multi_match", Map.of(
+                        "query", keyword,
+                        "fields", List.of("title^5", "tags^4", "content^2", "category^2", "suggest"),
+                        "type", "best_fields",
+                        "fuzziness", "AUTO"
+                )
+        );
         Map<String, Object> query = Map.of(
                 "function_score", Map.of(
                         "query", Map.of(
-                                "multi_match", Map.of(
-                                        "query", keyword,
-                                        "fields", List.of("title^5", "tags^4", "content^2", "category^2", "suggest"),
-                                        "type", "best_fields",
-                                        "fuzziness", "AUTO"
+                                "bool", Map.of(
+                                        "must", matchQuery,
+                                        "filter", Map.of("terms", Map.of(
+                                                "type", List.of(TYPE_NOTE, TYPE_PRODUCT, TYPE_SHOP, TYPE_TOPIC)
+                                        ))
                                 )
                         ),
                         "field_value_factor", Map.of(
@@ -340,6 +414,20 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
                 TYPE_TOPIC,
                 topic.getHeat() == null ? 1L : topic.getHeat(),
                 topic.getCreateTime());
+    }
+
+    private Map<String, Object> userDocument(User user) {
+        return baseDocument(TYPE_USER, user.getId(), user.getNickName(), "",
+                "", "role-" + (user.getRole() == null ? 1 : user.getRole()),
+                1L,
+                user.getCreateTime());
+    }
+
+    private Map<String, Object> danmakuDocument(VideoDanmaku danmaku) {
+        return baseDocument(TYPE_DANMAKU, danmaku.getId(), danmaku.getContent(), danmaku.getContent(),
+                "", "video-" + danmaku.getBlogId(),
+                heat(1, danmaku.getReportCount(), 0),
+                danmaku.getCreateTime());
     }
 
     private Map<String, Object> baseDocument(String type, Object sourceId, String title, String content, String tags,

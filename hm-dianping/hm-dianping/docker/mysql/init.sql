@@ -17,6 +17,10 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+CREATE USER IF NOT EXISTS 'canal'@'%' IDENTIFIED BY 'canal';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
+FLUSH PRIVILEGES;
+
 -- ----------------------------
 -- Table structure for tb_blog
 -- ----------------------------

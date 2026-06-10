@@ -13,6 +13,11 @@ services:
       HMDP_REDIS_PORT: "6379"
       HMDP_REDIS_PASSWORD: ""
       HMDP_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      HMDP_ELASTICSEARCH_URIS: "http://elasticsearch:9200"
+      HMDP_CANAL_ENABLED: "true"
+      HMDP_CANAL_HOST: "canal"
+      HMDP_CANAL_PORT: "11111"
+      HMDP_CANAL_DESTINATION: "example"
       HMDP_DANMAKU_WS_PORT: "8090"
       HMDP_PRIVATE_MESSAGE_WS_PORT: "8091"
       HMDP_STORAGE_TYPE: "local"
@@ -26,10 +31,19 @@ services:
         condition: service_started
       kafka:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
+      canal:
+        condition: service_started
     restart: unless-stopped
 
   mysql:
     image: mysql:8.0
+    command:
+      - "--server-id=1"
+      - "--log-bin=mysql-bin"
+      - "--binlog-format=ROW"
+      - "--binlog-row-image=FULL"
     environment:
       MYSQL_ROOT_PASSWORD: "root123"
       MYSQL_DATABASE: "hmdp"
@@ -72,8 +86,44 @@ services:
       - kafka-data:/bitnami/kafka
     restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  canal:
+    image: canal/canal-server:v1.1.7
+    ports:
+      - "11111:11111"
+    environment:
+      canal.auto.scan: "false"
+      canal.destinations: "example"
+      canal.instance.master.address: "mysql:3306"
+      canal.instance.dbUsername: "canal"
+      canal.instance.dbPassword: "canal"
+      canal.instance.connectionCharset: "UTF-8"
+      canal.instance.tsdb.enable: "true"
+      canal.instance.gtidon: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   mysql-data:
   redis-data:
   kafka-data:
+  elasticsearch-data:
   upload-data:

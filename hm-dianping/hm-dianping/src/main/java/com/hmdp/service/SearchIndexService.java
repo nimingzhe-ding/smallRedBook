@@ -3,6 +3,8 @@ package com.hmdp.service;
 import com.hmdp.dto.ContentSearchResult;
 import com.hmdp.dto.SearchIndexRebuildResult;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.User;
+import com.hmdp.entity.VideoDanmaku;
 
 public interface SearchIndexService {
     boolean isEnabled();
@@ -13,7 +15,15 @@ public interface SearchIndexService {
 
     SearchIndexRebuildResult rebuildAll();
 
-    void indexBlog(Blog blog);
+    boolean indexBlog(Blog blog);
 
-    void deleteBlog(Long blogId);
+    boolean deleteBlog(Long blogId);
+
+    boolean indexUser(User user);
+
+    boolean deleteUser(Long userId);
+
+    boolean indexDanmaku(VideoDanmaku danmaku);
+
+    boolean deleteDanmaku(Long danmakuId);
 }

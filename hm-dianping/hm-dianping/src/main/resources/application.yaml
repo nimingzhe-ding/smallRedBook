@@ -80,6 +80,19 @@ hmdp:
       enabled: ${HMDP_ELASTICSEARCH_ENABLED:true}
       uris: "${HMDP_ELASTICSEARCH_URIS:http://localhost:9200}"
       index: "${HMDP_ELASTICSEARCH_INDEX:hmdp_search}"
+  canal:
+    enabled: ${HMDP_CANAL_ENABLED:false}
+    host: "${HMDP_CANAL_HOST:127.0.0.1}"
+    port: ${HMDP_CANAL_PORT:11111}
+    destination: "${HMDP_CANAL_DESTINATION:example}"
+    username: "${HMDP_CANAL_USERNAME:}"
+    password: "${HMDP_CANAL_PASSWORD:}"
+    subscribe: "${HMDP_CANAL_SUBSCRIBE:.*\\.tb_blog,.*\\.tb_user,.*\\.tb_video_danmaku}"
+    batch-size: ${HMDP_CANAL_BATCH_SIZE:1000}
+    idle-sleep-millis: ${HMDP_CANAL_IDLE_SLEEP_MILLIS:500}
+    initial-backoff-millis: ${HMDP_CANAL_INITIAL_BACKOFF_MILLIS:1000}
+    max-backoff-millis: ${HMDP_CANAL_MAX_BACKOFF_MILLIS:30000}
+    cache-ttl-minutes: ${HMDP_CANAL_CACHE_TTL_MINUTES:30}
   seckill:
     kafka:
       order-topic: "${HMDP_SECKILL_ORDER_TOPIC:seckill-order}"
