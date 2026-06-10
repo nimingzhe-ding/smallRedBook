@@ -6,6 +6,7 @@ services:
     ports:
       - "8081:8081"
       - "8090:8090"
+      - "8091:8091"
     environment:
       HMDP_DATASOURCE_URL: "jdbc:mysql://mysql:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
       HMDP_DATASOURCE_USERNAME: "root"
@@ -15,6 +16,7 @@ services:
       HMDP_REDIS_PASSWORD: ""
       HMDP_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       HMDP_DANMAKU_WS_PORT: "8090"
+      HMDP_LIVE_CHAT_WS_PORT: "8091"
       HMDP_STORAGE_TYPE: "local"
       HMDP_IMAGE_UPLOAD_DIR: "/data/imgs"
     volumes:

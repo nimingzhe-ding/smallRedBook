@@ -104,3 +104,11 @@ hmdp:
       listener-concurrency: ${HMDP_DANMAKU_CONCURRENCY:2}
       cache-limit: ${HMDP_DANMAKU_CACHE_LIMIT:300}
       cache-ttl-hours: ${HMDP_DANMAKU_CACHE_TTL_HOURS:48}
+  live-chat:
+    websocket:
+      enabled: ${HMDP_LIVE_CHAT_WS_ENABLED:true}
+      port: ${HMDP_LIVE_CHAT_WS_PORT:8091}
+      path: "${HMDP_LIVE_CHAT_WS_PATH:/ws/live-chat}"
+      reader-idle-seconds: ${HMDP_LIVE_CHAT_WS_READER_IDLE_SECONDS:75}
+      max-frame-payload-length: ${HMDP_LIVE_CHAT_WS_MAX_FRAME_PAYLOAD_LENGTH:1024}
+      persistence-threads: ${HMDP_LIVE_CHAT_PERSISTENCE_THREADS:2}

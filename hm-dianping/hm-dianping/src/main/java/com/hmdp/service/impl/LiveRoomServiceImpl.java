@@ -249,6 +249,15 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         return detail(roomId);
     }
 
+    @Override
+    public boolean canChat(Long roomId) {
+        if (roomId == null) {
+            return false;
+        }
+        LiveRoom room = getById(roomId);
+        return room != null && room.getStatus() != null && room.getStatus() == STATUS_LIVING;
+    }
+
     private List<LiveRoom> attachProducts(List<LiveRoom> rooms) {
         if (rooms == null || rooms.isEmpty()) {
             return List.of();

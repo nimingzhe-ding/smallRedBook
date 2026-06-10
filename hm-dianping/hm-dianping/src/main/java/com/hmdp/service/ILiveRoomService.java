@@ -30,4 +30,6 @@ public interface ILiveRoomService extends IService<LiveRoom> {
     Result likeRoom(Long roomId);
 
     Result updateOnline(Long roomId, Integer delta);
+
+    boolean canChat(Long roomId);
 }
