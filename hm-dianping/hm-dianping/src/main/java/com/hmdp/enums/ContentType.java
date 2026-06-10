@@ -10,7 +10,6 @@ import java.util.Arrays;
 public enum ContentType {
     IMAGE,
     VIDEO,
-    LIVE,
     PRODUCT_NOTE;
 
     public static boolean isSupported(String value) {
@@ -38,6 +37,6 @@ public enum ContentType {
 
     public static boolean supportsDanmaku(String value, String videoUrl) {
         String resolved = resolve(value, videoUrl);
-        return VIDEO.name().equals(resolved) || LIVE.name().equals(resolved);
+        return VIDEO.name().equals(resolved);
     }
 }

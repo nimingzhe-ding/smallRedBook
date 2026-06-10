@@ -94,7 +94,7 @@ public class VideoDanmakuServiceImpl extends ServiceImpl<VideoDanmakuMapper, Vid
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "弹幕内容不能为空");
         }
         if (!canUseDanmaku(danmaku.getBlogId())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "只有视频和直播内容可以发送弹幕");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "只有视频内容可以发送弹幕");
         }
         contentModerationService.checkText("弹幕内容", danmaku.getContent());
 

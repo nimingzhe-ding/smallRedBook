@@ -1,8 +1,8 @@
-package com.hmdp.livechat;
+package com.hmdp.privatemessage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hmdp.config.LiveChatWebSocketProperties;
-import com.hmdp.service.ILiveRoomService;
+import com.hmdp.config.PrivateMessageWebSocketProperties;
+import com.hmdp.service.IPrivateMessageService;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
@@ -17,14 +17,13 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
-public class LiveChatChannelInitializer extends ChannelInitializer<SocketChannel> {
+public class PrivateMessageChannelInitializer extends ChannelInitializer<SocketChannel> {
 
-    private final LiveChatWebSocketProperties properties;
+    private final PrivateMessageWebSocketProperties properties;
     private final StringRedisTemplate stringRedisTemplate;
-    private final ILiveRoomService liveRoomService;
     private final ObjectMapper objectMapper;
-    private final LiveChatRoomRegistry roomRegistry;
-    private final LiveChatRealtimeService realtimeService;
+    private final PrivateMessageConnectionRegistry connectionRegistry;
+    private final IPrivateMessageService privateMessageService;
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -32,13 +31,17 @@ public class LiveChatChannelInitializer extends ChannelInitializer<SocketChannel
                 .addLast(new HttpServerCodec())
                 .addLast(new HttpObjectAggregator(8192))
                 .addLast(new IdleStateHandler(properties.getReaderIdleSeconds(), 0, 0, TimeUnit.SECONDS))
-                .addLast(new LiveChatHandshakeAuthHandler(properties, stringRedisTemplate, liveRoomService))
+                .addLast(new PrivateMessageHandshakeAuthHandler(properties, stringRedisTemplate))
                 .addLast(new WebSocketServerProtocolHandler(
                         properties.getPath(),
                         null,
                         true,
                         properties.getMaxFramePayloadLength()
                 ))
-                .addLast(new LiveChatWebSocketFrameHandler(objectMapper, roomRegistry, realtimeService));
+                .addLast(new PrivateMessageWebSocketFrameHandler(
+                        objectMapper,
+                        connectionRegistry,
+                        privateMessageService
+                ));
     }
 }

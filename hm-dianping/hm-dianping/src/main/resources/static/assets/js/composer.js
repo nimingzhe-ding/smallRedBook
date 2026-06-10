@@ -243,13 +243,12 @@
 
   function applyComposerType() {
     var contentType = getComposerContentType();
-    var isVideoLike = ["VIDEO", "LIVE"].includes(contentType);
+    var isVideoLike = contentType === "VIDEO";
     var isProductNote = contentType === "PRODUCT_NOTE";
     var titles = {
       IMAGE: "发布图文",
       VIDEO: "发布视频",
-      PRODUCT_NOTE: "发布商品种草",
-      LIVE: "发布直播预告"
+      PRODUCT_NOTE: "发布商品种草"
     };
     if (els.composerTitle) {
       els.composerTitle.textContent = state.editingNoteId ? "编辑内容" : (titles[contentType] || "发布内容");
@@ -259,9 +258,7 @@
       field.hidden = (scope === "video" && !isVideoLike) || (scope === "shop" && !isProductNote);
     });
     if (els.videoUploadTip) {
-      els.videoUploadTip.textContent = contentType === "LIVE"
-        ? "支持直播预告视频、回放或直播地址"
-        : "支持 MP4/WebM/MOV，发布前会自动上传";
+      els.videoUploadTip.textContent = "支持 MP4/WebM/MOV，发布前会自动上传";
     }
     var shopInput = els.composerForm.elements.shopId;
     if (shopInput) {
@@ -320,7 +317,7 @@
     submitButton.textContent = "发布中";
     try {
       var contentType = getComposerContentType();
-      var isVideoLike = ["VIDEO", "LIVE"].includes(contentType);
+      var isVideoLike = contentType === "VIDEO";
       var isProductNote = contentType === "PRODUCT_NOTE";
       submitButton.textContent = "上传素材中";
       var uploaded = await uploadSelectedImages();
@@ -341,7 +338,7 @@
         return;
       }
       if (isVideoLike && !videoUrl) {
-        showStatus(contentType === "LIVE" ? "直播预告需要填写直播地址或上传预告视频。" : "视频内容需要上传视频或填写视频地址。");
+        showStatus("视频内容需要上传视频或填写视频地址。");
         saveComposerDraft(true);
         return;
       }

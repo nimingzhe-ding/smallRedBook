@@ -127,7 +127,7 @@ VALUES
   (900403, 9004, '浴室无痕置物架', '免打孔，瓶瓶罐罐不再堆台面', 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=900&q=80', 4990, 7900, 96, 188, 'home', 5, 501, '双层 / 免打孔 / 承重 8kg', 1, 45, 32, 118),
   (900501, 9005, '桌面无线充电支架', '边充边看消息，适合办公桌', 'https://images.unsplash.com/photo-1616410011236-7a42121dd981?auto=format&fit=crop&w=900&q=80', 12900, 16900, 70, 176, 'digital', 4, 401, '15W / 可折叠 / 黑白双色', 1, 48, 54, 173),
   (900502, 9005, '便携蓝牙键盘', '轻薄静音，咖啡店办公友好', 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=900&q=80', 15900, 21900, 54, 141, 'digital', 4, 402, '蓝牙双模 / 静音 / 便携', 1, 47, 42, 150),
-  (900503, 9005, '手机三脚架自拍杆', '视频、直播、探店都能用', 'https://images.unsplash.com/photo-1520390138845-fd2d229dd553?auto=format&fit=crop&w=900&q=80', 8990, 12900, 88, 265, 'gear', 4, 401, '1.4m / 蓝牙遥控 / 稳定云台', 1, 46, 77, 220),
+  (900503, 9005, '手机三脚架自拍杆', '视频、拍摄、探店都能用', 'https://images.unsplash.com/photo-1520390138845-fd2d229dd553?auto=format&fit=crop&w=900&q=80', 8990, 12900, 88, 265, 'gear', 4, 401, '1.4m / 蓝牙遥控 / 稳定云台', 1, 46, 77, 220),
   (900504, 9005, '桌面理线磁吸夹', '数据线不再掉到桌子后面', 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80', 2990, 4900, 210, 390, 'digital', 4, 401, '6 枚装 / 磁吸 / 多色', 1, 45, 38, 132)
 ON DUPLICATE KEY UPDATE
   `merchant_id` = VALUES(`merchant_id`),
@@ -181,7 +181,7 @@ VALUES
   (900016, 9004, 0, '托特包能不能通勤，看这 5 个细节', 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80', NULL, 'PRODUCT_NOTE', '包包,通勤,穿搭', '底部是否定型、肩带宽度、内袋数量、拉链和重量，决定能不能天天背。', 456, 18, 0, NOW() - INTERVAL 8 HOUR),
   (900017, 9005, 0, '浴室台面清空之后，早上真的快了 5 分钟', 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=900&q=80', 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', 'VIDEO', '家居,浴室收纳,清洁', '把洗漱、护肤、清洁分层放，湿区尽量上墙，水渍少很多。', 388, 20, 0, NOW() - INTERVAL 9 HOUR),
   (900018, 9002, 0, '短途出差我只带一个透明收纳袋', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80', 'https://www.w3schools.com/html/mov_bbb.mp4', 'VIDEO', '旅行收纳,出差,好物', '证件、充电线、护肤小样放一起，安检和酒店入住都不慌。', 501, 27, 0, NOW() - INTERVAL 10 HOUR),
-  (900019, 9007, 0, '手机三脚架不是智商税，前提是你会这样用', 'https://images.unsplash.com/photo-1520390138845-fd2d229dd553?auto=format&fit=crop&w=900&q=80', 'https://media.w3.org/2010/05/bunny/trailer.mp4', 'VIDEO', '拍摄,直播,数码', '拍开箱、做菜、探店延时都能用，重点是高度和夹具稳定。', 604, 37, 0, NOW() - INTERVAL 11 HOUR),
+  (900019, 9007, 0, '手机三脚架不是智商税，前提是你会这样用', 'https://images.unsplash.com/photo-1520390138845-fd2d229dd553?auto=format&fit=crop&w=900&q=80', 'https://media.w3.org/2010/05/bunny/trailer.mp4', 'VIDEO', '拍摄,视频,数码', '拍开箱、做菜、探店延时都能用，重点是高度和夹具稳定。', 604, 37, 0, NOW() - INTERVAL 11 HOUR),
   (900020, 9008, 5, '火锅后怎么清爽收尾：我会点这几样', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80', NULL, 'IMAGE', '火锅,晚餐,探店', '番茄锅底、蔬菜拼盘、冰粉和无糖茶，比一顿全肉舒服很多。', 312, 14, 0, NOW() - INTERVAL 12 HOUR),
   (900021, 9006, 0, '周末城市漫游包：轻一点才走得远', 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80', NULL, 'PRODUCT_NOTE', '城市漫游,旅行,包包', '相机、薄外套、雨伞、水杯和充电宝，包本身一定要轻。', 436, 22, 0, NOW() - INTERVAL 13 HOUR),
   (900022, 9005, 0, '香氛蜡烛怎么选不踩雷：先看空间大小', 'https://images.unsplash.com/photo-1602874801007-5f01c3f83d76?auto=format&fit=crop&w=900&q=80', NULL, 'PRODUCT_NOTE', '香氛,家居,睡前仪式', '卧室适合低扩香，客厅可以更明亮，第一次买别选太甜。', 377, 16, 0, NOW() - INTERVAL 14 HOUR),

@@ -1,7 +1,10 @@
-package com.hmdp.livechat;
+package com.hmdp.privatemessage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.dto.PrivateMessageRequest;
+import com.hmdp.dto.UserDTO;
 import com.hmdp.exception.BusinessException;
+import com.hmdp.service.IPrivateMessageService;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
@@ -17,19 +20,19 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Map;
 
 @Slf4j
-public class LiveChatWebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
+public class PrivateMessageWebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
 
     private final ObjectMapper objectMapper;
-    private final LiveChatRoomRegistry roomRegistry;
-    private final LiveChatRealtimeService realtimeService;
+    private final PrivateMessageConnectionRegistry connectionRegistry;
+    private final IPrivateMessageService privateMessageService;
 
-    public LiveChatWebSocketFrameHandler(
+    public PrivateMessageWebSocketFrameHandler(
             ObjectMapper objectMapper,
-            LiveChatRoomRegistry roomRegistry,
-            LiveChatRealtimeService realtimeService) {
+            PrivateMessageConnectionRegistry connectionRegistry,
+            IPrivateMessageService privateMessageService) {
         this.objectMapper = objectMapper;
-        this.roomRegistry = roomRegistry;
-        this.realtimeService = realtimeService;
+        this.connectionRegistry = connectionRegistry;
+        this.privateMessageService = privateMessageService;
     }
 
     @Override
@@ -49,32 +52,35 @@ public class LiveChatWebSocketFrameHandler extends SimpleChannelInboundHandler<W
             sendError(ctx, 400, "unsupported websocket frame");
             return;
         }
-
+        UserDTO user = ctx.channel().attr(PrivateMessageChannelAttrs.USER).get();
+        if (user == null || user.getId() == null) {
+            sendError(ctx, 401, "login required");
+            ctx.close();
+            return;
+        }
         try {
-            LiveChatInboundMessage message = objectMapper.readValue(textFrame.text(), LiveChatInboundMessage.class);
-            realtimeService.handleIncoming(ctx.channel(), message);
+            PrivateMessageInboundMessage inbound =
+                    objectMapper.readValue(textFrame.text(), PrivateMessageInboundMessage.class);
+            PrivateMessageRequest request = new PrivateMessageRequest();
+            request.setRequestId(inbound.getRequestId());
+            request.setContent(inbound.getContent());
+            privateMessageService.sendMessageFromUser(inbound.getConversationId(), user.getId(), request);
         } catch (BusinessException e) {
             sendError(ctx, e.getCode(), e.getMessage());
         } catch (Exception e) {
-            log.warn("Handle live chat websocket frame failed", e);
-            sendError(ctx, 400, "invalid live chat message");
+            log.warn("Handle private message websocket frame failed", e);
+            sendError(ctx, 400, "invalid private message");
         }
-    }
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        roomRegistry.leave(ctx.channel());
-        super.channelInactive(ctx);
     }
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete) {
-            Long roomId = ctx.channel().attr(LiveChatChannelAttrs.ROOM_ID).get();
-            if (roomId != null) {
-                int roomSize = roomRegistry.join(roomId, ctx.channel());
+            UserDTO user = ctx.channel().attr(PrivateMessageChannelAttrs.USER).get();
+            if (user != null && user.getId() != null) {
+                int connections = connectionRegistry.bind(user.getId(), ctx.channel());
                 ctx.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(
-                        Map.of("type", "connected", "roomId", roomId, "roomSize", roomSize)
+                        Map.of("type", "connected", "userId", user.getId(), "connections", connections)
                 )));
             }
             return;
@@ -88,16 +94,22 @@ public class LiveChatWebSocketFrameHandler extends SimpleChannelInboundHandler<W
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.warn("Live chat websocket channel exception", cause);
-        roomRegistry.leave(ctx.channel());
-        ctx.close();
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        connectionRegistry.unbind(ctx.channel());
+        super.channelInactive(ctx);
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        roomRegistry.leave(ctx.channel());
+        connectionRegistry.unbind(ctx.channel());
         super.handlerRemoved(ctx);
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        log.warn("Private message websocket channel exception", cause);
+        connectionRegistry.unbind(ctx.channel());
+        ctx.close();
     }
 
     private void sendError(ChannelHandlerContext ctx, int code, String message) {

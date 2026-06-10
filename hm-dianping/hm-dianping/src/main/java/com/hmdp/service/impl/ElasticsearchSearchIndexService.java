@@ -425,7 +425,7 @@ public class ElasticsearchSearchIndexService implements SearchIndexService {
 
     private boolean isVideoNote(ContentNoteDTO note) {
         String type = StrUtil.blankToDefault(note.getContentType(), "");
-        return "VIDEO".equals(type) || "LIVE".equals(type);
+        return "VIDEO".equals(type);
     }
 
     private String firstImage(String images) {

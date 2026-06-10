@@ -16,7 +16,7 @@ function renderVideoFeed() {
     <article class="video-slide" data-video-id="${note.id}">
       <video class="immersive-video" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" loop playsinline preload="metadata" ${state.videoMuted ? "muted" : ""}></video>
       <div class="danmaku-layer" data-danmaku-layer="${note.id}"></div>
-      <div class="danmaku-live-pill" data-danmaku-live="${note.id}">实时弹幕连接中</div>
+      <div class="danmaku-status-pill" data-danmaku-status="${note.id}">实时弹幕连接中</div>
       <div class="video-gradient"></div>
       <div class="video-info">
         <div class="video-author">
@@ -211,23 +211,37 @@ async function loadDanmaku(noteId) {
 function subscribeDanmaku(noteId) {
   if (!noteId || state.danmakuSourceNoteId === String(noteId)) return;
   closeDanmakuSource();
-  if (typeof EventSource === "undefined") return;
-  updateDanmakuLiveStatus(noteId, "connecting");
-  const source = new EventSource(apiUrl(`/video-danmaku/stream/${noteId}`));
-  state.danmakuSource = source;
+  if (typeof WebSocket === "undefined" || !token()) return;
+  updateDanmakuStatus(noteId, "connecting");
+  const configured = window.HMDP_DANMAKU_WS_URL;
+  const url = configured
+    ? `${configured}${configured.includes("?") ? "&" : "?"}videoId=${encodeURIComponent(noteId)}&token=${encodeURIComponent(token())}`
+    : `${wsUrl("/ws/danmaku", 8090)}?videoId=${encodeURIComponent(noteId)}&token=${encodeURIComponent(token())}`;
+  const socket = new WebSocket(url);
+  state.danmakuSource = socket;
   state.danmakuSourceNoteId = String(noteId);
-  source.onopen = () => updateDanmakuLiveStatus(noteId, "open");
-  source.addEventListener("danmaku", event => {
+  socket.onopen = () => updateDanmakuStatus(noteId, "open");
+  socket.onmessage = event => {
     try {
-      receiveRealtimeDanmaku(noteId, JSON.parse(event.data));
+      const data = JSON.parse(event.data);
+      if (data.type === "connected") {
+        updateDanmakuStatus(noteId, "open");
+        return;
+      }
+      if (data.type === "error") {
+        showStatus(data.message || "弹幕连接异常。");
+        return;
+      }
+      receiveRealtimeDanmaku(noteId, data);
     } catch {
       // Ignore malformed events; HTTP history remains the source of truth.
     }
-  });
-  source.onerror = () => {
-    updateDanmakuLiveStatus(noteId, "offline");
+  };
+  socket.onerror = () => {
+    updateDanmakuStatus(noteId, "offline");
     closeDanmakuSource();
   };
+  socket.onclose = () => updateDanmakuStatus(noteId, "offline");
 }
 
 function closeDanmakuSource() {
@@ -239,15 +253,16 @@ function closeDanmakuSource() {
 }
 
 function receiveRealtimeDanmaku(noteId, item) {
-  if (!item || item.id == null) return;
+  if (!item || !item.content) return;
   const key = String(noteId);
   const list = state.danmakuStore[key] || [];
-  if (list.some(existing => String(existing.id) === String(item.id))) {
+  const identity = danmakuIdentity(item);
+  if (list.some(existing => danmakuIdentity(existing) === identity)) {
     return;
   }
   list.push(item);
   state.danmakuStore[key] = dedupeDanmaku(list);
-  updateDanmakuLiveStatus(noteId, "open");
+  updateDanmakuStatus(noteId, "open");
   const slide = activeVideoSlide(noteId);
   const video = slide?.querySelector("video");
   const currentSecond = Math.floor(video?.currentTime || 0);
@@ -258,13 +273,13 @@ function receiveRealtimeDanmaku(noteId, item) {
   }
 }
 
-function updateDanmakuLiveStatus(noteId, status) {
+function updateDanmakuStatus(noteId, status) {
   const text = {
     connecting: "实时弹幕连接中",
     open: "实时弹幕已开启",
     offline: "实时弹幕已断开"
   }[status] || "实时弹幕";
-  document.querySelectorAll(`[data-danmaku-live="${CSS.escape(String(noteId))}"]`).forEach(item => {
+  document.querySelectorAll(`[data-danmaku-status="${CSS.escape(String(noteId))}"]`).forEach(item => {
     item.textContent = text;
     item.dataset.status = status;
   });
@@ -273,11 +288,19 @@ function updateDanmakuLiveStatus(noteId, status) {
 function dedupeDanmaku(list) {
   const seen = new Set();
   return list.filter(item => {
-    const id = item && item.id != null ? String(item.id) : `${item.content}:${item.videoSecond}:${item.lane}`;
+    const id = danmakuIdentity(item);
     if (seen.has(id)) return false;
     seen.add(id);
     return true;
   });
+}
+
+function danmakuIdentity(item) {
+  if (!item) return "";
+  if (item.id != null) return `id:${item.id}`;
+  if (item.messageId != null) return `message:${item.messageId}`;
+  if (item.requestId) return `request:${item.requestId}`;
+  return `content:${item.content}:${item.videoSecond}:${item.lane}`;
 }
 
 function activeVideoSlide(noteId) {
@@ -431,23 +454,27 @@ async function submitDanmaku(event) {
   const slide = form.closest(".video-slide");
   const video = slide?.querySelector("video");
   const currentSecond = Math.max(0, Math.floor(video?.currentTime || 0));
+  const requestId = `dm-${noteId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const payload = {
-    blogId: Number(noteId),
+    requestId,
     content: text,
     videoSecond: currentSecond,
     lane: Math.floor(Math.random() * 5),
   };
   try {
-    const saved = await request("/video-danmaku", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    subscribeDanmaku(noteId);
+    const socket = state.danmakuSource;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      throw new Error("弹幕连接中，请稍后再发。");
+    }
+    socket.send(JSON.stringify(payload));
+    const saved = { ...payload, videoId: Number(noteId) };
     const list = state.danmakuStore[noteId] || [];
-    list.push(saved || payload);
-    state.danmakuStore[noteId] = list;
+    list.push(saved);
+    state.danmakuStore[noteId] = dedupeDanmaku(list);
     input.value = "";
     const layer = slide?.querySelector(`[data-danmaku-layer="${CSS.escape(String(noteId))}"]`);
-    if (layer) shootDanmaku(layer, text, payload.lane, saved?.id);
+    if (layer) shootDanmaku(layer, text, payload.lane, null);
   } catch (error) {
     showStatus(error.message || "弹幕发送失败。");
   }
@@ -718,7 +745,7 @@ function openVideoFullscreen(note, options = {}) {
     <article class="video-slide video-fullscreen-slide" data-video-id="${noteId}">
       <video class="immersive-video video-fullscreen-player" src="${normalizeMedia(note.videoUrl)}" poster="${normalizeImage(note.image)}" autoplay playsinline preload="metadata" ${state.videoMuted ? "muted" : ""}></video>
       <div class="danmaku-layer video-fullscreen-danmaku" data-danmaku-layer="${noteId}"></div>
-      <div class="danmaku-live-pill video-fullscreen-live" data-danmaku-live="${noteId}">实时弹幕连接中</div>
+      <div class="danmaku-status-pill video-fullscreen-status" data-danmaku-status="${noteId}">实时弹幕连接中</div>
       <div class="video-gradient"></div>
       <button class="video-fullscreen-close" type="button" aria-label="退出全屏">退出</button>
       <button class="video-fullscreen-sound" type="button" data-video-mute="${noteId}" aria-label="${state.videoMuted ? "打开声音" : "静音"}">${state.videoMuted ? "静音" : "声音"}</button>
@@ -853,7 +880,7 @@ window.loadDanmaku = loadDanmaku;
 window.subscribeDanmaku = subscribeDanmaku;
 window.closeDanmakuSource = closeDanmakuSource;
 window.receiveRealtimeDanmaku = receiveRealtimeDanmaku;
-window.updateDanmakuLiveStatus = updateDanmakuLiveStatus;
+window.updateDanmakuStatus = updateDanmakuStatus;
 window.dedupeDanmaku = dedupeDanmaku;
 window.renderDanmaku = renderDanmaku;
 window.activeVideoSlide = activeVideoSlide;

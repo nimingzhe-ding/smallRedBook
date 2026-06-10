@@ -256,7 +256,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             throw new BusinessException(ErrorCode.BAD_REQUEST, "内容包含不友善表达，请修改后再发布");
         }
         contentModerationService.checkText("笔记内容", blog.getTitle(), blog.getContent(), blog.getTags());
-        boolean videoNote = ContentType.VIDEO.name().equals(contentType) || ContentType.LIVE.name().equals(contentType);
+        boolean videoNote = ContentType.VIDEO.name().equals(contentType);
         if (videoNote && StrUtil.isBlank(blog.getVideoUrl())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "视频笔记需要上传视频或填写视频地址");
         }

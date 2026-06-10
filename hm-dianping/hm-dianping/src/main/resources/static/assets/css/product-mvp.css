@@ -555,7 +555,7 @@ body {
   font-weight: 900;
 }
 
-.danmaku-live-pill {
+.danmaku-status-pill {
   position: absolute;
   top: 14px;
   left: 16px;
@@ -573,7 +573,7 @@ body {
   pointer-events: none;
 }
 
-.danmaku-live-pill::before {
+.danmaku-status-pill::before {
   content: "";
   width: 6px;
   height: 6px;
@@ -582,15 +582,15 @@ body {
   background: #fbbf24;
 }
 
-.danmaku-live-pill[data-status="open"]::before {
+.danmaku-status-pill[data-status="open"]::before {
   background: #22c55e;
 }
 
-.danmaku-live-pill[data-status="offline"]::before {
+.danmaku-status-pill[data-status="offline"]::before {
   background: #a1a1aa;
 }
 
-.video-fullscreen-live {
+.video-fullscreen-status {
   top: max(54px, calc(env(safe-area-inset-top, 0) + 48px));
   left: 14px;
 }
@@ -2620,7 +2620,7 @@ body {
   backdrop-filter: blur(14px);
 }
 
-.video-fullscreen-live {
+.video-fullscreen-status {
   max-width: 168px;
   min-height: 24px;
   overflow: hidden;

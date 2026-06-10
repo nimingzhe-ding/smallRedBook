@@ -416,6 +416,122 @@ async function loadDmConversations(options = {}) {
 }
 window.loadDmConversations = loadDmConversations;
 
+function connectPrivateMessageSocket(force = false) {
+  const currentToken = token();
+  if (!currentToken || typeof WebSocket === "undefined") return null;
+  const current = state.privateMessageSocket;
+  const reusable = current
+    && [WebSocket.CONNECTING, WebSocket.OPEN].includes(current.readyState)
+    && state.privateMessageSocketToken === currentToken;
+  if (!force && reusable) return current;
+  closePrivateMessageSocket();
+  state.privateMessageManualClose = false;
+  state.privateMessageSocketToken = currentToken;
+  const configured = window.HMDP_PRIVATE_MESSAGE_WS_URL || localStorage.getItem("hmdp_private_message_ws_url") || "";
+  const socketUrl = new URL(configured || wsUrl("/ws/messages", 8091), location.href);
+  if (socketUrl.protocol === "http:") socketUrl.protocol = "ws:";
+  if (socketUrl.protocol === "https:") socketUrl.protocol = "wss:";
+  socketUrl.searchParams.set("token", currentToken);
+  const socket = new WebSocket(socketUrl.toString());
+  state.privateMessageSocket = socket;
+  socket.onmessage = handlePrivateMessageSocketEvent;
+  socket.onclose = () => {
+    if (state.privateMessageSocket === socket) state.privateMessageSocket = null;
+    if (!state.privateMessageManualClose && token() && state.mode === "messages") {
+      schedulePrivateMessageReconnect();
+    }
+  };
+  socket.onerror = () => {};
+  return socket;
+}
+window.connectPrivateMessageSocket = connectPrivateMessageSocket;
+
+function closePrivateMessageSocket() {
+  state.privateMessageManualClose = true;
+  if (state.privateMessageReconnectTimer) clearTimeout(state.privateMessageReconnectTimer);
+  state.privateMessageReconnectTimer = null;
+  const socket = state.privateMessageSocket;
+  state.privateMessageSocket = null;
+  if (socket && typeof WebSocket !== "undefined" && [WebSocket.CONNECTING, WebSocket.OPEN].includes(socket.readyState)) {
+    socket.onclose = null;
+    socket.close();
+  }
+}
+window.closePrivateMessageSocket = closePrivateMessageSocket;
+
+function schedulePrivateMessageReconnect() {
+  if (state.privateMessageReconnectTimer) return;
+  state.privateMessageReconnectTimer = setTimeout(() => {
+    state.privateMessageReconnectTimer = null;
+    if (state.mode === "messages" && token()) connectPrivateMessageSocket(true);
+  }, 3000);
+}
+window.schedulePrivateMessageReconnect = schedulePrivateMessageReconnect;
+
+function handlePrivateMessageSocketEvent(event) {
+  let payload = null;
+  try {
+    payload = JSON.parse(event.data || "{}");
+  } catch {
+    return;
+  }
+  if (payload.type === "private_message") {
+    appendRealtimeDmMessage(payload.message, payload.requestId);
+    return;
+  }
+  if (payload.type === "error" && payload.message) {
+    showStatus(payload.message);
+  }
+}
+window.handlePrivateMessageSocketEvent = handlePrivateMessageSocketEvent;
+
+function appendRealtimeDmMessage(message) {
+  if (!message || !message.conversationId) return;
+  const conversationId = String(message.conversationId);
+  let conversation = findDmConversation(conversationId);
+  if (conversation) {
+    conversation.lastMessageContent = message.content || conversation.lastMessageContent || "";
+    conversation.lastMessageTime = message.createTime || conversation.lastMessageTime || new Date().toISOString();
+    conversation.updatedAt = conversation.lastMessageTime;
+    if (String(state.activeDmId || "") !== conversationId && !message.isMe) {
+      conversation.unreadCount = Number(conversation.unreadCount || 0) + 1;
+    }
+    state.dmConversations = [
+      conversation,
+      ...state.dmConversations.filter(item => String(item.id) !== conversationId)
+    ];
+  } else {
+    loadDmConversations({ silent: true });
+  }
+  if (String(state.activeDmId || "") === conversationId) {
+    if (!state.dmMessages.some(item => sameDmMessage(item, message))) {
+      state.dmMessages.push(message);
+    }
+    if (conversation) {
+      conversation.unreadCount = 0;
+      state.activeDmConversation = conversation;
+    }
+    request(`/messages/conversations/${conversationId}/read`, { method: "POST" })
+      .then(refreshNotificationBadge)
+      .catch(() => {});
+    renderDmThread();
+  } else {
+    renderDmConversations();
+    refreshNotificationBadge();
+  }
+}
+window.appendRealtimeDmMessage = appendRealtimeDmMessage;
+
+function sameDmMessage(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id) return String(a.id) === String(b.id);
+  return String(a.conversationId) === String(b.conversationId)
+    && String(a.senderId) === String(b.senderId)
+    && String(a.createTime || "") === String(b.createTime || "")
+    && String(a.content || "") === String(b.content || "");
+}
+window.sameDmMessage = sameDmMessage;
+
 function switchMessageMode(mode) {
   state.messageMode = mode === "notifications" ? "notifications" : "dm";
   els.messageArea?.classList.toggle("is-notification-mode", state.messageMode === "notifications");
@@ -425,6 +541,7 @@ function switchMessageMode(mode) {
   if (els.dmPane) els.dmPane.hidden = state.messageMode !== "dm";
   if (els.notificationPane) els.notificationPane.hidden = state.messageMode !== "notifications";
   if (state.messageMode === "dm") {
+    connectPrivateMessageSocket();
     startMessagePolling();
     if (state.activeDmId) startDmThreadPolling();
   } else {
@@ -521,10 +638,21 @@ window.loadDmThread = loadDmThread;
 async function sendDmMessage(text) {
   const value = String(text || "").trim();
   if (!value || !state.activeDmId) return;
+  const requestId = `pm-${state.activeDmId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   try {
+    const socket = connectPrivateMessageSocket();
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        requestId,
+        conversationId: Number(state.activeDmId),
+        content: value
+      }));
+      if (els.dmInput) els.dmInput.value = "";
+      return;
+    }
     await request(`/messages/conversations/${state.activeDmId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content: value })
+      body: JSON.stringify({ requestId, content: value })
     });
     if (els.dmInput) els.dmInput.value = "";
     await Promise.all([loadDmThread({ silent: true }), loadDmConversations({ silent: true })]);
@@ -621,6 +749,7 @@ window.closeDmMobileChat = closeDmMobileChat;
 
 function startMessagePolling() {
   if (!token() || state.mode !== "messages") return;
+  connectPrivateMessageSocket();
   if (!state.messagePollTimer) {
     state.messagePollTimer = setInterval(() => {
       if (state.mode === "messages") loadDmConversations({ silent: true });
@@ -634,6 +763,7 @@ function stopMessagePolling() {
   if (state.messagePollTimer) clearInterval(state.messagePollTimer);
   state.messagePollTimer = null;
   stopDmThreadPolling();
+  closePrivateMessageSocket();
 }
 window.stopMessagePolling = stopMessagePolling;
 

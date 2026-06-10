@@ -18,6 +18,7 @@ import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.mapper.PrivateConversationMapper;
 import com.hmdp.mapper.PrivateMessageMapper;
+import com.hmdp.privatemessage.PrivateMessageWebSocketPushService;
 import com.hmdp.service.IPrivateMessageService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
@@ -46,6 +47,8 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     private PrivateConversationMapper conversationMapper;
     @Resource
     private IUserService userService;
+    @Resource
+    private PrivateMessageWebSocketPushService messagePushService;
 
     @Override
     public Result conversations() {
@@ -104,6 +107,19 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     @Transactional
     public Result sendMessage(Long conversationId, PrivateMessageRequest request) {
         Long userId = requireUserId();
+        return Result.ok(doSendMessage(conversationId, userId, request));
+    }
+
+    @Override
+    @Transactional
+    public PrivateMessageDTO sendMessageFromUser(Long conversationId, Long senderId, PrivateMessageRequest request) {
+        if (senderId == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        }
+        return doSendMessage(conversationId, senderId, request);
+    }
+
+    private PrivateMessageDTO doSendMessage(Long conversationId, Long userId, PrivateMessageRequest request) {
         PrivateConversation conversation = requireConversation(conversationId, userId);
         String content = StrUtil.trim(request == null ? null : request.getContent());
         if (StrUtil.isBlank(content)) {
@@ -132,7 +148,10 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
                         ? "low_unread_count = low_unread_count + 1"
                         : "high_unread_count = high_unread_count + 1");
         conversationMapper.update(null, update);
-        return Result.ok(toMessageDTO(message, userId));
+        PrivateMessageDTO senderView = toMessageDTO(message, userId);
+        PrivateMessageDTO receiverView = toMessageDTO(message, receiverId);
+        messagePushService.pushMessage(request == null ? null : request.getRequestId(), senderView, receiverView);
+        return senderView;
     }
 
     @Override

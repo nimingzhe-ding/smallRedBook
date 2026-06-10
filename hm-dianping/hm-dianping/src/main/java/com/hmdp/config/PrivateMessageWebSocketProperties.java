@@ -6,13 +6,12 @@ import org.springframework.stereotype.Component;
 
 @Data
 @Component
-@ConfigurationProperties(prefix = "hmdp.live-chat.websocket")
-public class LiveChatWebSocketProperties {
+@ConfigurationProperties(prefix = "hmdp.private-message.websocket")
+public class PrivateMessageWebSocketProperties {
 
     private boolean enabled = true;
     private int port = 8091;
-    private String path = "/ws/live-chat";
+    private String path = "/ws/messages";
     private int readerIdleSeconds = 75;
-    private int maxFramePayloadLength = 1024;
-    private int persistenceThreads = 2;
+    private int maxFramePayloadLength = 2048;
 }

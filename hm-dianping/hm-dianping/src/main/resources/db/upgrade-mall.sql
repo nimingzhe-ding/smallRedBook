@@ -143,7 +143,7 @@ CALL add_column_if_missing('tb_voucher', 'product_id', '`product_id` bigint UNSI
 CALL add_index_if_missing('tb_voucher', 'idx_mall_voucher', 'ADD INDEX `idx_mall_voucher` (`merchant_id`, `product_id`, `status`)');
 
 CALL add_column_if_missing('tb_blog', 'video_url', '`video_url` varchar(1024) NULL COMMENT ''视频笔记地址'' AFTER `images`');
-CALL add_column_if_missing('tb_blog', 'content_type', '`content_type` varchar(32) NOT NULL DEFAULT ''IMAGE'' COMMENT ''内容类型：IMAGE/VIDEO/LIVE/PRODUCT_NOTE'' AFTER `video_url`');
+CALL add_column_if_missing('tb_blog', 'content_type', '`content_type` varchar(32) NOT NULL DEFAULT ''IMAGE'' COMMENT ''内容类型：IMAGE/VIDEO/PRODUCT_NOTE'' AFTER `video_url`');
 CALL add_index_if_missing('tb_blog', 'idx_blog_content_type', 'ADD INDEX `idx_blog_content_type` (`content_type`, `create_time`)');
 
 UPDATE `tb_blog`

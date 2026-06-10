@@ -1,6 +1,6 @@
-package com.hmdp.livechat;
+package com.hmdp.privatemessage;
 
-import com.hmdp.config.LiveChatWebSocketProperties;
+import com.hmdp.config.PrivateMessageWebSocketProperties;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -16,10 +16,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class LiveChatNettyWebSocketServer {
+public class PrivateMessageNettyWebSocketServer {
 
-    private final LiveChatWebSocketProperties properties;
-    private final LiveChatChannelInitializer channelInitializer;
+    private final PrivateMessageWebSocketProperties properties;
+    private final PrivateMessageChannelInitializer channelInitializer;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -28,7 +28,7 @@ public class LiveChatNettyWebSocketServer {
     @PostConstruct
     public void start() throws InterruptedException {
         if (!properties.isEnabled()) {
-            log.info("Live chat Netty websocket server is disabled");
+            log.info("Private message Netty websocket server is disabled");
             return;
         }
         bossGroup = new NioEventLoopGroup(1);
@@ -40,7 +40,7 @@ public class LiveChatNettyWebSocketServer {
 
         ChannelFuture future = bootstrap.bind(properties.getPort()).sync();
         serverChannel = future.channel();
-        log.info("Live chat Netty websocket server started at ws://0.0.0.0:{}{}",
+        log.info("Private message Netty websocket server started at ws://0.0.0.0:{}{}",
                 properties.getPort(), properties.getPath());
     }
 
@@ -55,6 +55,6 @@ public class LiveChatNettyWebSocketServer {
         if (workerGroup != null) {
             workerGroup.shutdownGracefully();
         }
-        log.info("Live chat Netty websocket server stopped");
+        log.info("Private message Netty websocket server stopped");
     }
 }

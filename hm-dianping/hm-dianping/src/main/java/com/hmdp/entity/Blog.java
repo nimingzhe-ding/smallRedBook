@@ -74,7 +74,7 @@ public class Blog implements Serializable {
     private String videoUrl;
 
     /**
-     * 内容类型：IMAGE、VIDEO、LIVE、PRODUCT_NOTE
+     * 内容类型：IMAGE、VIDEO、PRODUCT_NOTE
      */
     private String contentType;
 

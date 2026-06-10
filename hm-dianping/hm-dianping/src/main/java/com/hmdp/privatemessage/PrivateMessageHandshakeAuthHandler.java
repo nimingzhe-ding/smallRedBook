@@ -1,10 +1,9 @@
-package com.hmdp.livechat;
+package com.hmdp.privatemessage;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
-import com.hmdp.config.LiveChatWebSocketProperties;
+import com.hmdp.config.PrivateMessageWebSocketProperties;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.service.ILiveRoomService;
 import com.hmdp.utils.RedisConstants;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -25,19 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class LiveChatHandshakeAuthHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+public class PrivateMessageHandshakeAuthHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
-    private final LiveChatWebSocketProperties properties;
+    private final PrivateMessageWebSocketProperties properties;
     private final StringRedisTemplate stringRedisTemplate;
-    private final ILiveRoomService liveRoomService;
 
-    public LiveChatHandshakeAuthHandler(
-            LiveChatWebSocketProperties properties,
-            StringRedisTemplate stringRedisTemplate,
-            ILiveRoomService liveRoomService) {
+    public PrivateMessageHandshakeAuthHandler(
+            PrivateMessageWebSocketProperties properties,
+            StringRedisTemplate stringRedisTemplate) {
         this.properties = properties;
         this.stringRedisTemplate = stringRedisTemplate;
-        this.liveRoomService = liveRoomService;
     }
 
     @Override
@@ -47,34 +43,13 @@ public class LiveChatHandshakeAuthHandler extends SimpleChannelInboundHandler<Fu
             reject(ctx, HttpResponseStatus.NOT_FOUND, "unsupported websocket path");
             return;
         }
-
-        Long roomId = parseRoomId(decoder.parameters());
-        if (roomId == null || !liveRoomService.canChat(roomId)) {
-            reject(ctx, HttpResponseStatus.BAD_REQUEST, "live room does not exist or is not living");
-            return;
-        }
-
         UserDTO user = authenticate(request, decoder.parameters());
-        if (user == null) {
+        if (user == null || user.getId() == null) {
             reject(ctx, HttpResponseStatus.UNAUTHORIZED, "login required");
             return;
         }
-
-        ctx.channel().attr(LiveChatChannelAttrs.ROOM_ID).set(roomId);
-        ctx.channel().attr(LiveChatChannelAttrs.USER).set(user);
+        ctx.channel().attr(PrivateMessageChannelAttrs.USER).set(user);
         ctx.fireChannelRead(request.retain());
-    }
-
-    private Long parseRoomId(Map<String, List<String>> parameters) {
-        String raw = first(parameters, "roomId");
-        if (StrUtil.isBlank(raw)) {
-            return null;
-        }
-        try {
-            return Long.valueOf(raw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 
     private UserDTO authenticate(FullHttpRequest request, Map<String, List<String>> parameters) {
@@ -86,7 +61,6 @@ public class LiveChatHandshakeAuthHandler extends SimpleChannelInboundHandler<Fu
         if (StrUtil.isBlank(token)) {
             return null;
         }
-
         String key = RedisConstants.LOGIN_USER_KEY + token;
         Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(key);
         if (userMap.isEmpty()) {

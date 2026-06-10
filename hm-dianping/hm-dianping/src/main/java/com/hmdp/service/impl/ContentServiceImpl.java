@@ -614,7 +614,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             wrapper.in("user_id", followUserIds);
         }
         if ("video".equals(normalizedChannel)) {
-            wrapper.in("content_type", ContentType.VIDEO.name(), ContentType.LIVE.name());
+            wrapper.eq("content_type", ContentType.VIDEO.name());
         }
         if ("mall".equals(normalizedChannel)) {
             wrapper.and(w -> w.eq("content_type", ContentType.PRODUCT_NOTE.name())
@@ -719,7 +719,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             return false;
         }
         String contentType = StrUtil.blankToDefault(note.getContentType(), "");
-        return ContentType.VIDEO.name().equals(contentType) || ContentType.LIVE.name().equals(contentType);
+        return ContentType.VIDEO.name().equals(contentType);
     }
 
     private List<ContentNoteDTO> findRelatedNotes(Blog source) {
@@ -1427,7 +1427,7 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
         if (likes >= 100) badges.add("人气作者");
         if (collects >= 20) badges.add("收藏达人");
         if (followers >= 10) badges.add("被关注");
-        if (blogs.stream().anyMatch(blog -> ContentType.VIDEO.name().equals(blog.getContentType()) || ContentType.LIVE.name().equals(blog.getContentType()))) {
+        if (blogs.stream().anyMatch(blog -> ContentType.VIDEO.name().equals(blog.getContentType()))) {
             badges.add("视频创作者");
         }
         if (blogs.stream().anyMatch(blog -> ContentType.PRODUCT_NOTE.name().equals(blog.getContentType()))) {

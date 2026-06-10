@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS `tb_user_notification_setting` (
   UNIQUE KEY `uk_notification_setting_user` (`user_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户消息通知设置表';
 
-CALL add_column_if_missing('tb_blog', 'content_type', 'varchar(32) NOT NULL DEFAULT ''IMAGE'' COMMENT ''内容类型：IMAGE/VIDEO/LIVE/PRODUCT_NOTE'' AFTER `video_url`');
+CALL add_column_if_missing('tb_blog', 'content_type', 'varchar(32) NOT NULL DEFAULT ''IMAGE'' COMMENT ''内容类型：IMAGE/VIDEO/PRODUCT_NOTE'' AFTER `video_url`');
 CALL add_column_if_missing('tb_blog', 'tags', 'varchar(128) NULL COMMENT ''内容标签，多个标签用英文逗号分隔'' AFTER `content_type`');
 
 UPDATE `tb_blog` SET `comments` = 0 WHERE `comments` IS NULL;
@@ -166,56 +166,6 @@ CREATE TABLE IF NOT EXISTS `tb_video_play_metric` (
   KEY `idx_blog_time` (`blog_id`, `create_time`) USING BTREE,
   KEY `idx_user_blog` (`user_id`, `blog_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频播放指标表';
-
-CREATE TABLE IF NOT EXISTS `tb_live_room` (
-  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `merchant_id` bigint UNSIGNED NOT NULL COMMENT '商家id',
-  `anchor_user_id` bigint UNSIGNED NOT NULL COMMENT '主播用户id',
-  `blog_id` bigint UNSIGNED NULL COMMENT '关联内容id，回放会沉淀为视频内容',
-  `title` varchar(80) NOT NULL COMMENT '直播标题',
-  `cover_url` varchar(512) NULL COMMENT '直播封面',
-  `stream_url` varchar(512) NULL COMMENT '直播流地址',
-  `replay_video_url` varchar(512) NULL COMMENT '直播回放视频地址',
-  `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '状态：0预告，1直播中，2已结束',
-  `online_count` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '在线人数',
-  `liked` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '直播点赞数',
-  `start_time` timestamp NULL DEFAULT NULL COMMENT '开播时间',
-  `end_time` timestamp NULL DEFAULT NULL COMMENT '关播时间',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_status_time` (`status`, `start_time`, `create_time`) USING BTREE,
-  KEY `idx_merchant_time` (`merchant_id`, `create_time`) USING BTREE,
-  KEY `idx_anchor_time` (`anchor_user_id`, `create_time`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播间表';
-
-CREATE TABLE IF NOT EXISTS `tb_live_room_product` (
-  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `room_id` bigint UNSIGNED NOT NULL COMMENT '直播间id',
-  `product_id` bigint UNSIGNED NOT NULL COMMENT '商品id',
-  `sort` int NOT NULL DEFAULT 0 COMMENT '排序',
-  `explain_text` varchar(255) NULL COMMENT '商品讲解文案',
-  `explaining` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否正在讲解',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_room_product` (`room_id`, `product_id`) USING BTREE,
-  KEY `idx_product_id` (`product_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播间商品橱窗表';
-
-CREATE TABLE IF NOT EXISTS `tb_live_room_message` (
-  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `room_id` bigint UNSIGNED NOT NULL COMMENT '直播间id',
-  `user_id` bigint UNSIGNED NOT NULL COMMENT '发送用户id',
-  `type` varchar(32) NOT NULL DEFAULT 'danmaku' COMMENT '消息类型：danmaku/like/system',
-  `content` varchar(120) NOT NULL COMMENT '消息内容',
-  `liked` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '消息点赞数',
-  `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '状态：0正常，1举报，2删除',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_room_time` (`room_id`, `create_time`) USING BTREE,
-  KEY `idx_user_time` (`user_id`, `create_time`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='直播互动消息表';
 
 CALL add_column_if_missing('tb_mall_product', 'category_id', 'bigint UNSIGNED NULL COMMENT ''一级类目id'' AFTER `category`');
 CALL add_column_if_missing('tb_mall_product', 'sub_category_id', 'bigint UNSIGNED NULL COMMENT ''二级类目id'' AFTER `category_id`');

@@ -153,6 +153,10 @@ window.state = {
   dmMobileChatOpen: false,
   messagePollTimer: null,
   dmThreadPollTimer: null,
+  privateMessageSocket: null,
+  privateMessageSocketToken: null,
+  privateMessageReconnectTimer: null,
+  privateMessageManualClose: false,
   dmSearchTimer: null
 };
 
@@ -385,6 +389,15 @@ function apiUrl(url) {
 }
 window.apiUrl = apiUrl;
 
+function wsUrl(path, port) {
+  if (/^wss?:\/\//i.test(path)) return path;
+  const origin = new URL(API_ORIGIN || location.origin);
+  const protocol = origin.protocol === "https:" ? "wss:" : "ws:";
+  const host = port ? `${origin.hostname}:${port}` : origin.host;
+  return `${protocol}//${host}${path.startsWith("/") ? path : `/${path}`}`;
+}
+window.wsUrl = wsUrl;
+
 function token() {
   return localStorage.getItem("hmdp_token") || "";
 }
@@ -490,7 +503,7 @@ function normalizeNote(note, index = 0) {
     auditRemark: note.auditRemark || "",
     content: parsedContent.content,
     videoUrl,
-    isVideo: ["VIDEO", "LIVE"].includes(contentType) && Boolean(videoUrl),
+    isVideo: contentType === "VIDEO" && Boolean(videoUrl),
     isLike,
     isCollect,
     isFollow,
@@ -510,7 +523,7 @@ window.normalizeNote = normalizeNote;
 
 function normalizeContentType(contentType, videoUrl) {
   const normalized = String(contentType || "").trim().toUpperCase();
-  const supported = ["IMAGE", "VIDEO", "LIVE", "PRODUCT_NOTE"];
+  const supported = ["IMAGE", "VIDEO", "PRODUCT_NOTE"];
   if (supported.includes(normalized)) return normalized;
   return videoUrl ? "VIDEO" : "IMAGE";
 }
@@ -520,7 +533,6 @@ function contentTypeLabel(contentType) {
   return {
     IMAGE: "图文",
     VIDEO: "视频",
-    LIVE: "直播",
     PRODUCT_NOTE: "种草"
   }[contentType] || "图文";
 }

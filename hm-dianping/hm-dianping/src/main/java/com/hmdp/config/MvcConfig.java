@@ -69,8 +69,6 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/ai/customer-service/chat",
                         // 商城商品浏览（公开）
                         "/mall/products/**",
-                        // 直播公开接口
-                        "/live/public/**",
                         // 行为采集（公开，匿名也可上报）
                         "/note-event",
                         // 视频弹幕公开接口
