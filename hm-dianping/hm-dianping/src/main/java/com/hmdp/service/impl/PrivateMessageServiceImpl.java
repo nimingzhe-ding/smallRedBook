@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.dto.PrivateConversationDTO;
 import com.hmdp.dto.PrivateConversationRequest;
 import com.hmdp.dto.PrivateMessageDTO;
@@ -13,13 +14,16 @@ import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.PrivateConversation;
 import com.hmdp.entity.PrivateMessage;
+import com.hmdp.entity.PrivateMessageOutbox;
 import com.hmdp.entity.User;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.config.RequestKeySupport;
 import com.hmdp.mapper.PrivateConversationMapper;
 import com.hmdp.mapper.PrivateMessageMapper;
-import com.hmdp.privatemessage.PrivateMessageWebSocketPushService;
+import com.hmdp.mapper.PrivateMessageOutboxMapper;
+import com.hmdp.privatemessage.PrivateMessageOutboxStatus;
+import com.hmdp.privatemessage.PrivateMessagePushEvent;
 import com.hmdp.service.IPrivateMessageService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
@@ -52,9 +56,11 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     @Resource
     private IUserService userService;
     @Resource
-    private PrivateMessageWebSocketPushService messagePushService;
+    private PrivateMessageOutboxMapper outboxMapper;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private ObjectMapper objectMapper;
 
     @Override
     public Result conversations() {
@@ -156,9 +162,39 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
                         : "high_unread_count = high_unread_count + 1");
         conversationMapper.update(null, update);
         PrivateMessageDTO senderView = toMessageDTO(message, userId);
-        PrivateMessageDTO receiverView = toMessageDTO(message, receiverId);
-        messagePushService.pushMessage(request == null ? null : request.getRequestId(), senderView, receiverView);
+        savePushOutbox(message, request == null ? null : request.getRequestId());
         return senderView;
+    }
+
+    private void savePushOutbox(PrivateMessage message, String requestId) {
+        LocalDateTime now = LocalDateTime.now();
+        String eventKey = "private-message:push:message:" + message.getId();
+        PrivateMessagePushEvent event = new PrivateMessagePushEvent()
+                .setEventKey(eventKey)
+                .setMessageId(message.getId())
+                .setConversationId(message.getConversationId())
+                .setSenderId(message.getSenderId())
+                .setReceiverId(message.getReceiverId())
+                .setRequestId(requestId)
+                .setCreateTime(now);
+        try {
+            outboxMapper.insert(new PrivateMessageOutbox()
+                    .setEventKey(eventKey)
+                    .setMessageId(message.getId())
+                    .setConversationId(message.getConversationId())
+                    .setSenderId(message.getSenderId())
+                    .setReceiverId(message.getReceiverId())
+                    .setRequestId(requestId)
+                    .setPayload(objectMapper.writeValueAsString(event))
+                    .setStatus(PrivateMessageOutboxStatus.PENDING)
+                    .setRetryCount(0)
+                    .setMaxRetry(12)
+                    .setNextRetryTime(now)
+                    .setCreateTime(now)
+                    .setUpdateTime(now));
+        } catch (Exception e) {
+            throw new IllegalStateException("Create private message outbox failed, messageId=" + message.getId(), e);
+        }
     }
 
     private void ensureRequestIdempotent(Long conversationId, Long userId, PrivateMessageRequest request) {

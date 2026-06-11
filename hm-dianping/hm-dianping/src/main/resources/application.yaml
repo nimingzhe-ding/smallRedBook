@@ -84,6 +84,7 @@ hmdp:
     max-image-size: ${HMDP_UPLOAD_MAX_IMAGE_SIZE:5242880}
     max-video-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
     direct-upload-expire-minutes: ${HMDP_DIRECT_UPLOAD_EXPIRE_MINUTES:10}
+    multipart-cleanup-grace-minutes: ${HMDP_MULTIPART_CLEANUP_GRACE_MINUTES:30}
   ai:
     model: qwen-plus
     customer-service-temperature: 0.6
@@ -93,6 +94,14 @@ hmdp:
     knowledge-top-k: 3
   auth:
     debug-code-response: ${HMDP_AUTH_DEBUG_CODE_RESPONSE:true}
+  compensation:
+    enabled: ${HMDP_COMPENSATION_ENABLED:true}
+    batch-size: ${HMDP_COMPENSATION_BATCH_SIZE:20}
+    fixed-delay-millis: ${HMDP_COMPENSATION_FIXED_DELAY_MILLIS:5000}
+    max-retry: ${HMDP_COMPENSATION_MAX_RETRY:12}
+    initial-backoff-seconds: ${HMDP_COMPENSATION_INITIAL_BACKOFF_SECONDS:30}
+    max-backoff-seconds: ${HMDP_COMPENSATION_MAX_BACKOFF_SECONDS:3600}
+    lock-seconds: ${HMDP_COMPENSATION_LOCK_SECONDS:300}
   moderation:
     enabled: ${HMDP_MODERATION_ENABLED:true}
     sensitive-words: "${HMDP_SENSITIVE_WORDS:}"
@@ -139,6 +148,20 @@ hmdp:
       cache-limit: ${HMDP_DANMAKU_CACHE_LIMIT:300}
       cache-ttl-hours: ${HMDP_DANMAKU_CACHE_TTL_HOURS:48}
   private-message:
+    kafka:
+      topic: "${HMDP_PRIVATE_MESSAGE_TOPIC:private-message}"
+      dlt-topic: "${HMDP_PRIVATE_MESSAGE_DLT_TOPIC:private-message.DLT}"
+      push-consumer-group: "${HMDP_PRIVATE_MESSAGE_PUSH_CONSUMER_GROUP:private-message-push-${random.uuid}}"
+      dlt-consumer-group: "${HMDP_PRIVATE_MESSAGE_DLT_CONSUMER_GROUP:private-message-dlt-compensation-group}"
+      partitions: ${HMDP_PRIVATE_MESSAGE_PARTITIONS:3}
+      replicas: ${HMDP_PRIVATE_MESSAGE_REPLICAS:1}
+      listener-concurrency: ${HMDP_PRIVATE_MESSAGE_CONCURRENCY:3}
+      outbox-batch-size: ${HMDP_PRIVATE_MESSAGE_OUTBOX_BATCH_SIZE:100}
+      outbox-fixed-delay-millis: ${HMDP_PRIVATE_MESSAGE_OUTBOX_FIXED_DELAY_MILLIS:1000}
+      outbox-max-retry: ${HMDP_PRIVATE_MESSAGE_OUTBOX_MAX_RETRY:12}
+      outbox-initial-backoff-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_INITIAL_BACKOFF_SECONDS:5}
+      outbox-max-backoff-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_MAX_BACKOFF_SECONDS:300}
+      outbox-lock-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_LOCK_SECONDS:120}
     websocket:
       enabled: ${HMDP_PRIVATE_MESSAGE_WS_ENABLED:true}
       port: ${HMDP_PRIVATE_MESSAGE_WS_PORT:8091}

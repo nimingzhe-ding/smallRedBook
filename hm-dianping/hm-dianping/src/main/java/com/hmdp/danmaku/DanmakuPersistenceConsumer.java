@@ -1,8 +1,10 @@
 package com.hmdp.danmaku;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.compensation.CompensationEventTypes;
 import com.hmdp.config.DanmakuKafkaProperties;
 import com.hmdp.entity.VideoDanmaku;
+import com.hmdp.service.CompensationEventService;
 import com.hmdp.service.IVideoDanmakuService;
 import com.hmdp.service.impl.VideoDanmakuServiceImpl;
 import com.hmdp.utils.RedisConstants;
@@ -19,7 +21,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -32,6 +37,7 @@ public class DanmakuPersistenceConsumer {
     private final StringRedisTemplate stringRedisTemplate;
     private final DanmakuKafkaProperties properties;
     private final TransactionTemplate transactionTemplate;
+    private final CompensationEventService compensationEventService;
 
     @KafkaListener(
             topics = "${hmdp.danmaku.kafka.topic:video-danmaku}",
@@ -62,6 +68,35 @@ public class DanmakuPersistenceConsumer {
         List<VideoDanmaku> entities = events.stream().map(this::toEntity).toList();
         transactionTemplate.executeWithoutResult(status -> videoDanmakuService.saveBatch(entities));
         cacheSavedDanmaku(events, entities);
+        acknowledgment.acknowledge();
+    }
+
+    @KafkaListener(
+            topics = "${hmdp.danmaku.kafka.dlt-topic:video-danmaku.DLT}",
+            groupId = "video-danmaku-dlt-compensation-group",
+            containerFactory = "danmakuKafkaListenerContainerFactory"
+    )
+    public void handleDanmakuDltMessages(List<ConsumerRecord<String, String>> records, Acknowledgment acknowledgment) {
+        if (records == null || records.isEmpty()) {
+            acknowledgment.acknowledge();
+            return;
+        }
+        for (ConsumerRecord<String, String> record : records) {
+            try {
+                DanmakuEvent event = objectMapper.readValue(record.value(), DanmakuEvent.class);
+                compensationEventService.record(
+                        CompensationEventTypes.DANMAKU_KAFKA_PERSIST,
+                        "DANMAKU",
+                        String.valueOf(event.getVideoId()),
+                        danmakuPersistKey(event, record),
+                        event,
+                        "Danmaku Kafka message entered DLT"
+                );
+            } catch (Exception e) {
+                log.error("Skip invalid danmaku DLT message, topic={}, partition={}, offset={}, payload={}",
+                        record.topic(), record.partition(), record.offset(), record.value(), e);
+            }
+        }
         acknowledgment.acknowledge();
     }
 
@@ -99,7 +134,34 @@ public class DanmakuPersistenceConsumer {
             }
         } catch (Exception e) {
             log.warn("Update danmaku Redis ZSet failed after database batch save", e);
+            Set<Long> blogIds = new LinkedHashSet<>();
+            for (DanmakuEvent event : events) {
+                Long blogId = event.getVideoId() == null ? event.getBlogId() : event.getVideoId();
+                if (blogId != null) {
+                    blogIds.add(blogId);
+                }
+            }
+            for (Long blogId : blogIds) {
+                compensationEventService.record(
+                        CompensationEventTypes.DANMAKU_REDIS_ZSET_REFRESH,
+                        "DANMAKU",
+                        String.valueOf(blogId),
+                        "danmaku:redis-zset:refresh:" + blogId,
+                        Map.of("blogId", blogId),
+                        e.getMessage()
+                );
+            }
         }
+    }
+
+    private String danmakuPersistKey(DanmakuEvent event, ConsumerRecord<String, String> record) {
+        if (event.getRequestId() != null && !event.getRequestId().isBlank()) {
+            return "danmaku:persist:request:" + event.getRequestId();
+        }
+        if (event.getMessageId() != null) {
+            return "danmaku:persist:message:" + event.getMessageId();
+        }
+        return "danmaku:persist:kafka:" + record.topic() + ":" + record.partition() + ":" + record.offset();
     }
 
     private void trimCache(String key) {

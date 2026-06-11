@@ -3,6 +3,7 @@ package com.hmdp.controller;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.annotation.Idempotent;
 import com.hmdp.annotation.SlidingWindowRateLimit;
+import com.hmdp.compensation.CompensationEventTypes;
 import com.hmdp.dto.CompleteUploadRequest;
 import com.hmdp.dto.DirectUploadRequest;
 import com.hmdp.dto.DirectUploadResult;
@@ -18,6 +19,7 @@ import com.hmdp.dto.UploadResult;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.enums.RateLimitScope;
 import com.hmdp.exception.BusinessException;
+import com.hmdp.service.CompensationEventService;
 import com.hmdp.service.storage.FileStorageService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +33,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -51,6 +56,8 @@ public class UploadController {
 
     @Resource
     private FileStorageService fileStorageService;
+    @Resource
+    private CompensationEventService compensationEventService;
 
     @Value("${hmdp.upload.max-image-size:5242880}")
     private long maxImageSize;
@@ -60,6 +67,9 @@ public class UploadController {
 
     @Value("${hmdp.upload.direct-upload-expire-minutes:10}")
     private long directUploadExpireMinutes;
+
+    @Value("${hmdp.upload.multipart-cleanup-grace-minutes:30}")
+    private long multipartCleanupGraceMinutes;
 
     @PostMapping("note")
     @SlidingWindowRateLimit(key = "upload:image", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
@@ -188,6 +198,7 @@ public class UploadController {
                 partSize,
                 Duration.ofMinutes(Math.max(1, directUploadExpireMinutes))
         );
+        registerMultipartAbortCompensation(result);
         return Result.ok(result);
     }
 
@@ -258,6 +269,8 @@ public class UploadController {
                 contentType,
                 request.getSize()
         );
+        compensationEventService.cancelByKey(multipartAbortKey(request.getObjectName(), request.getUploadId()),
+                "Multipart upload completed");
         String url = normalizeAccessUrl(fileStorageService.getUrl(objectName));
         return Result.ok(new UploadResult(objectName, url, contentType, request.getSize()));
     }
@@ -266,8 +279,46 @@ public class UploadController {
     @Idempotent(key = "upload:video:multipart:abort", expireSeconds = 60)
     public Result abortVideoMultipartUpload(@RequestBody MultipartUploadAbortRequest request) {
         requireMultipartTarget(request == null ? null : request.getObjectName(), request == null ? null : request.getUploadId());
-        fileStorageService.abortMultipartUpload(request.getObjectName(), request.getUploadId());
+        try {
+            fileStorageService.abortMultipartUpload(request.getObjectName(), request.getUploadId());
+            compensationEventService.cancelByKey(multipartAbortKey(request.getObjectName(), request.getUploadId()),
+                    "Multipart upload aborted by user");
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.OSS_MULTIPART_ABORT,
+                    "OSS",
+                    request.getObjectName(),
+                    multipartAbortKey(request.getObjectName(), request.getUploadId()),
+                    Map.of("objectName", request.getObjectName(), "uploadId", request.getUploadId()),
+                    e.getMessage()
+            );
+            throw e;
+        }
         return Result.ok();
+    }
+
+    private void registerMultipartAbortCompensation(MultipartUploadInitResult result) {
+        if (result == null || StrUtil.hasBlank(result.getObjectName(), result.getUploadId())) {
+            return;
+        }
+        LocalDateTime cleanupAt = LocalDateTime.ofInstant(
+                result.getExpireAt().plus(Duration.ofMinutes(Math.max(1, multipartCleanupGraceMinutes))),
+                ZoneId.systemDefault()
+        );
+        compensationEventService.record(
+                CompensationEventTypes.OSS_MULTIPART_ABORT,
+                "OSS",
+                result.getObjectName(),
+                multipartAbortKey(result.getObjectName(), result.getUploadId()),
+                Map.of("objectName", result.getObjectName(), "uploadId", result.getUploadId()),
+                "Multipart upload has not completed before cleanup deadline",
+                cleanupAt,
+                24
+        );
+    }
+
+    private String multipartAbortKey(String objectName, String uploadId) {
+        return "oss:multipart:abort:" + objectName + ":" + uploadId;
     }
 
     private String getValidatedSuffix(MultipartFile image) {

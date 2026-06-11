@@ -2,14 +2,15 @@ package com.hmdp.canal;
 
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.compensation.CompensationEventTypes;
 import com.hmdp.config.CanalSyncProperties;
-import com.hmdp.config.DanmakuKafkaProperties;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.User;
 import com.hmdp.entity.VideoDanmaku;
 import com.hmdp.enums.ContentType;
+import com.hmdp.service.CompensationEventService;
+import com.hmdp.service.DanmakuCacheRepairService;
 import com.hmdp.service.SearchIndexService;
-import com.hmdp.service.IVideoDanmakuService;
 import com.hmdp.service.impl.VideoDanmakuServiceImpl;
 import com.hmdp.utils.RedisConstants;
 import lombok.RequiredArgsConstructor;
@@ -38,11 +39,11 @@ public class CanalRedisSearchSyncService {
     private static final DateTimeFormatter MYSQL_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CanalSyncProperties canalProperties;
-    private final DanmakuKafkaProperties danmakuProperties;
-    private final IVideoDanmakuService videoDanmakuService;
     private final SearchIndexService searchIndexService;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final CompensationEventService compensationEventService;
+    private final DanmakuCacheRepairService danmakuCacheRepairService;
 
     public boolean supports(String tableName) {
         return TABLE_BLOG.equals(tableName) || TABLE_USER.equals(tableName) || TABLE_DANMAKU.equals(tableName);
@@ -70,17 +71,38 @@ public class CanalRedisSearchSyncService {
             return;
         }
         if (change.delete()) {
-            evictVideo(id);
-            requireSearch(searchIndexService.deleteBlog(id), "delete video index " + id);
+            evictVideoWithCompensation(id);
+            recordSearchFailure(
+                    searchIndexService.deleteBlog(id),
+                    CompensationEventTypes.SEARCH_INDEX_BLOG_DELETE,
+                    "BLOG",
+                    id,
+                    Map.of("blogId", id),
+                    "delete video index " + id
+            );
             return;
         }
         Blog blog = toBlog(change.afterColumns());
         if (isVisibleVideo(blog)) {
-            cache(RedisConstants.CACHE_VIDEO_KEY + id, blog);
-            requireSearch(searchIndexService.indexBlog(blog), "index video " + id);
+            cacheVideoWithCompensation(id, blog);
+            recordSearchFailure(
+                    searchIndexService.indexBlog(blog),
+                    CompensationEventTypes.SEARCH_INDEX_BLOG_UPSERT,
+                    "BLOG",
+                    id,
+                    Map.of("blogId", id),
+                    "index video " + id
+            );
         } else {
-            evictVideo(id);
-            requireSearch(searchIndexService.deleteBlog(id), "delete video index " + id);
+            evictVideoWithCompensation(id);
+            recordSearchFailure(
+                    searchIndexService.deleteBlog(id),
+                    CompensationEventTypes.SEARCH_INDEX_BLOG_DELETE,
+                    "BLOG",
+                    id,
+                    Map.of("blogId", id),
+                    "delete video index " + id
+            );
         }
     }
 
@@ -90,13 +112,27 @@ public class CanalRedisSearchSyncService {
             return;
         }
         if (change.delete()) {
-            stringRedisTemplate.delete(RedisConstants.CACHE_USER_KEY + id);
-            requireSearch(searchIndexService.deleteUser(id), "delete user index " + id);
+            evictUserWithCompensation(id);
+            recordSearchFailure(
+                    searchIndexService.deleteUser(id),
+                    CompensationEventTypes.SEARCH_INDEX_USER_DELETE,
+                    "USER",
+                    id,
+                    Map.of("userId", id),
+                    "delete user index " + id
+            );
             return;
         }
         User user = toUser(change.afterColumns());
-        cache(RedisConstants.CACHE_USER_KEY + id, userCacheView(user));
-        requireSearch(searchIndexService.indexUser(user), "index user " + id);
+        cacheUserWithCompensation(id, user);
+        recordSearchFailure(
+                searchIndexService.indexUser(user),
+                CompensationEventTypes.SEARCH_INDEX_USER_UPSERT,
+                "USER",
+                id,
+                Map.of("userId", id),
+                "index user " + id
+        );
     }
 
     private void syncDanmaku(CanalRowChange change, Set<Long> refreshBlogIds) {
@@ -109,13 +145,34 @@ public class CanalRedisSearchSyncService {
             return;
         }
         if (change.delete()) {
-            requireSearch(searchIndexService.deleteDanmaku(id), "delete danmaku index " + id);
+            recordSearchFailure(
+                    searchIndexService.deleteDanmaku(id),
+                    CompensationEventTypes.SEARCH_INDEX_DANMAKU_DELETE,
+                    "DANMAKU",
+                    id,
+                    Map.of("danmakuId", id),
+                    "delete danmaku index " + id
+            );
         } else {
             VideoDanmaku danmaku = toDanmaku(change.afterColumns());
             if (isVisibleDanmaku(danmaku)) {
-                requireSearch(searchIndexService.indexDanmaku(danmaku), "index danmaku " + id);
+                recordSearchFailure(
+                        searchIndexService.indexDanmaku(danmaku),
+                        CompensationEventTypes.SEARCH_INDEX_DANMAKU_UPSERT,
+                        "DANMAKU",
+                        id,
+                        Map.of("danmakuId", id),
+                        "index danmaku " + id
+                );
             } else {
-                requireSearch(searchIndexService.deleteDanmaku(id), "delete danmaku index " + id);
+                recordSearchFailure(
+                        searchIndexService.deleteDanmaku(id),
+                        CompensationEventTypes.SEARCH_INDEX_DANMAKU_DELETE,
+                        "DANMAKU",
+                        id,
+                        Map.of("danmakuId", id),
+                        "delete danmaku index " + id
+                );
             }
         }
         if (blogId != null) {
@@ -123,34 +180,19 @@ public class CanalRedisSearchSyncService {
         }
     }
 
-    private void evictVideo(Long id) {
-        stringRedisTemplate.delete(RedisConstants.CACHE_VIDEO_KEY + id);
-        stringRedisTemplate.delete(RedisConstants.VIDEO_DANMAKU_ZSET_KEY + id);
-    }
-
-    private void refreshDanmakuCache(Long blogId) throws Exception {
-        if (blogId == null) {
-            return;
-        }
-        String key = RedisConstants.VIDEO_DANMAKU_ZSET_KEY + blogId;
-        stringRedisTemplate.delete(key);
-        List<VideoDanmaku> list = videoDanmakuService.query()
-                .eq("blog_id", blogId)
-                .eq("status", VideoDanmakuServiceImpl.STATUS_NORMAL)
-                .orderByAsc("video_second")
-                .last("LIMIT " + danmakuProperties.getCacheLimit())
-                .list();
-        if (list.isEmpty()) {
-            return;
-        }
-        for (VideoDanmaku danmaku : list) {
-            stringRedisTemplate.opsForZSet().add(
-                    key,
-                    objectMapper.writeValueAsString(danmakuCacheView(danmaku)),
-                    danmaku.getVideoSecond() == null ? 0D : danmaku.getVideoSecond().doubleValue()
+    private void refreshDanmakuCache(Long blogId) {
+        try {
+            danmakuCacheRepairService.refreshVideoDanmakuCache(blogId);
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.DANMAKU_REDIS_ZSET_REFRESH,
+                    "DANMAKU",
+                    String.valueOf(blogId),
+                    "danmaku:redis-zset:refresh:" + blogId,
+                    Map.of("blogId", blogId),
+                    e.getMessage()
             );
         }
-        stringRedisTemplate.expire(key, danmakuProperties.getCacheTtlHours(), TimeUnit.HOURS);
     }
 
     private void cache(String key, Object value) throws Exception {
@@ -162,10 +204,80 @@ public class CanalRedisSearchSyncService {
         );
     }
 
-    private void requireSearch(boolean success, String action) {
-        if (!success) {
-            throw new IllegalStateException("Elasticsearch sync failed: " + action);
+    private void cacheVideoWithCompensation(Long id, Blog blog) {
+        try {
+            cache(RedisConstants.CACHE_VIDEO_KEY + id, blog);
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.REDIS_VIDEO_CACHE_REFRESH,
+                    "BLOG",
+                    String.valueOf(id),
+                    "redis:video:cache:refresh:" + id,
+                    Map.of("blogId", id),
+                    e.getMessage()
+            );
         }
+    }
+
+    private void evictVideoWithCompensation(Long id) {
+        try {
+            stringRedisTemplate.delete(RedisConstants.CACHE_VIDEO_KEY + id);
+            stringRedisTemplate.delete(RedisConstants.VIDEO_DANMAKU_ZSET_KEY + id);
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.REDIS_VIDEO_CACHE_EVICT,
+                    "BLOG",
+                    String.valueOf(id),
+                    "redis:video:cache:evict:" + id,
+                    Map.of("blogId", id),
+                    e.getMessage()
+            );
+        }
+    }
+
+    private void cacheUserWithCompensation(Long id, User user) {
+        try {
+            cache(RedisConstants.CACHE_USER_KEY + id, userCacheView(user));
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.REDIS_USER_CACHE_REFRESH,
+                    "USER",
+                    String.valueOf(id),
+                    "redis:user:cache:refresh:" + id,
+                    Map.of("userId", id),
+                    e.getMessage()
+            );
+        }
+    }
+
+    private void evictUserWithCompensation(Long id) {
+        try {
+            stringRedisTemplate.delete(RedisConstants.CACHE_USER_KEY + id);
+        } catch (Exception e) {
+            compensationEventService.record(
+                    CompensationEventTypes.REDIS_USER_CACHE_EVICT,
+                    "USER",
+                    String.valueOf(id),
+                    "redis:user:cache:evict:" + id,
+                    Map.of("userId", id),
+                    e.getMessage()
+            );
+        }
+    }
+
+    private void recordSearchFailure(boolean success, String eventType, String bizType, Long bizId,
+                                     Map<String, Object> payload, String action) {
+        if (success) {
+            return;
+        }
+        compensationEventService.record(
+                eventType,
+                bizType,
+                String.valueOf(bizId),
+                "search:" + eventType.toLowerCase(Locale.ROOT) + ":" + bizId,
+                payload,
+                "Elasticsearch sync failed: " + action
+        );
     }
 
     private boolean isVisibleVideo(Blog blog) {
@@ -247,18 +359,6 @@ public class CanalRedisSearchSyncService {
         view.put("role", user.getRole());
         view.put("createTime", user.getCreateTime());
         view.put("updateTime", user.getUpdateTime());
-        return view;
-    }
-
-    private Map<String, Object> danmakuCacheView(VideoDanmaku danmaku) {
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("id", danmaku.getId());
-        view.put("blogId", danmaku.getBlogId());
-        view.put("videoId", danmaku.getBlogId());
-        view.put("content", danmaku.getContent());
-        view.put("videoSecond", firstNonNull(danmaku.getVideoSecond(), 0));
-        view.put("lane", firstNonNull(danmaku.getLane(), 0));
-        view.put("createTime", danmaku.getCreateTime());
         return view;
     }
 

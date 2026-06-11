@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.compensation.CompensationEventTypes;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.SeckillVoucher;
@@ -9,8 +10,10 @@ import com.hmdp.entity.VoucherOrder;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.service.CompensationEventService;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
+import com.hmdp.service.SeckillRedisRollbackService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
@@ -31,23 +34,20 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Service
 @Slf4j
-public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
+@Service
+public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder>
+        implements IVoucherOrderService {
 
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
-    private static final DefaultRedisScript<Long> ROLLBACK_SECKILL_SCRIPT;
 
     static {
         SECKILL_SCRIPT = new DefaultRedisScript<>();
         SECKILL_SCRIPT.setLocation(new ClassPathResource("seckill.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
-
-        ROLLBACK_SECKILL_SCRIPT = new DefaultRedisScript<>();
-        ROLLBACK_SECKILL_SCRIPT.setLocation(new ClassPathResource("rollback-seckill.lua"));
-        ROLLBACK_SECKILL_SCRIPT.setResultType(Long.class);
     }
 
     @Resource
@@ -64,6 +64,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private KafkaTemplate<String, String> kafkaTemplate;
     @Resource
     private ObjectMapper objectMapper;
+    @Resource
+    private CompensationEventService compensationEventService;
+    @Resource
+    private SeckillRedisRollbackService seckillRedisRollbackService;
 
     @Value("${hmdp.seckill.kafka.order-topic:seckill-order}")
     private String orderTopic;
@@ -75,7 +79,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
         }
         if (voucherId == null) {
-            throw new BusinessException(ErrorCode.PARAM_EMPTY, "优惠券ID不能为空");
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "Voucher id cannot be empty");
         }
 
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
@@ -108,7 +112,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             if (code == 1) {
                 throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
             }
-            throw new BusinessException(ErrorCode.REPEAT_OPERATION, "不能重复下单");
+            throw new BusinessException(ErrorCode.REPEAT_OPERATION, "Duplicate seckill order");
         }
 
         VoucherOrder voucherOrder = new VoucherOrder();
@@ -120,8 +124,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             sendSeckillOrder(voucherOrder);
         } catch (Exception e) {
             rollbackSeckill(voucherId, userId);
-            log.error("发送秒杀订单 Kafka 消息失败, orderId={}, userId={}, voucherId={}", orderId, userId, voucherId, e);
-            throw new BusinessException(ErrorCode.SERVER_BUSY, "订单消息发送失败，请稍后重试");
+            log.error("Send seckill order Kafka message failed, orderId={}, userId={}, voucherId={}",
+                    orderId, userId, voucherId, e);
+            throw new BusinessException(ErrorCode.SERVER_BUSY, "Order message send failed, please retry later");
         }
 
         return Result.ok(orderId);
@@ -135,7 +140,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         long count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
         if (count > 0) {
-            log.warn("用户重复下单, userId={}, voucherId={}", userId, voucherId);
+            log.warn("Duplicate voucher order, userId={}, voucherId={}", userId, voucherId);
             return false;
         }
 
@@ -145,14 +150,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 .gt("stock", 0)
                 .update();
         if (!stockUpdated) {
-            log.warn("库存扣减失败, userId={}, voucherId={}", userId, voucherId);
+            log.warn("Voucher stock update failed, userId={}, voucherId={}", userId, voucherId);
             return false;
         }
 
         try {
             return save(voucherOrder);
         } catch (DuplicateKeyException e) {
-            log.warn("订单唯一约束冲突, userId={}, voucherId={}", userId, voucherId);
+            log.warn("Voucher order unique key conflict, userId={}, voucherId={}", userId, voucherId);
             throw e;
         }
     }
@@ -177,10 +182,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         try {
             VoucherOrder voucherOrder = objectMapper.readValue(payload, VoucherOrder.class);
             rollbackSeckill(voucherOrder.getVoucherId(), voucherOrder.getUserId());
-            log.error("秒杀订单消息进入死信队列，已回滚 Redis 预扣状态, orderId={}, userId={}, voucherId={}",
+            log.error("Seckill order entered DLT, Redis pre-deduction rollback requested. orderId={}, userId={}, voucherId={}",
                     voucherOrder.getId(), voucherOrder.getUserId(), voucherOrder.getVoucherId());
         } catch (Exception e) {
-            log.error("处理秒杀订单死信消息失败, payload={}", payload, e);
+            log.error("Handle seckill order DLT message failed, payload={}", payload, e);
         } finally {
             acknowledgment.acknowledge();
         }
@@ -196,7 +201,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         RLock lock = redissonClient.getLock("lock:order:" + userId);
         boolean locked = lock.tryLock();
         if (!locked) {
-            log.warn("用户重复下单, userId={}, voucherId={}", userId, voucherOrder.getVoucherId());
+            log.warn("Duplicate voucher order lock rejected, userId={}, voucherId={}", userId, voucherOrder.getVoucherId());
             rollbackSeckill(voucherOrder.getVoucherId(), userId);
             return;
         }
@@ -208,10 +213,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             }
         } catch (DuplicateKeyException e) {
             rollbackSeckill(voucherOrder.getVoucherId(), userId);
-            log.warn("订单唯一约束冲突，已回滚 Redis 预扣状态, orderId={}, userId={}, voucherId={}",
+            log.warn("Voucher order unique key conflict, Redis rollback requested. orderId={}, userId={}, voucherId={}",
                     voucherOrder.getId(), userId, voucherOrder.getVoucherId());
         } catch (Exception e) {
-            log.error("处理 Kafka 秒杀订单异常，等待 Kafka 重试, orderId={}, userId={}, voucherId={}",
+            log.error("Handle Kafka seckill order failed, waiting for Kafka retry. orderId={}, userId={}, voucherId={}",
                     voucherOrder.getId(), userId, voucherOrder.getVoucherId(), e);
             throw e;
         } finally {
@@ -223,14 +228,17 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     private void rollbackSeckill(Long voucherId, Long userId) {
         try {
-            stringRedisTemplate.execute(
-                    ROLLBACK_SECKILL_SCRIPT,
-                    Collections.emptyList(),
-                    voucherId.toString(),
-                    userId.toString()
-            );
+            seckillRedisRollbackService.rollback(voucherId, userId);
         } catch (Exception e) {
-            log.error("回滚秒杀 Redis 状态失败, voucherId={}, userId={}", voucherId, userId, e);
+            log.error("Rollback seckill Redis state failed, voucherId={}, userId={}", voucherId, userId, e);
+            compensationEventService.record(
+                    CompensationEventTypes.SECKILL_REDIS_ROLLBACK,
+                    "SECKILL",
+                    voucherId + ":" + userId,
+                    "seckill:redis-rollback:" + voucherId + ":" + userId,
+                    Map.of("voucherId", voucherId, "userId", userId),
+                    e.getMessage()
+            );
         }
     }
 }
