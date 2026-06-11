@@ -2,6 +2,8 @@ package com.hmdp.controller;
 
 import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hmdp.annotation.Idempotent;
+import com.hmdp.annotation.SlidingWindowRateLimit;
 import com.hmdp.dto.NoteCommentRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -9,6 +11,7 @@ import com.hmdp.entity.BlogComments;
 import com.hmdp.entity.User;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.enums.EventType;
+import com.hmdp.enums.RateLimitScope;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.service.CommentService;
 import com.hmdp.service.ContentModerationService;
@@ -125,6 +128,8 @@ public class NoteCommentsController {
      * 发表评论或二级回复。
      */
     @PostMapping
+    @SlidingWindowRateLimit(key = "notes:comments:create", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "notes:comments:create", expireSeconds = 8)
     public Result saveComment(@RequestBody NoteCommentRequest request) {
         UserDTO user = UserHolder.getUser();
         if (user == null) {
@@ -211,6 +216,7 @@ public class NoteCommentsController {
      * 评论点赞。当前轻量实现只维护点赞数，不记录用户点赞明细。
      */
     @PutMapping("/like/{id}")
+    @SlidingWindowRateLimit(key = "notes:comments:like", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result likeComment(@PathVariable("id") Long commentId) {
         if (UserHolder.getUser() == null) {
             throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
@@ -234,6 +240,7 @@ public class NoteCommentsController {
      * 删除评论：软删除，一级评论会连同二级回复一起隐藏。
      */
     @DeleteMapping("/{id}")
+    @Idempotent(key = "notes:comments:delete", expireSeconds = 10)
     public Result deleteComment(@PathVariable("id") Long commentId) {
         UserDTO user = UserHolder.getUser();
         if (user == null) {
@@ -255,6 +262,8 @@ public class NoteCommentsController {
      * 举报评论：将评论标记为被举报并从前台隐藏，等待后续运营审核。
      */
     @PutMapping("/report/{id}")
+    @SlidingWindowRateLimit(key = "notes:comments:report", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "notes:comments:report", expireSeconds = 30)
     public Result reportComment(@PathVariable("id") Long commentId) {
         UserDTO user = UserHolder.getUser();
         if (user == null) {

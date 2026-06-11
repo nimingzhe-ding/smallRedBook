@@ -1,57 +1,105 @@
 package com.hmdp.config;
 
+import com.hmdp.annotation.SlidingWindowRateLimit;
+import com.hmdp.dto.UserDTO;
+import com.hmdp.enums.RateLimitScope;
+import com.hmdp.utils.UserHolder;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import jakarta.annotation.Resource;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+import java.lang.reflect.Method;
 
-/**
- * Redis 滑动窗口限流拦截器。
- * 基于 IP + URI 维度，默认 60 秒内最多 60 次请求。
- */
 @Slf4j
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final SlidingWindowRateLimiter rateLimiter;
+    private final MeterRegistry meterRegistry;
 
-    private static final long WINDOW_SECONDS = 60;
-    private static final long MAX_REQUESTS = 60;
+    public RateLimitInterceptor(SlidingWindowRateLimiter rateLimiter, MeterRegistry meterRegistry) {
+        this.rateLimiter = rateLimiter;
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        String ip = getClientIp(request);
-        String uri = request.getRequestURI();
-        String key = "rate:" + ip + ":" + uri;
-
-        stringRedisTemplate.opsForValue().setIfAbsent(key, "0", WINDOW_SECONDS, TimeUnit.SECONDS);
-        Long count = stringRedisTemplate.opsForValue().increment(key);
-
-        if (count != null && count > MAX_REQUESTS) {
-            log.warn("限流触发: ip={}, uri={}, count={}", ip, uri, count);
-            response.setStatus(429);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"success\":false,\"code\":429,\"errorMsg\":\"请求过于频繁，请稍后重试\"}");
-            return false;
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            return true;
         }
-        return true;
+        SlidingWindowRateLimit limit = resolveAnnotation(handlerMethod);
+        if (limit == null) {
+            return true;
+        }
+
+        int maxRequests = Math.max(1, limit.maxRequests());
+        int windowSeconds = Math.max(1, limit.windowSeconds());
+        String businessKey = RequestKeySupport.hasText(limit.key())
+                ? limit.key()
+                : request.getMethod() + ":" + RequestKeySupport.handlerPattern(request);
+        String identity = identity(request, limit.scope());
+        String rawKey = businessKey + ":" + limit.scope().name() + ":" + identity;
+        long count = rateLimiter.hit(rawKey, maxRequests, windowSeconds);
+
+        response.setHeader("X-RateLimit-Limit", String.valueOf(maxRequests));
+        response.setHeader("X-RateLimit-Window", String.valueOf(windowSeconds));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, maxRequests - count)));
+
+        if (count <= maxRequests) {
+            return true;
+        }
+
+        Counter.builder("hmdp.rate.limit.rejected")
+                .tag("key", RequestKeySupport.sanitize(businessKey))
+                .tag("scope", limit.scope().name())
+                .register(meterRegistry)
+                .increment();
+        log.warn("Rate limit rejected: key={}, scope={}, identity={}, count={}, limit={}, uri={}",
+                businessKey, limit.scope(), identity, count, maxRequests, request.getRequestURI());
+        writeJson(response, 429, 429, limit.message());
+        return false;
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
+    private SlidingWindowRateLimit resolveAnnotation(HandlerMethod handlerMethod) {
+        Method method = handlerMethod.getMethod();
+        SlidingWindowRateLimit methodLimit = AnnotationUtils.findAnnotation(method, SlidingWindowRateLimit.class);
+        if (methodLimit != null) {
+            return methodLimit;
         }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
+        return AnnotationUtils.findAnnotation(handlerMethod.getBeanType(), SlidingWindowRateLimit.class);
+    }
+
+    private String identity(HttpServletRequest request, RateLimitScope scope) {
+        return switch (scope) {
+            case GLOBAL -> "global";
+            case IP -> "ip:" + RequestKeySupport.clientIp(request);
+            case USER -> {
+                UserDTO user = UserHolder.getUser();
+                yield user == null || user.getId() == null ? "guest" : "u:" + user.getId();
+            }
+            case USER_OR_IP -> RequestKeySupport.currentUserOrIp(request);
+            case USER_AND_IP -> RequestKeySupport.currentUserAndIp(request);
+        };
+    }
+
+    private void writeJson(HttpServletResponse response, int httpStatus, int code, String message) throws IOException {
+        response.setStatus(httpStatus);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"success\":false,\"code\":" + code + ",\"errorMsg\":\"" + escape(message) + "\"}");
+    }
+
+    private String escape(String message) {
+        if (message == null) {
+            return "";
         }
-        return request.getRemoteAddr();
+        return message.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

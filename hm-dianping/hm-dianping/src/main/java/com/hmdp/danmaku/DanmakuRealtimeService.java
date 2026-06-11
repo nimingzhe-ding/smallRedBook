@@ -1,14 +1,20 @@
 package com.hmdp.danmaku;
 
 import cn.hutool.core.util.StrUtil;
+import com.hmdp.config.RequestKeySupport;
+import com.hmdp.config.SlidingWindowRateLimiter;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.service.ContentModerationService;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisIdWorker;
 import io.netty.channel.Channel;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +27,8 @@ public class DanmakuRealtimeService {
     private final RedisIdWorker redisIdWorker;
     private final DanmakuRoomRegistry roomRegistry;
     private final DanmakuKafkaProducer kafkaProducer;
+    private final SlidingWindowRateLimiter rateLimiter;
+    private final StringRedisTemplate stringRedisTemplate;
 
     public DanmakuEvent handleIncoming(Channel channel, DanmakuInboundMessage message) {
         Long videoId = channel.attr(DanmakuChannelAttrs.VIDEO_ID).get();
@@ -31,6 +39,11 @@ public class DanmakuRealtimeService {
         if (message == null || StrUtil.isBlank(message.getContent())) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "danmaku content must not be empty");
         }
+        long count = rateLimiter.hit("ws:danmaku:send:u:" + user.getId() + ":v:" + videoId, 60, 60);
+        if (count > 60) {
+            throw new BusinessException(429, "Too many danmaku messages, please retry later");
+        }
+        ensureIdempotent(message, user.getId(), videoId);
 
         String content = StrUtil.sub(message.getContent().trim(), 0, MAX_CONTENT_LENGTH);
         contentModerationService.checkText("danmaku content", content);
@@ -49,5 +62,17 @@ public class DanmakuRealtimeService {
         roomRegistry.broadcast(videoId, event);
         kafkaProducer.sendAsync(event);
         return event;
+    }
+
+    private void ensureIdempotent(DanmakuInboundMessage message, Long userId, Long videoId) {
+        if (message == null || StrUtil.isBlank(message.getRequestId())) {
+            return;
+        }
+        String raw = "ws:danmaku:" + userId + ":" + videoId + ":" + message.getRequestId().trim();
+        String key = RedisConstants.IDEMPOTENT_KEY + RequestKeySupport.sha256(raw);
+        Boolean acquired = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", Duration.ofSeconds(60));
+        if (!Boolean.TRUE.equals(acquired)) {
+            throw new BusinessException(ErrorCode.REPEAT_OPERATION, "Duplicate danmaku request");
+        }
     }
 }

@@ -53,4 +53,6 @@ public class RedisConstants {
     // 笔记行为事件流
     public static final String NOTE_EVENT_STREAM_KEY = "stream.notes.events";
     public static final String VIDEO_DANMAKU_ZSET_KEY = "danmaku:video:";
+    public static final String RATE_LIMIT_KEY = "rate:sw:";
+    public static final String IDEMPOTENT_KEY = "idem:";
 }

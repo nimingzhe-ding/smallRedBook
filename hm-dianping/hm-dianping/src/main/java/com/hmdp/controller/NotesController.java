@@ -1,11 +1,14 @@
 package com.hmdp.controller;
 
 import com.hmdp.annotation.RequireRole;
+import com.hmdp.annotation.Idempotent;
+import com.hmdp.annotation.SlidingWindowRateLimit;
 import com.hmdp.dto.ContentAiRequest;
 import com.hmdp.dto.NoteCreateRequest;
 import com.hmdp.dto.NoteUpdateRequest;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
+import com.hmdp.enums.RateLimitScope;
 import com.hmdp.enums.UserRole;
 import com.hmdp.service.CollectService;
 import com.hmdp.service.LikeService;
@@ -55,6 +58,7 @@ public class NotesController {
      * 可选关键词 query 过滤，支持地理位置参数 (x, y) 做附近推荐。
      */
     @GetMapping("/feed")
+    @SlidingWindowRateLimit(key = "notes:feed", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result feed(
             @RequestParam(value = "channel", defaultValue = "recommend") String channel,
             @RequestParam(value = "query", required = false) String query,
@@ -68,6 +72,7 @@ public class NotesController {
      * 统一搜索：按关键词全文检索笔记、视频、商品、店铺、话题。
      */
     @GetMapping("/search")
+    @SlidingWindowRateLimit(key = "notes:search", maxRequests = 60, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result search(
             @RequestParam("query") String query,
             @RequestParam(value = "current", defaultValue = "1") Integer current) {
@@ -89,6 +94,8 @@ public class NotesController {
      */
     @PostMapping
     @RequireRole(UserRole.USER)
+    @SlidingWindowRateLimit(key = "notes:publish", maxRequests = 10, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "notes:publish", expireSeconds = 15)
     public Result publish(@RequestBody NoteCreateRequest request) {
         return noteService.publish(toBlog(request));
     }
@@ -97,6 +104,7 @@ public class NotesController {
      * 编辑自己的笔记。
      */
     @PutMapping("/{id}")
+    @Idempotent(key = "notes:update", expireSeconds = 10)
     public Result update(@PathVariable("id") Long noteId, @RequestBody NoteUpdateRequest request) {
         return noteService.updateOwnNote(noteId, toBlog(request));
     }
@@ -105,11 +113,14 @@ public class NotesController {
      * 删除自己的笔记。
      */
     @DeleteMapping("/{id}")
+    @Idempotent(key = "notes:delete", expireSeconds = 10)
     public Result delete(@PathVariable("id") Long noteId) {
         return noteService.deleteOwnNote(noteId);
     }
 
     @PutMapping("/{id}/report")
+    @SlidingWindowRateLimit(key = "notes:report", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "notes:report", expireSeconds = 30)
     public Result report(@PathVariable("id") Long noteId) {
         return noteService.reportNote(noteId);
     }
@@ -120,6 +131,7 @@ public class NotesController {
      * 点赞/取消点赞（同一接口，后端幂等切换）。
      */
     @PutMapping("/{id}/like")
+    @SlidingWindowRateLimit(key = "notes:like", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result like(@PathVariable("id") Long noteId) {
         return likeService.likeNote(noteId);
     }
@@ -138,6 +150,7 @@ public class NotesController {
      * 收藏/取消收藏：collect=true 收藏，collect=false 取消。
      */
     @PutMapping("/{id}/collect/{collect}")
+    @SlidingWindowRateLimit(key = "notes:collect", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result collect(@PathVariable("id") Long noteId, @PathVariable("collect") Boolean collect) {
         return collectService.collectBlog(noteId, collect);
     }
@@ -242,6 +255,7 @@ public class NotesController {
      * 搜索联想：根据输入前缀返回补全建议。
      */
     @GetMapping("/suggestions")
+    @SlidingWindowRateLimit(key = "notes:suggestions", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result suggestions(@RequestParam("prefix") String prefix) {
         return recommendationService.suggestions(prefix);
     }
@@ -284,6 +298,7 @@ public class NotesController {
      * AI 个性化推荐：基于用户行为和偏好生成推荐理由与结果。
      */
     @PostMapping("/ai/recommend")
+    @SlidingWindowRateLimit(key = "notes:ai:recommend", maxRequests = 10, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result aiRecommend(@RequestBody ContentAiRequest request) {
         return recommendationService.aiRecommend(request);
     }

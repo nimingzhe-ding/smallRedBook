@@ -1,6 +1,8 @@
 package com.hmdp.controller;
 
 import cn.hutool.core.util.StrUtil;
+import com.hmdp.annotation.Idempotent;
+import com.hmdp.annotation.SlidingWindowRateLimit;
 import com.hmdp.dto.CompleteUploadRequest;
 import com.hmdp.dto.DirectUploadRequest;
 import com.hmdp.dto.DirectUploadResult;
@@ -14,6 +16,7 @@ import com.hmdp.dto.MultipartUploadedPart;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UploadResult;
 import com.hmdp.enums.ErrorCode;
+import com.hmdp.enums.RateLimitScope;
 import com.hmdp.exception.BusinessException;
 import com.hmdp.service.storage.FileStorageService;
 import jakarta.annotation.Resource;
@@ -59,6 +62,7 @@ public class UploadController {
     private long directUploadExpireMinutes;
 
     @PostMapping("note")
+    @SlidingWindowRateLimit(key = "upload:image", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result uploadImage(@RequestParam("file") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
@@ -84,6 +88,7 @@ public class UploadController {
     }
 
     @PostMapping("video")
+    @SlidingWindowRateLimit(key = "upload:video", maxRequests = 5, windowSeconds = 600, scope = RateLimitScope.USER_OR_IP)
     public Result uploadVideo(@RequestParam("file") MultipartFile video) {
         if (video == null || video.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
@@ -107,6 +112,7 @@ public class UploadController {
     }
 
     @PostMapping("video/direct-signature")
+    @SlidingWindowRateLimit(key = "upload:video:direct-signature", maxRequests = 10, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result createVideoDirectUpload(@RequestBody DirectUploadRequest request) {
         if (request == null || request.getSize() == null || request.getSize() <= 0) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "视频文件信息不能为空");
@@ -130,6 +136,7 @@ public class UploadController {
     }
 
     @PostMapping("video/complete")
+    @Idempotent(key = "upload:video:complete", expireSeconds = 60)
     public Result completeVideoUpload(@RequestBody CompleteUploadRequest request) {
         if (request == null || StrUtil.isBlank(request.getObjectName())) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "视频对象路径不能为空");
@@ -154,6 +161,8 @@ public class UploadController {
     }
 
     @PostMapping("video/multipart/init")
+    @SlidingWindowRateLimit(key = "upload:video:multipart:init", maxRequests = 10, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "upload:video:multipart:init", expireSeconds = 30)
     public Result initVideoMultipartUpload(@RequestBody MultipartUploadInitRequest request) {
         if (request == null || request.getSize() == null || request.getSize() <= 0) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "视频文件信息不能为空");
@@ -183,6 +192,7 @@ public class UploadController {
     }
 
     @PostMapping("video/multipart/part-signature")
+    @SlidingWindowRateLimit(key = "upload:video:multipart:part-signature", maxRequests = 600, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result createVideoMultipartPartUpload(@RequestBody MultipartUploadPartSignRequest request) {
         requireMultipartTarget(request == null ? null : request.getObjectName(), request == null ? null : request.getUploadId());
         if (request.getPartNumber() == null || request.getPartNumber() < 1 || request.getPartNumber() > MAX_MULTIPART_COUNT) {
@@ -210,6 +220,7 @@ public class UploadController {
     }
 
     @PostMapping("video/multipart/complete")
+    @Idempotent(key = "upload:video:multipart:complete", expireSeconds = 60)
     public Result completeVideoMultipartUpload(@RequestBody MultipartUploadCompleteRequest request) {
         requireMultipartTarget(request == null ? null : request.getObjectName(), request == null ? null : request.getUploadId());
         String suffix = getValidatedVideoSuffix(request.getObjectName(), request.getContentType());
@@ -252,6 +263,7 @@ public class UploadController {
     }
 
     @PostMapping("video/multipart/abort")
+    @Idempotent(key = "upload:video:multipart:abort", expireSeconds = 60)
     public Result abortVideoMultipartUpload(@RequestBody MultipartUploadAbortRequest request) {
         requireMultipartTarget(request == null ? null : request.getObjectName(), request == null ? null : request.getUploadId());
         fileStorageService.abortMultipartUpload(request.getObjectName(), request.getUploadId());

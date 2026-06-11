@@ -1,8 +1,11 @@
 package com.hmdp.controller;
 
+import com.hmdp.annotation.Idempotent;
+import com.hmdp.annotation.SlidingWindowRateLimit;
 import com.hmdp.dto.PrivateConversationRequest;
 import com.hmdp.dto.PrivateMessageRequest;
 import com.hmdp.dto.Result;
+import com.hmdp.enums.RateLimitScope;
 import com.hmdp.service.IPrivateMessageService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,16 +23,20 @@ public class MessagesController {
     private IPrivateMessageService privateMessageService;
 
     @GetMapping("/conversations")
+    @SlidingWindowRateLimit(key = "messages:conversations", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result conversations() {
         return privateMessageService.conversations();
     }
 
     @PostMapping("/conversations")
+    @SlidingWindowRateLimit(key = "messages:open-conversation", maxRequests = 30, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "messages:open-conversation", expireSeconds = 10)
     public Result openConversation(@RequestBody PrivateConversationRequest request) {
         return privateMessageService.openConversation(request);
     }
 
     @GetMapping("/conversations/{id}/messages")
+    @SlidingWindowRateLimit(key = "messages:list", maxRequests = 180, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result messages(@PathVariable("id") Long conversationId,
                            @RequestParam(value = "beforeId", required = false) Long beforeId,
                            @RequestParam(value = "limit", defaultValue = "30") Integer limit) {
@@ -37,12 +44,15 @@ public class MessagesController {
     }
 
     @PostMapping("/conversations/{id}/messages")
+    @SlidingWindowRateLimit(key = "messages:send", maxRequests = 120, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "messages:send", expireSeconds = 5)
     public Result sendMessage(@PathVariable("id") Long conversationId,
                               @RequestBody PrivateMessageRequest request) {
         return privateMessageService.sendMessage(conversationId, request);
     }
 
     @PostMapping("/conversations/{id}/read")
+    @Idempotent(key = "messages:read", expireSeconds = 5)
     public Result markRead(@PathVariable("id") Long conversationId) {
         return privateMessageService.markRead(conversationId);
     }
@@ -53,6 +63,7 @@ public class MessagesController {
     }
 
     @GetMapping("/users")
+    @SlidingWindowRateLimit(key = "messages:users", maxRequests = 60, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
     public Result searchUsers(@RequestParam(value = "keyword", required = false) String keyword) {
         return privateMessageService.searchUsers(keyword);
     }

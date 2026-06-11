@@ -16,17 +16,21 @@ import com.hmdp.entity.PrivateMessage;
 import com.hmdp.entity.User;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
+import com.hmdp.config.RequestKeySupport;
 import com.hmdp.mapper.PrivateConversationMapper;
 import com.hmdp.mapper.PrivateMessageMapper;
 import com.hmdp.privatemessage.PrivateMessageWebSocketPushService;
 import com.hmdp.service.IPrivateMessageService;
 import com.hmdp.service.IUserService;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,6 +53,8 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     private IUserService userService;
     @Resource
     private PrivateMessageWebSocketPushService messagePushService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result conversations() {
@@ -121,6 +127,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
 
     private PrivateMessageDTO doSendMessage(Long conversationId, Long userId, PrivateMessageRequest request) {
         PrivateConversation conversation = requireConversation(conversationId, userId);
+        ensureRequestIdempotent(conversationId, userId, request);
         String content = StrUtil.trim(request == null ? null : request.getContent());
         if (StrUtil.isBlank(content)) {
             throw new BusinessException(ErrorCode.PARAM_EMPTY, "消息不能为空");
@@ -152,6 +159,18 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         PrivateMessageDTO receiverView = toMessageDTO(message, receiverId);
         messagePushService.pushMessage(request == null ? null : request.getRequestId(), senderView, receiverView);
         return senderView;
+    }
+
+    private void ensureRequestIdempotent(Long conversationId, Long userId, PrivateMessageRequest request) {
+        if (request == null || StrUtil.isBlank(request.getRequestId())) {
+            return;
+        }
+        String raw = "private-message:" + conversationId + ":" + userId + ":" + request.getRequestId().trim();
+        String key = RedisConstants.IDEMPOTENT_KEY + RequestKeySupport.sha256(raw);
+        Boolean acquired = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", Duration.ofMinutes(5));
+        if (!Boolean.TRUE.equals(acquired)) {
+            throw new BusinessException(ErrorCode.REPEAT_OPERATION, "Duplicate private message request");
+        }
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.hmdp.privatemessage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.config.PrivateMessageWebSocketProperties;
+import com.hmdp.config.SlidingWindowRateLimiter;
 import com.hmdp.service.IPrivateMessageService;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
@@ -24,6 +25,7 @@ public class PrivateMessageChannelInitializer extends ChannelInitializer<SocketC
     private final ObjectMapper objectMapper;
     private final PrivateMessageConnectionRegistry connectionRegistry;
     private final IPrivateMessageService privateMessageService;
+    private final SlidingWindowRateLimiter rateLimiter;
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -41,7 +43,8 @@ public class PrivateMessageChannelInitializer extends ChannelInitializer<SocketC
                 .addLast(new PrivateMessageWebSocketFrameHandler(
                         objectMapper,
                         connectionRegistry,
-                        privateMessageService
+                        privateMessageService,
+                        rateLimiter
                 ));
     }
 }

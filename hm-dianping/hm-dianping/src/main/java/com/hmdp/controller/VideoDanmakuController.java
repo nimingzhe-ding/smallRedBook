@@ -1,7 +1,10 @@
 package com.hmdp.controller;
 
+import com.hmdp.annotation.Idempotent;
+import com.hmdp.annotation.SlidingWindowRateLimit;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.VideoDanmaku;
+import com.hmdp.enums.RateLimitScope;
 import com.hmdp.service.IVideoDanmakuService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,11 +33,15 @@ public class VideoDanmakuController {
     }
 
     @PostMapping
+    @SlidingWindowRateLimit(key = "video:danmaku:send", maxRequests = 60, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "video:danmaku:send", expireSeconds = 3)
     public Result send(@RequestBody VideoDanmaku danmaku) {
         return danmakuService.send(danmaku);
     }
 
     @PutMapping("/{id}/report")
+    @SlidingWindowRateLimit(key = "video:danmaku:report", maxRequests = 20, windowSeconds = 60, scope = RateLimitScope.USER_OR_IP)
+    @Idempotent(key = "video:danmaku:report", expireSeconds = 30)
     public Result report(@PathVariable("id") Long id) {
         return danmakuService.report(id);
     }

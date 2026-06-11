@@ -1,6 +1,7 @@
 package com.hmdp.privatemessage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.config.SlidingWindowRateLimiter;
 import com.hmdp.dto.PrivateMessageRequest;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.exception.BusinessException;
@@ -25,14 +26,17 @@ public class PrivateMessageWebSocketFrameHandler extends SimpleChannelInboundHan
     private final ObjectMapper objectMapper;
     private final PrivateMessageConnectionRegistry connectionRegistry;
     private final IPrivateMessageService privateMessageService;
+    private final SlidingWindowRateLimiter rateLimiter;
 
     public PrivateMessageWebSocketFrameHandler(
             ObjectMapper objectMapper,
             PrivateMessageConnectionRegistry connectionRegistry,
-            IPrivateMessageService privateMessageService) {
+            IPrivateMessageService privateMessageService,
+            SlidingWindowRateLimiter rateLimiter) {
         this.objectMapper = objectMapper;
         this.connectionRegistry = connectionRegistry;
         this.privateMessageService = privateMessageService;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
@@ -56,6 +60,11 @@ public class PrivateMessageWebSocketFrameHandler extends SimpleChannelInboundHan
         if (user == null || user.getId() == null) {
             sendError(ctx, 401, "login required");
             ctx.close();
+            return;
+        }
+        long count = rateLimiter.hit("ws:private-message:send:u:" + user.getId(), 120, 60);
+        if (count > 120) {
+            sendError(ctx, 429, "Too many private messages, please retry later");
             return;
         }
         try {

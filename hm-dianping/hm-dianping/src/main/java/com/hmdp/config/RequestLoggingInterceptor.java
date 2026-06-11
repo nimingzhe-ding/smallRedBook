@@ -5,49 +5,64 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/**
- * 请求日志拦截器：记录 URI、参数、状态码、耗时。
- * 超过 500ms 的请求额外记入 slow.log。
- */
+import java.util.UUID;
+
 @Slf4j
 @Component
 public class RequestLoggingInterceptor implements HandlerInterceptor {
 
+    public static final String TRACE_ID_HEADER = "X-Trace-Id";
+
     private static final Logger SLOW_LOG = LoggerFactory.getLogger("SLOW_API");
     private static final long SLOW_THRESHOLD_MS = 500;
-
     private static final String START_TIME_ATTR = "requestStartTime";
+    private static final String TRACE_ID_ATTR = "requestTraceId";
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         request.setAttribute(START_TIME_ATTR, System.currentTimeMillis());
+        String traceId = request.getHeader(TRACE_ID_HEADER);
+        if (traceId == null || traceId.isBlank()) {
+            traceId = UUID.randomUUID().toString().replace("-", "");
+        }
+        request.setAttribute(TRACE_ID_ATTR, traceId);
+        response.setHeader(TRACE_ID_HEADER, traceId);
+        MDC.put("traceId", traceId);
         return true;
     }
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) {
-        long startTime = (long) request.getAttribute(START_TIME_ATTR);
-        long duration = System.currentTimeMillis() - startTime;
+        Long startTime = (Long) request.getAttribute(START_TIME_ATTR);
+        long duration = startTime == null ? 0 : System.currentTimeMillis() - startTime;
+        Object traceId = request.getAttribute(TRACE_ID_ATTR);
+        if (traceId != null) {
+            MDC.put("traceId", traceId.toString());
+        }
+
         String uri = request.getRequestURI();
         String method = request.getMethod();
         int status = response.getStatus();
         String query = request.getQueryString();
-
-        String logMsg = "{} {} {} status={} cost={}ms{}";
         String queryPart = query != null ? " query=" + query : "";
+        String logMsg = "{} {} {} status={} cost={}ms{}";
 
-        if (duration > SLOW_THRESHOLD_MS) {
-            SLOW_LOG.warn(logMsg, method, uri, request.getRemoteAddr(), status, duration, queryPart);
-        } else {
-            log.info(logMsg, method, uri, request.getRemoteAddr(), status, duration, queryPart);
-        }
-
-        if (ex != null) {
-            log.error("请求异常: {} {}", method, uri, ex);
+        try {
+            if (duration > SLOW_THRESHOLD_MS) {
+                SLOW_LOG.warn(logMsg, method, uri, request.getRemoteAddr(), status, duration, queryPart);
+            } else {
+                log.info(logMsg, method, uri, request.getRemoteAddr(), status, duration, queryPart);
+            }
+            if (ex != null) {
+                log.error("Request failed: {} {}", method, uri, ex);
+            }
+        } finally {
+            MDC.remove("traceId");
         }
     }
 }
