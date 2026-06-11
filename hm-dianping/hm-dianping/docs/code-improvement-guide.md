@@ -1,4 +1,4 @@
-# hm-dianping 代码完善说明
+# xiaohongshu 代码完善说明
 
 本文档记录本次代码完善的目标、修改内容、运行配置、数据库变更和后续建议。适合作为复盘材料，也可以用于面试时说明项目优化点。
 
@@ -28,24 +28,24 @@ spring:
     dashscope:
       api-key: "${DASHSCOPE_API_KEY:}"
   datasource:
-    url: "${HMDP_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
-    username: "${HMDP_DATASOURCE_USERNAME:root}"
-    password: "${HMDP_DATASOURCE_PASSWORD:}"
+    url: "${XHS_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/xiaohongshu?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
+    username: "${XHS_DATASOURCE_USERNAME:root}"
+    password: "${XHS_DATASOURCE_PASSWORD:}"
   data:
     redis:
-      host: "${HMDP_REDIS_HOST:127.0.0.1}"
-      port: ${HMDP_REDIS_PORT:6379}
-      password: "${HMDP_REDIS_PASSWORD:}"
+      host: "${XHS_REDIS_HOST:127.0.0.1}"
+      port: ${XHS_REDIS_PORT:6379}
+      password: "${XHS_REDIS_PASSWORD:}"
 ```
 
 本地运行前建议设置：
 
 ```powershell
 $env:DASHSCOPE_API_KEY="你的 DashScope Key"
-$env:HMDP_DATASOURCE_PASSWORD="你的 MySQL 密码"
-$env:HMDP_REDIS_PASSWORD="你的 Redis 密码"
-$env:HMDP_REDIS_HOST="127.0.0.1"
-$env:HMDP_IMAGE_UPLOAD_DIR="D:/hmdp/nginx-1.18.0/html/hmdp/imgs"
+$env:XHS_DATASOURCE_PASSWORD="你的 MySQL 密码"
+$env:XHS_REDIS_PASSWORD="你的 Redis 密码"
+$env:XHS_REDIS_HOST="127.0.0.1"
+$env:XHS_IMAGE_UPLOAD_DIR="D:/xiaohongshu/nginx-1.18.0/html/xiaohongshu/imgs"
 ```
 
 注意：如果之前真实 Key 已经提交过，应该到对应平台立即作废旧 Key 并生成新 Key。
@@ -56,8 +56,8 @@ $env:HMDP_IMAGE_UPLOAD_DIR="D:/hmdp/nginx-1.18.0/html/hmdp/imgs"
 
 - `src/main/resources/seckill.lua`
 - `src/main/resources/rollback-seckill.lua`
-- `src/main/java/com/hmdp/service/impl/VoucherOrderServiceImpl.java`
-- `src/main/java/com/hmdp/service/IVoucherOrderService.java`
+- `src/main/java/com/xhs/service/impl/VoucherOrderServiceImpl.java`
+- `src/main/java/com/xhs/service/IVoucherOrderService.java`
 
 ### 1. Lua 脚本处理库存 key 不存在
 
@@ -119,7 +119,7 @@ Boolean created = transactionTemplate.execute(status -> createVoucherOrder(vouch
 
 修改文件：
 
-- `src/main/resources/db/hmdp.sql`
+- `src/main/resources/db/xiaohongshu.sql`
 
 新增约束：
 
@@ -158,8 +158,8 @@ HAVING COUNT(*) > 1;
 
 修改文件：
 
-- `src/main/java/com/hmdp/controller/UploadController.java`
-- `src/main/java/com/hmdp/config/MvcConfig.java`
+- `src/main/java/com/xhs/controller/UploadController.java`
+- `src/main/java/com/xhs/config/MvcConfig.java`
 
 ### 1. 上传接口需要登录
 
@@ -190,8 +190,8 @@ if (!target.startsWith(root)) {
 
 修改文件：
 
-- `src/main/java/com/hmdp/config/MvcConfig.java`
-- `src/main/java/com/hmdp/ai/tool/HmDianPingAiTools.java`
+- `src/main/java/com/xhs/config/MvcConfig.java`
+- `src/main/java/com/xhs/ai/tool/XiaohongshuAiTools.java`
 
 ### 1. AI 接口需要登录
 
@@ -214,8 +214,8 @@ Long currentUserId = currentUser.getId();
 
 修改文件：
 
-- `src/main/java/com/hmdp/utils/CacheClient.java`
-- `src/main/java/com/hmdp/service/impl/ShopServiceImpl.java`
+- `src/main/java/com/xhs/utils/CacheClient.java`
+- `src/main/java/com/xhs/service/impl/ShopServiceImpl.java`
 
 ### 1. 修复 TimeUnit 被忽略的问题
 
@@ -259,7 +259,7 @@ if (isLock) {
 
 修改文件：
 
-- `src/test/java/com/hmdp/HmDianPingApplicationTests.java`
+- `src/test/java/com/xhs/XiaohongshuApplicationTests.java`
 
 `loadShopData` 是 Redis GEO 数据初始化脚本，需要 MySQL 和 Redis 都可用，不适合作为默认自动测试。
 
@@ -271,7 +271,7 @@ if (isLock) {
 
 如果需要重新导入店铺 GEO 数据，可以临时去掉 `@Disabled`，并确认：
 
-1. MySQL 已导入 `hmdp.sql`
+1. MySQL 已导入 `xiaohongshu.sql`
 2. Redis 已启动并能连接
 3. `application.yaml` 或环境变量里的 Redis/MySQL 配置正确
 

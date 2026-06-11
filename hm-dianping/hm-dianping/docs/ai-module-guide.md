@@ -1,4 +1,4 @@
-# 黑马点评 AI 模块接入文档
+# 小红书 AI 模块接入文档
 
 ## 1. 模块目标
 
@@ -30,16 +30,16 @@
 
 ### 3.1 新增模块结构
 
-新增代码位于 `com.hmdp.ai` 包及一个新的 AI 控制器：
+新增代码位于 `com.xhs.ai` 包及一个新的 AI 控制器：
 
-1. `com.hmdp.ai.config`
-2. `com.hmdp.ai.dto`
-3. `com.hmdp.ai.enums`
-4. `com.hmdp.ai.knowledge`
-5. `com.hmdp.ai.prompt`
-6. `com.hmdp.ai.service`
-7. `com.hmdp.ai.tool`
-8. `com.hmdp.controller.AiAssistantController`
+1. `com.xhs.ai.config`
+2. `com.xhs.ai.dto`
+3. `com.xhs.ai.enums`
+4. `com.xhs.ai.knowledge`
+5. `com.xhs.ai.prompt`
+6. `com.xhs.ai.service`
+7. `com.xhs.ai.tool`
+8. `com.xhs.controller.AiAssistantController`
 
 ### 3.2 模块组成
 
@@ -49,7 +49,7 @@
    负责加载不同场景的系统提示词。
 3. `AiKnowledgeService`
    负责加载本地知识库 JSON，并按关键字命中业务知识片段。
-4. `HmDianPingAiTools`
+4. `XiaohongshuAiTools`
    把现有店铺、分类、优惠券、订单能力封装为 AI 可调用工具。
 5. `ChatMemory`
    采用 `MessageWindowChatMemory + InMemoryChatMemoryRepository` 保存短期上下文窗口。
@@ -159,7 +159,7 @@ spring:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:please-replace-with-your-dashscope-api-key}
 
-hmdp:
+xiaohongshu:
   ai:
     model: qwen-plus
     customer-service-temperature: 0.6
@@ -173,7 +173,7 @@ hmdp:
 
 1. `spring.ai.dashscope.api-key`
    DashScope 的 API Key
-2. `hmdp.ai.model`
+2. `xiaohongshu.ai.model`
    默认聊天模型，当前默认 `qwen-plus`
 3. `customer-service-temperature`
    客服场景的温度，更偏自然交流
@@ -274,7 +274,7 @@ DELETE /ai/session/query/query-001
 
 ## 11. 本次落地结论
 
-现在项目已经具备一个可运行的 AI 模块骨架，并且是贴合当前黑马点评业务数据的：
+现在项目已经具备一个可运行的 AI 模块骨架，并且是贴合当前小红书业务数据的：
 
 1. 有独立 AI 控制层
 2. 有 Spring AI Alibaba 对话接入

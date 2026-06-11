@@ -7,10 +7,10 @@
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.5.0</version>
         <relativePath/> </parent>
-    <groupId>com.hmdp</groupId>
-    <artifactId>hm-dianping</artifactId>
+    <groupId>com.xhs</groupId>
+    <artifactId>xiaohongshu</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>hm-dianping</name>
+    <name>xiaohongshu</name>
     <description>Demo project for Spring Boot</description>
     <properties>
         <java.version>17</java.version>

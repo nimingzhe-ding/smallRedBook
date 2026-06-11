@@ -184,7 +184,7 @@ window.notificationCategoryLabel = notificationCategoryLabel;
 // ------------------------------
 function dmStoreKey() {
   const userId = state.currentUser?.id || "guest";
-  return `hmdp_dm_${userId}`;
+  return `xiaohongshu_dm_${userId}`;
 }
 window.dmStoreKey = dmStoreKey;
 
@@ -427,7 +427,7 @@ function connectPrivateMessageSocket(force = false) {
   closePrivateMessageSocket();
   state.privateMessageManualClose = false;
   state.privateMessageSocketToken = currentToken;
-  const configured = window.HMDP_PRIVATE_MESSAGE_WS_URL || localStorage.getItem("hmdp_private_message_ws_url") || "";
+  const configured = window.XHS_PRIVATE_MESSAGE_WS_URL || localStorage.getItem("xiaohongshu_private_message_ws_url") || "";
   const socketUrl = new URL(configured || wsUrl("/ws/messages", 8091), location.href);
   if (socketUrl.protocol === "http:") socketUrl.protocol = "ws:";
   if (socketUrl.protocol === "https:") socketUrl.protocol = "wss:";

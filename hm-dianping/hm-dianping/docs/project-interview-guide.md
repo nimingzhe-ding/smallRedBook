@@ -1,4 +1,4 @@
-# 黑马点评项目面试版说明文档
+# 小红书项目面试版说明文档
 
 ## 1. 项目一句话介绍
 
@@ -6,11 +6,11 @@
 
 如果面试官只给你 20 秒，你可以这样说：
 
-> 这是一个偏高并发和 Redis 场景的点评类项目，原项目重点在缓存、登录态、秒杀、Feed 流和 GEO 检索；我在这个基础上又接入了 Spring AI Alibaba，用工具调用把店铺、优惠券、订单这些真实业务能力暴露给大模型，做了智能客服和智能查询问答。
+> 这是一个偏高并发和 Redis 场景的小红书类项目，原项目重点在缓存、登录态、秒杀、Feed 流和 GEO 检索；我在这个基础上又接入了 Spring AI Alibaba，用工具调用把店铺、优惠券、订单这些真实业务能力暴露给大模型，做了智能客服和智能查询问答。
 
 ## 2. 项目定位和业务范围
 
-这个项目可以理解为“简化版的大众点评/本地生活服务后端”。
+这个项目可以理解为“简化版的大众小红书/本地生活服务后端”。
 
 核心业务能力包括：
 
@@ -43,7 +43,7 @@
 
 关键代码位置：
 
-1. 应用启动类：`src/main/java/com/hmdp/HmDianPingApplication.java`
+1. 应用启动类：`src/main/java/com/xhs/XiaohongshuApplication.java`
 2. Maven 配置：`pom.xml`
 3. 运行配置：`src/main/resources/application.yaml`
 
@@ -72,7 +72,7 @@
 
 如果面试官问“你有没有大改原项目结构”，你的答案应该是：
 
-> 没有大改。我保留了原有单体分层结构，只在原系统上新增了一个 `com.hmdp.ai` 模块，并在 `controller` 层增加了一个 `AiAssistantController`。原业务 service 和数据库表结构没有被重构。
+> 没有大改。我保留了原有单体分层结构，只在原系统上新增了一个 `com.xhs.ai` 模块，并在 `controller` 层增加了一个 `AiAssistantController`。原业务 service 和数据库表结构没有被重构。
 
 ## 5. 请求处理主链路
 
@@ -88,11 +88,11 @@
 
 关键代码：
 
-1. 拦截器注册：`src/main/java/com/hmdp/config/MvcConfig.java`
-2. token 刷新：`src/main/java/com/hmdp/utils/RefreshTokenInterceptor.java`
-3. 登录拦截：`src/main/java/com/hmdp/utils/LoginInterceptor.java`
-4. 用户上下文：`src/main/java/com/hmdp/utils/UserHolder.java`
-5. 统一异常：`src/main/java/com/hmdp/config/WebExceptionAdvice.java`
+1. 拦截器注册：`src/main/java/com/xhs/config/MvcConfig.java`
+2. token 刷新：`src/main/java/com/xhs/utils/RefreshTokenInterceptor.java`
+3. 登录拦截：`src/main/java/com/xhs/utils/LoginInterceptor.java`
+4. 用户上下文：`src/main/java/com/xhs/utils/UserHolder.java`
+5. 统一异常：`src/main/java/com/xhs/config/WebExceptionAdvice.java`
 
 ## 6. 典型业务模块拆解
 
@@ -115,8 +115,8 @@
 
 核心代码：
 
-1. 控制层：`src/main/java/com/hmdp/controller/UserController.java`
-2. 业务层：`src/main/java/com/hmdp/service/impl/UserServiceImpl.java`
+1. 控制层：`src/main/java/com/xhs/controller/UserController.java`
+2. 业务层：`src/main/java/com/xhs/service/impl/UserServiceImpl.java`
 
 面试亮点可以这样说：
 
@@ -146,10 +146,10 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/ShopServiceImpl.java`
-2. `src/main/java/com/hmdp/utils/CacheClient.java`
-3. `src/main/java/com/hmdp/utils/RedisConstants.java`
-4. `src/main/java/com/hmdp/controller/ShopController.java`
+1. `src/main/java/com/xhs/service/impl/ShopServiceImpl.java`
+2. `src/main/java/com/xhs/utils/CacheClient.java`
+3. `src/main/java/com/xhs/utils/RedisConstants.java`
+4. `src/main/java/com/xhs/controller/ShopController.java`
 
 面试说法：
 
@@ -167,7 +167,7 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/ShopTypeServiceImpl.java`
+1. `src/main/java/com/xhs/service/impl/ShopTypeServiceImpl.java`
 
 ### 6.4 GEO 附近店铺查询
 
@@ -184,8 +184,8 @@
 
 核心代码：
 
-1. `src/main/java/com/hmdp/service/impl/ShopServiceImpl.java`
-2. 测试写 GEO：`src/test/java/com/hmdp/HmDianPingApplicationTests.java`
+1. `src/main/java/com/xhs/service/impl/ShopServiceImpl.java`
+2. 测试写 GEO：`src/test/java/com/xhs/XiaohongshuApplicationTests.java`
 
 面试亮点：
 
@@ -210,10 +210,10 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/VoucherOrderServiceImpl.java`
-2. `src/main/java/com/hmdp/service/impl/VoucherServiceImpl.java`
+1. `src/main/java/com/xhs/service/impl/VoucherOrderServiceImpl.java`
+2. `src/main/java/com/xhs/service/impl/VoucherServiceImpl.java`
 3. `src/main/resources/seckill.lua`
-4. `src/main/java/com/hmdp/config/RedissonConfig.java`
+4. `src/main/java/com/xhs/config/RedissonConfig.java`
 
 如果面试官问“为什么要 Lua + 队列 + 锁一起上”，你可以这样答：
 
@@ -237,9 +237,9 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/BlogServiceImpl.java`
-2. `src/main/java/com/hmdp/controller/BlogController.java`
-3. `src/main/java/com/hmdp/dto/ScrollResult.java`
+1. `src/main/java/com/xhs/service/impl/BlogServiceImpl.java`
+2. `src/main/java/com/xhs/controller/BlogController.java`
+3. `src/main/java/com/xhs/dto/ScrollResult.java`
 
 面试亮点：
 
@@ -265,7 +265,7 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/FollowServiceImpl.java`
+1. `src/main/java/com/xhs/service/impl/FollowServiceImpl.java`
 
 ### 6.8 签到统计
 
@@ -280,7 +280,7 @@
 
 关键代码：
 
-1. `src/main/java/com/hmdp/service/impl/UserServiceImpl.java`
+1. `src/main/java/com/xhs/service/impl/UserServiceImpl.java`
 
 ## 7. 项目里的 Redis 用法总结
 
@@ -344,19 +344,19 @@
 AI 相关代码主要集中在以下位置：
 
 1. 配置层
-   `src/main/java/com/hmdp/ai/config/AiAssistantConfig.java`
-   `src/main/java/com/hmdp/ai/config/AiAssistantProperties.java`
+   `src/main/java/com/xhs/ai/config/AiAssistantConfig.java`
+   `src/main/java/com/xhs/ai/config/AiAssistantProperties.java`
 2. 控制层
-   `src/main/java/com/hmdp/controller/AiAssistantController.java`
+   `src/main/java/com/xhs/controller/AiAssistantController.java`
 3. 核心服务层
-   `src/main/java/com/hmdp/ai/service/AiAssistantService.java`
+   `src/main/java/com/xhs/ai/service/AiAssistantService.java`
 4. 工具层
-   `src/main/java/com/hmdp/ai/tool/HmDianPingAiTools.java`
+   `src/main/java/com/xhs/ai/tool/XiaohongshuAiTools.java`
 5. 知识库层
-   `src/main/java/com/hmdp/ai/knowledge/AiKnowledgeService.java`
+   `src/main/java/com/xhs/ai/knowledge/AiKnowledgeService.java`
    `src/main/resources/ai/knowledge/*.json`
 6. 提示词层
-   `src/main/java/com/hmdp/ai/prompt/AiPromptService.java`
+   `src/main/java/com/xhs/ai/prompt/AiPromptService.java`
    `src/main/resources/ai/prompts/*.txt`
 
 ### 8.4 AI 提供了哪些能力
@@ -374,7 +374,7 @@ AI 相关代码主要集中在以下位置：
 
 控制器代码：
 
-1. `src/main/java/com/hmdp/controller/AiAssistantController.java`
+1. `src/main/java/com/xhs/controller/AiAssistantController.java`
 
 ### 8.5 AI 模块的核心调用链
 
@@ -388,14 +388,14 @@ AI 相关代码主要集中在以下位置：
 6. 绑定会话 ID 和 `ChatMemory`
 7. 把当前登录用户 ID、知识片段、用户问题拼成 prompt
 8. 使用 `ChatClient` 发起模型调用
-9. 模型在需要时自动调用 `HmDianPingAiTools`
+9. 模型在需要时自动调用 `XiaohongshuAiTools`
 10. 工具返回真实业务数据
 11. 大模型基于真实数据组织自然语言回答
 12. 返回统一 `AiChatResponse`
 
 核心代码：
 
-1. `src/main/java/com/hmdp/ai/service/AiAssistantService.java`
+1. `src/main/java/com/xhs/ai/service/AiAssistantService.java`
 
 ### 8.6 为什么不用“纯 Prompt 问答”，而要做工具调用
 
@@ -411,7 +411,7 @@ AI 相关代码主要集中在以下位置：
 
 工具类在：
 
-1. `src/main/java/com/hmdp/ai/tool/HmDianPingAiTools.java`
+1. `src/main/java/com/xhs/ai/tool/XiaohongshuAiTools.java`
 
 当前主要提供了这些工具：
 
@@ -473,7 +473,7 @@ AI 相关代码主要集中在以下位置：
 
 相关代码：
 
-1. `src/main/java/com/hmdp/ai/knowledge/AiKnowledgeService.java`
+1. `src/main/java/com/xhs/ai/knowledge/AiKnowledgeService.java`
 2. `src/main/resources/ai/knowledge/customer-service-knowledge.json`
 3. `src/main/resources/ai/knowledge/query-knowledge.json`
 
@@ -506,7 +506,7 @@ AI 相关代码主要集中在以下位置：
 
 配置在：
 
-1. `src/main/java/com/hmdp/ai/config/AiAssistantConfig.java`
+1. `src/main/java/com/xhs/ai/config/AiAssistantConfig.java`
 
 设计含义：
 
@@ -526,7 +526,7 @@ AI 相关代码主要集中在以下位置：
 
 ### 8.11 AI 配置设计
 
-AI 配置被抽到了 `hmdp.ai` 前缀下：
+AI 配置被抽到了 `xiaohongshu.ai` 前缀下：
 
 1. 模型名
 2. 客服温度
@@ -537,7 +537,7 @@ AI 配置被抽到了 `hmdp.ai` 前缀下：
 
 对应代码：
 
-1. `src/main/java/com/hmdp/ai/config/AiAssistantProperties.java`
+1. `src/main/java/com/xhs/ai/config/AiAssistantProperties.java`
 
 这样做的好处是：
 
@@ -684,7 +684,7 @@ AI 配置被抽到了 `hmdp.ai` 前缀下：
 
 你可以写成这样：
 
-> 黑马点评后端项目，基于 Spring Boot、MyBatis-Plus、Redis、MySQL 实现本地生活服务系统，覆盖验证码登录、店铺缓存、GEO 附近检索、优惠券秒杀、博客 Feed 流和签到统计等核心功能；新增基于 Spring AI Alibaba 的智能客服与智能查询问答模块，通过 Tool Calling 复用店铺、优惠券、订单等业务能力，并结合本地知识库和会话记忆实现多轮业务问答。
+> 小红书后端项目，基于 Spring Boot、MyBatis-Plus、Redis、MySQL 实现本地生活服务系统，覆盖验证码登录、店铺缓存、GEO 附近检索、优惠券秒杀、博客 Feed 流和签到统计等核心功能；新增基于 Spring AI Alibaba 的智能客服与智能查询问答模块，通过 Tool Calling 复用店铺、优惠券、订单等业务能力，并结合本地知识库和会话记忆实现多轮业务问答。
 
 ## 13. 我建议你面试时强调的关键词
 

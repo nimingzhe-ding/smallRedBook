@@ -1,7 +1,7 @@
 -- ============================================================
 -- Compensation event table.
 -- Execute:
---   mysql -u root -p hmdp < upgrade-compensation.sql
+--   mysql -u root -p xiaohongshu < upgrade-compensation.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `tb_compensation_event` (

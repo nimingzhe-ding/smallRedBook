@@ -388,7 +388,7 @@ async function loadHotSearches() {
 
 async function loadSearchHistory() {
   if (!token()) {
-    state.searchHistory = readScopedJson("hmdp_search_history", [], "guest");
+    state.searchHistory = readScopedJson("xiaohongshu_search_history", [], "guest");
     return state.searchHistory;
   }
   try {
@@ -411,7 +411,7 @@ async function deleteSearchHistoryItem(keyword) {
     }
   }
   state.searchHistory = state.searchHistory.filter(item => item !== value);
-  writeScopedJson("hmdp_search_history", state.searchHistory, token() ? undefined : "guest");
+  writeScopedJson("xiaohongshu_search_history", state.searchHistory, token() ? undefined : "guest");
   renderSearchDiscovery();
 }
 
@@ -424,7 +424,7 @@ async function clearSearchHistoryAll() {
     }
   }
   state.searchHistory = [];
-  removeScopedStorage("hmdp_search_history", token() ? undefined : "guest");
+  removeScopedStorage("xiaohongshu_search_history", token() ? undefined : "guest");
   renderSearchDiscovery();
 }
 
@@ -433,7 +433,7 @@ function rememberLocalSearch(keyword) {
   if (!value) return;
   state.searchHistory = [value, ...state.searchHistory.filter(item => item !== value)].slice(0, 10);
   if (!token()) {
-    writeScopedJson("hmdp_search_history", state.searchHistory, "guest");
+    writeScopedJson("xiaohongshu_search_history", state.searchHistory, "guest");
   }
 }
 

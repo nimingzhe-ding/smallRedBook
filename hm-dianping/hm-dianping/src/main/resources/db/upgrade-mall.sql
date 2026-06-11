@@ -1,7 +1,7 @@
 -- 商城第一版增量脚本
 -- 用途：新增商品、购物车、商城订单表，并插入示例商品。
 
-USE hmdp;
+USE xiaohongshu;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS add_index_if_missing;

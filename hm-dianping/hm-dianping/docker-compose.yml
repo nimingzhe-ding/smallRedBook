@@ -1,3 +1,5 @@
+name: xiaohongshu
+
 services:
   app:
     build: .
@@ -6,30 +8,30 @@ services:
       - "8090:8090"
       - "8091:8091"
     environment:
-      HMDP_DATASOURCE_URL: "${HMDP_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
-      HMDP_DATASOURCE_USERNAME: "${HMDP_DATASOURCE_USERNAME:-root}"
-      HMDP_DATASOURCE_PASSWORD: "${HMDP_DATASOURCE_PASSWORD:-120402}"
-      HMDP_REDIS_HOST: "${HMDP_REDIS_HOST:-192.168.19.130}"
-      HMDP_REDIS_PORT: "${HMDP_REDIS_PORT:-6379}"
-      HMDP_REDIS_PASSWORD: "${HMDP_REDIS_PASSWORD:-120402}"
-      HMDP_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      HMDP_ELASTICSEARCH_URIS: "http://elasticsearch:9200"
-      HMDP_CANAL_ENABLED: "true"
-      HMDP_CANAL_HOST: "canal"
-      HMDP_CANAL_PORT: "11111"
-      HMDP_CANAL_DESTINATION: "example"
-      HMDP_DANMAKU_WS_PORT: "8090"
-      HMDP_PRIVATE_MESSAGE_WS_PORT: "8091"
-      HMDP_STORAGE_TYPE: "${HMDP_STORAGE_TYPE:-local}"
-      HMDP_OSS_ENDPOINT: "${HMDP_OSS_ENDPOINT:-}"
-      HMDP_OSS_BUCKET: "${HMDP_OSS_BUCKET:-}"
-      HMDP_OSS_ACCESS_KEY: "${HMDP_OSS_ACCESS_KEY:-}"
-      HMDP_OSS_SECRET_KEY: "${HMDP_OSS_SECRET_KEY:-}"
-      HMDP_OSS_DOMAIN: "${HMDP_OSS_DOMAIN:-}"
-      HMDP_UPLOAD_MAX_VIDEO_SIZE: "${HMDP_UPLOAD_MAX_VIDEO_SIZE:-524288000}"
-      HMDP_DIRECT_UPLOAD_EXPIRE_MINUTES: "${HMDP_DIRECT_UPLOAD_EXPIRE_MINUTES:-10}"
-      HMDP_IMAGE_UPLOAD_DIR: "/data/imgs"
-      HMDP_AI_ENABLED: "${HMDP_AI_ENABLED:-false}"
+      XHS_DATASOURCE_URL: "${XHS_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/xiaohongshu?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
+      XHS_DATASOURCE_USERNAME: "${XHS_DATASOURCE_USERNAME:-root}"
+      XHS_DATASOURCE_PASSWORD: "${XHS_DATASOURCE_PASSWORD:-120402}"
+      XHS_REDIS_HOST: "${XHS_REDIS_HOST:-192.168.19.130}"
+      XHS_REDIS_PORT: "${XHS_REDIS_PORT:-6379}"
+      XHS_REDIS_PASSWORD: "${XHS_REDIS_PASSWORD:-120402}"
+      XHS_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      XHS_ELASTICSEARCH_URIS: "http://elasticsearch:9200"
+      XHS_CANAL_ENABLED: "true"
+      XHS_CANAL_HOST: "canal"
+      XHS_CANAL_PORT: "11111"
+      XHS_CANAL_DESTINATION: "example"
+      XHS_DANMAKU_WS_PORT: "8090"
+      XHS_PRIVATE_MESSAGE_WS_PORT: "8091"
+      XHS_STORAGE_TYPE: "${XHS_STORAGE_TYPE:-local}"
+      XHS_OSS_ENDPOINT: "${XHS_OSS_ENDPOINT:-}"
+      XHS_OSS_BUCKET: "${XHS_OSS_BUCKET:-}"
+      XHS_OSS_ACCESS_KEY: "${XHS_OSS_ACCESS_KEY:-}"
+      XHS_OSS_SECRET_KEY: "${XHS_OSS_SECRET_KEY:-}"
+      XHS_OSS_DOMAIN: "${XHS_OSS_DOMAIN:-}"
+      XHS_UPLOAD_MAX_VIDEO_SIZE: "${XHS_UPLOAD_MAX_VIDEO_SIZE:-524288000}"
+      XHS_DIRECT_UPLOAD_EXPIRE_MINUTES: "${XHS_DIRECT_UPLOAD_EXPIRE_MINUTES:-10}"
+      XHS_IMAGE_UPLOAD_DIR: "/data/imgs"
+      XHS_AI_ENABLED: "${XHS_AI_ENABLED:-false}"
       DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY:-}"
     volumes:
       - upload-data:/data/imgs
@@ -52,7 +54,7 @@ services:
       - "--binlog-row-image=FULL"
     environment:
       MYSQL_ROOT_PASSWORD: "root123"
-      MYSQL_DATABASE: "hmdp"
+      MYSQL_DATABASE: "xiaohongshu"
     ports:
       - "${MYSQL_HOST_PORT:-3307}:3306"
     volumes:
@@ -123,9 +125,9 @@ services:
     environment:
       canal.auto.scan: "false"
       canal.destinations: "example"
-      canal.instance.master.address: "${HMDP_CANAL_MYSQL_ADDRESS:-host.docker.internal:3306}"
-      canal.instance.dbUsername: "${HMDP_CANAL_MYSQL_USERNAME:-canal}"
-      canal.instance.dbPassword: "${HMDP_CANAL_MYSQL_PASSWORD:-canal}"
+      canal.instance.master.address: "${XHS_CANAL_MYSQL_ADDRESS:-host.docker.internal:3306}"
+      canal.instance.dbUsername: "${XHS_CANAL_MYSQL_USERNAME:-canal}"
+      canal.instance.dbPassword: "${XHS_CANAL_MYSQL_PASSWORD:-canal}"
       canal.instance.connectionCharset: "UTF-8"
       canal.instance.tsdb.enable: "true"
       canal.instance.gtidon: "false"

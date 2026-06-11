@@ -23,7 +23,7 @@ async function initUser() {
     loadNotificationSettings?.();
     refreshNotificationBadge?.();
   } catch {
-    localStorage.removeItem("hmdp_token");
+    localStorage.removeItem("xiaohongshu_token");
     stopNotificationStream?.();
     renderUser(null);
     reloadScopedLocalState?.();
@@ -155,9 +155,9 @@ async function submitLogin(event) {
     });
     const loginToken = typeof response === "string" ? response : response?.token;
     if (!loginToken) throw new Error("登录响应缺少 token");
-    localStorage.setItem("hmdp_token", loginToken);
+    localStorage.setItem("xiaohongshu_token", loginToken);
     if (response?.expiresInSeconds) {
-      localStorage.setItem("hmdp_token_expire_at", String(Date.now() + Number(response.expiresInSeconds) * 1000));
+      localStorage.setItem("xiaohongshu_token_expire_at", String(Date.now() + Number(response.expiresInSeconds) * 1000));
     }
     els.loginDialog.close();
     if (response?.user) {
@@ -260,8 +260,8 @@ async function logout() {
   } catch {
     // 本地清理仍然要执行，避免过期 token 卡住用户。
   }
-  localStorage.removeItem("hmdp_token");
-  localStorage.removeItem("hmdp_token_expire_at");
+  localStorage.removeItem("xiaohongshu_token");
+  localStorage.removeItem("xiaohongshu_token_expire_at");
   stopNotificationStream?.();
   renderUser(null);
   reloadScopedLocalState?.();

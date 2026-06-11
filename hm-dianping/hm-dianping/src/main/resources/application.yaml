@@ -11,31 +11,31 @@ management:
       show-details: when_authorized
   metrics:
     tags:
-      application: ${spring.application.name:hmdp}
+      application: ${spring.application.name:xiaohongshu}
 
 spring:
   main:
     allow-circular-references: true
   application:
-    name: hmdp
+    name: xiaohongshu
   servlet:
     multipart:
-      max-file-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
-      max-request-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
+      max-file-size: ${XHS_UPLOAD_MAX_VIDEO_SIZE:524288000}
+      max-request-size: ${XHS_UPLOAD_MAX_VIDEO_SIZE:524288000}
   ai:
     dashscope:
-      enabled: ${HMDP_AI_ENABLED:false}
+      enabled: ${XHS_AI_ENABLED:false}
       api-key: "${DASHSCOPE_API_KEY:}"
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: "${HMDP_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
-    username: "${HMDP_DATASOURCE_USERNAME:root}"
-    password: "${HMDP_DATASOURCE_PASSWORD:120402}"
+    url: "${XHS_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/xiaohongshu?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
+    username: "${XHS_DATASOURCE_USERNAME:root}"
+    password: "${XHS_DATASOURCE_PASSWORD:120402}"
   data:
     redis:
-      host: "${HMDP_REDIS_HOST:192.168.19.130}"
-      port: ${HMDP_REDIS_PORT:6379}
-      password: "${HMDP_REDIS_PASSWORD:120402}"
+      host: "${XHS_REDIS_HOST:192.168.19.130}"
+      port: ${XHS_REDIS_PORT:6379}
+      password: "${XHS_REDIS_PASSWORD:120402}"
       lettuce:
         pool:
           max-active: 10
@@ -45,7 +45,7 @@ spring:
   jackson:
     default-property-inclusion: non_null
   kafka:
-    bootstrap-servers: "${HMDP_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}"
+    bootstrap-servers: "${XHS_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}"
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -64,27 +64,27 @@ spring:
       ack-mode: manual_immediate
 
 mybatis-plus:
-  type-aliases-package: com.hmdp.entity
+  type-aliases-package: com.xhs.entity
 
 logging:
   level:
-    com.hmdp: debug
+    com.xhs: debug
 
-hmdp:
+xiaohongshu:
   storage:
-    type: "${HMDP_STORAGE_TYPE:local}"
+    type: "${XHS_STORAGE_TYPE:local}"
     oss:
-      endpoint: "${HMDP_OSS_ENDPOINT:}"
-      bucket: "${HMDP_OSS_BUCKET:}"
-      access-key: "${HMDP_OSS_ACCESS_KEY:}"
-      secret-key: "${HMDP_OSS_SECRET_KEY:}"
-      domain: "${HMDP_OSS_DOMAIN:}"
+      endpoint: "${XHS_OSS_ENDPOINT:}"
+      bucket: "${XHS_OSS_BUCKET:}"
+      access-key: "${XHS_OSS_ACCESS_KEY:}"
+      secret-key: "${XHS_OSS_SECRET_KEY:}"
+      domain: "${XHS_OSS_DOMAIN:}"
   upload:
-    image-dir: "${HMDP_IMAGE_UPLOAD_DIR:D:/hmdp/nginx-1.18.0/html/hmdp/imgs}"
-    max-image-size: ${HMDP_UPLOAD_MAX_IMAGE_SIZE:5242880}
-    max-video-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
-    direct-upload-expire-minutes: ${HMDP_DIRECT_UPLOAD_EXPIRE_MINUTES:10}
-    multipart-cleanup-grace-minutes: ${HMDP_MULTIPART_CLEANUP_GRACE_MINUTES:30}
+    image-dir: "${XHS_IMAGE_UPLOAD_DIR:D:/xiaohongshu/nginx-1.18.0/html/xiaohongshu/imgs}"
+    max-image-size: ${XHS_UPLOAD_MAX_IMAGE_SIZE:5242880}
+    max-video-size: ${XHS_UPLOAD_MAX_VIDEO_SIZE:524288000}
+    direct-upload-expire-minutes: ${XHS_DIRECT_UPLOAD_EXPIRE_MINUTES:10}
+    multipart-cleanup-grace-minutes: ${XHS_MULTIPART_CLEANUP_GRACE_MINUTES:30}
   ai:
     model: qwen-plus
     customer-service-temperature: 0.6
@@ -93,78 +93,78 @@ hmdp:
     max-messages: 12
     knowledge-top-k: 3
   auth:
-    debug-code-response: ${HMDP_AUTH_DEBUG_CODE_RESPONSE:true}
+    debug-code-response: ${XHS_AUTH_DEBUG_CODE_RESPONSE:true}
   compensation:
-    enabled: ${HMDP_COMPENSATION_ENABLED:true}
-    batch-size: ${HMDP_COMPENSATION_BATCH_SIZE:20}
-    fixed-delay-millis: ${HMDP_COMPENSATION_FIXED_DELAY_MILLIS:5000}
-    max-retry: ${HMDP_COMPENSATION_MAX_RETRY:12}
-    initial-backoff-seconds: ${HMDP_COMPENSATION_INITIAL_BACKOFF_SECONDS:30}
-    max-backoff-seconds: ${HMDP_COMPENSATION_MAX_BACKOFF_SECONDS:3600}
-    lock-seconds: ${HMDP_COMPENSATION_LOCK_SECONDS:300}
+    enabled: ${XHS_COMPENSATION_ENABLED:true}
+    batch-size: ${XHS_COMPENSATION_BATCH_SIZE:20}
+    fixed-delay-millis: ${XHS_COMPENSATION_FIXED_DELAY_MILLIS:5000}
+    max-retry: ${XHS_COMPENSATION_MAX_RETRY:12}
+    initial-backoff-seconds: ${XHS_COMPENSATION_INITIAL_BACKOFF_SECONDS:30}
+    max-backoff-seconds: ${XHS_COMPENSATION_MAX_BACKOFF_SECONDS:3600}
+    lock-seconds: ${XHS_COMPENSATION_LOCK_SECONDS:300}
   moderation:
-    enabled: ${HMDP_MODERATION_ENABLED:true}
-    sensitive-words: "${HMDP_SENSITIVE_WORDS:}"
+    enabled: ${XHS_MODERATION_ENABLED:true}
+    sensitive-words: "${XHS_SENSITIVE_WORDS:}"
   search:
     elasticsearch:
-      enabled: ${HMDP_ELASTICSEARCH_ENABLED:true}
-      uris: "${HMDP_ELASTICSEARCH_URIS:http://localhost:9200}"
-      index: "${HMDP_ELASTICSEARCH_INDEX:hmdp_search}"
+      enabled: ${XHS_ELASTICSEARCH_ENABLED:true}
+      uris: "${XHS_ELASTICSEARCH_URIS:http://localhost:9200}"
+      index: "${XHS_ELASTICSEARCH_INDEX:xiaohongshu_search}"
   canal:
-    enabled: ${HMDP_CANAL_ENABLED:false}
-    host: "${HMDP_CANAL_HOST:127.0.0.1}"
-    port: ${HMDP_CANAL_PORT:11111}
-    destination: "${HMDP_CANAL_DESTINATION:example}"
-    username: "${HMDP_CANAL_USERNAME:}"
-    password: "${HMDP_CANAL_PASSWORD:}"
-    subscribe: "${HMDP_CANAL_SUBSCRIBE:.*\\.tb_blog,.*\\.tb_user,.*\\.tb_video_danmaku}"
-    batch-size: ${HMDP_CANAL_BATCH_SIZE:1000}
-    idle-sleep-millis: ${HMDP_CANAL_IDLE_SLEEP_MILLIS:500}
-    initial-backoff-millis: ${HMDP_CANAL_INITIAL_BACKOFF_MILLIS:1000}
-    max-backoff-millis: ${HMDP_CANAL_MAX_BACKOFF_MILLIS:30000}
-    cache-ttl-minutes: ${HMDP_CANAL_CACHE_TTL_MINUTES:30}
+    enabled: ${XHS_CANAL_ENABLED:false}
+    host: "${XHS_CANAL_HOST:127.0.0.1}"
+    port: ${XHS_CANAL_PORT:11111}
+    destination: "${XHS_CANAL_DESTINATION:example}"
+    username: "${XHS_CANAL_USERNAME:}"
+    password: "${XHS_CANAL_PASSWORD:}"
+    subscribe: "${XHS_CANAL_SUBSCRIBE:.*\\.tb_blog,.*\\.tb_user,.*\\.tb_video_danmaku}"
+    batch-size: ${XHS_CANAL_BATCH_SIZE:1000}
+    idle-sleep-millis: ${XHS_CANAL_IDLE_SLEEP_MILLIS:500}
+    initial-backoff-millis: ${XHS_CANAL_INITIAL_BACKOFF_MILLIS:1000}
+    max-backoff-millis: ${XHS_CANAL_MAX_BACKOFF_MILLIS:30000}
+    cache-ttl-minutes: ${XHS_CANAL_CACHE_TTL_MINUTES:30}
   seckill:
     kafka:
-      order-topic: "${HMDP_SECKILL_ORDER_TOPIC:seckill-order}"
-      order-dlt-topic: "${HMDP_SECKILL_ORDER_DLT_TOPIC:seckill-order.DLT}"
-      order-consumer-group: "${HMDP_SECKILL_ORDER_CONSUMER_GROUP:seckill-order-consumer-group}"
-      partitions: ${HMDP_SECKILL_ORDER_PARTITIONS:3}
-      replicas: ${HMDP_SECKILL_ORDER_REPLICAS:1}
-      listener-concurrency: ${HMDP_SECKILL_ORDER_CONCURRENCY:3}
+      order-topic: "${XHS_SECKILL_ORDER_TOPIC:seckill-order}"
+      order-dlt-topic: "${XHS_SECKILL_ORDER_DLT_TOPIC:seckill-order.DLT}"
+      order-consumer-group: "${XHS_SECKILL_ORDER_CONSUMER_GROUP:seckill-order-consumer-group}"
+      partitions: ${XHS_SECKILL_ORDER_PARTITIONS:3}
+      replicas: ${XHS_SECKILL_ORDER_REPLICAS:1}
+      listener-concurrency: ${XHS_SECKILL_ORDER_CONCURRENCY:3}
   danmaku:
     websocket:
-      enabled: ${HMDP_DANMAKU_WS_ENABLED:true}
-      port: ${HMDP_DANMAKU_WS_PORT:8090}
-      path: "${HMDP_DANMAKU_WS_PATH:/ws/danmaku}"
-      reader-idle-seconds: ${HMDP_DANMAKU_WS_READER_IDLE_SECONDS:75}
-      max-frame-payload-length: ${HMDP_DANMAKU_WS_MAX_FRAME_PAYLOAD_LENGTH:1024}
+      enabled: ${XHS_DANMAKU_WS_ENABLED:true}
+      port: ${XHS_DANMAKU_WS_PORT:8090}
+      path: "${XHS_DANMAKU_WS_PATH:/ws/danmaku}"
+      reader-idle-seconds: ${XHS_DANMAKU_WS_READER_IDLE_SECONDS:75}
+      max-frame-payload-length: ${XHS_DANMAKU_WS_MAX_FRAME_PAYLOAD_LENGTH:1024}
     kafka:
-      topic: "${HMDP_DANMAKU_TOPIC:video-danmaku}"
-      dlt-topic: "${HMDP_DANMAKU_DLT_TOPIC:video-danmaku.DLT}"
-      consumer-group: "${HMDP_DANMAKU_CONSUMER_GROUP:video-danmaku-consumer-group}"
-      partitions: ${HMDP_DANMAKU_PARTITIONS:3}
-      replicas: ${HMDP_DANMAKU_REPLICAS:1}
-      listener-concurrency: ${HMDP_DANMAKU_CONCURRENCY:2}
-      cache-limit: ${HMDP_DANMAKU_CACHE_LIMIT:300}
-      cache-ttl-hours: ${HMDP_DANMAKU_CACHE_TTL_HOURS:48}
+      topic: "${XHS_DANMAKU_TOPIC:video-danmaku}"
+      dlt-topic: "${XHS_DANMAKU_DLT_TOPIC:video-danmaku.DLT}"
+      consumer-group: "${XHS_DANMAKU_CONSUMER_GROUP:video-danmaku-consumer-group}"
+      partitions: ${XHS_DANMAKU_PARTITIONS:3}
+      replicas: ${XHS_DANMAKU_REPLICAS:1}
+      listener-concurrency: ${XHS_DANMAKU_CONCURRENCY:2}
+      cache-limit: ${XHS_DANMAKU_CACHE_LIMIT:300}
+      cache-ttl-hours: ${XHS_DANMAKU_CACHE_TTL_HOURS:48}
   private-message:
     kafka:
-      topic: "${HMDP_PRIVATE_MESSAGE_TOPIC:private-message}"
-      dlt-topic: "${HMDP_PRIVATE_MESSAGE_DLT_TOPIC:private-message.DLT}"
-      push-consumer-group: "${HMDP_PRIVATE_MESSAGE_PUSH_CONSUMER_GROUP:private-message-push-${random.uuid}}"
-      dlt-consumer-group: "${HMDP_PRIVATE_MESSAGE_DLT_CONSUMER_GROUP:private-message-dlt-compensation-group}"
-      partitions: ${HMDP_PRIVATE_MESSAGE_PARTITIONS:3}
-      replicas: ${HMDP_PRIVATE_MESSAGE_REPLICAS:1}
-      listener-concurrency: ${HMDP_PRIVATE_MESSAGE_CONCURRENCY:3}
-      outbox-batch-size: ${HMDP_PRIVATE_MESSAGE_OUTBOX_BATCH_SIZE:100}
-      outbox-fixed-delay-millis: ${HMDP_PRIVATE_MESSAGE_OUTBOX_FIXED_DELAY_MILLIS:1000}
-      outbox-max-retry: ${HMDP_PRIVATE_MESSAGE_OUTBOX_MAX_RETRY:12}
-      outbox-initial-backoff-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_INITIAL_BACKOFF_SECONDS:5}
-      outbox-max-backoff-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_MAX_BACKOFF_SECONDS:300}
-      outbox-lock-seconds: ${HMDP_PRIVATE_MESSAGE_OUTBOX_LOCK_SECONDS:120}
+      topic: "${XHS_PRIVATE_MESSAGE_TOPIC:private-message}"
+      dlt-topic: "${XHS_PRIVATE_MESSAGE_DLT_TOPIC:private-message.DLT}"
+      push-consumer-group: "${XHS_PRIVATE_MESSAGE_PUSH_CONSUMER_GROUP:private-message-push-${random.uuid}}"
+      dlt-consumer-group: "${XHS_PRIVATE_MESSAGE_DLT_CONSUMER_GROUP:private-message-dlt-compensation-group}"
+      partitions: ${XHS_PRIVATE_MESSAGE_PARTITIONS:3}
+      replicas: ${XHS_PRIVATE_MESSAGE_REPLICAS:1}
+      listener-concurrency: ${XHS_PRIVATE_MESSAGE_CONCURRENCY:3}
+      outbox-batch-size: ${XHS_PRIVATE_MESSAGE_OUTBOX_BATCH_SIZE:100}
+      outbox-fixed-delay-millis: ${XHS_PRIVATE_MESSAGE_OUTBOX_FIXED_DELAY_MILLIS:1000}
+      outbox-max-retry: ${XHS_PRIVATE_MESSAGE_OUTBOX_MAX_RETRY:12}
+      outbox-initial-backoff-seconds: ${XHS_PRIVATE_MESSAGE_OUTBOX_INITIAL_BACKOFF_SECONDS:5}
+      outbox-max-backoff-seconds: ${XHS_PRIVATE_MESSAGE_OUTBOX_MAX_BACKOFF_SECONDS:300}
+      outbox-lock-seconds: ${XHS_PRIVATE_MESSAGE_OUTBOX_LOCK_SECONDS:120}
     websocket:
-      enabled: ${HMDP_PRIVATE_MESSAGE_WS_ENABLED:true}
-      port: ${HMDP_PRIVATE_MESSAGE_WS_PORT:8091}
-      path: "${HMDP_PRIVATE_MESSAGE_WS_PATH:/ws/messages}"
-      reader-idle-seconds: ${HMDP_PRIVATE_MESSAGE_WS_READER_IDLE_SECONDS:75}
-      max-frame-payload-length: ${HMDP_PRIVATE_MESSAGE_WS_MAX_FRAME_PAYLOAD_LENGTH:2048}
+      enabled: ${XHS_PRIVATE_MESSAGE_WS_ENABLED:true}
+      port: ${XHS_PRIVATE_MESSAGE_WS_PORT:8091}
+      path: "${XHS_PRIVATE_MESSAGE_WS_PATH:/ws/messages}"
+      reader-idle-seconds: ${XHS_PRIVATE_MESSAGE_WS_READER_IDLE_SECONDS:75}
+      max-frame-payload-length: ${XHS_PRIVATE_MESSAGE_WS_MAX_FRAME_PAYLOAD_LENGTH:2048}

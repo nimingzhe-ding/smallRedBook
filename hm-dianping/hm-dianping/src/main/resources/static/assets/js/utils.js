@@ -2,7 +2,7 @@
 // 加载顺序：第一个加载，auth.js / feed.js / detail.js 等都依赖它
 (function() {
 function tokenStorageScope() {
-  const raw = localStorage.getItem("hmdp_token") || "";
+  const raw = localStorage.getItem("xiaohongshu_token") || "";
   if (!raw) return "guest";
   let hash = 0;
   for (let i = 0; i < raw.length; i++) {
@@ -66,11 +66,11 @@ window.saveScopedSet = saveScopedSet;
 
 function reloadScopedLocalState() {
   if (!window.state) return;
-  state.wallet = new Set(readScopedJson("hmdp_wallet", []));
-  state.collected = new Set(readScopedJson("hmdp_collected", []));
-  state.followed = new Set(readScopedJson("hmdp_followed", []));
-  state.aiSessionId = readScopedValue("hmdp_ai_session", crypto.randomUUID());
-  writeScopedValue("hmdp_ai_session", state.aiSessionId);
+  state.wallet = new Set(readScopedJson("xiaohongshu_wallet", []));
+  state.collected = new Set(readScopedJson("xiaohongshu_collected", []));
+  state.followed = new Set(readScopedJson("xiaohongshu_followed", []));
+  state.aiSessionId = readScopedValue("xiaohongshu_ai_session", crypto.randomUUID());
+  writeScopedValue("xiaohongshu_ai_session", state.aiSessionId);
 }
 window.reloadScopedLocalState = reloadScopedLocalState;
 // ==================== 全局状态 ====================
@@ -96,13 +96,13 @@ window.state = {
   danmakuSource: null,
   danmakuSourceNoteId: null,
   danmakuStore: {},
-  danmakuEnabled: JSON.parse(localStorage.getItem("hmdp_danmaku_enabled") || "true"),
-  danmakuSpeed: Number(localStorage.getItem("hmdp_danmaku_speed") || 8.5),
-  danmakuOpacity: Number(localStorage.getItem("hmdp_danmaku_opacity") || 0.9),
-  danmakuBlockWords: localStorage.getItem("hmdp_danmaku_block_words") || "",
-  danmakuHotOnly: JSON.parse(localStorage.getItem("hmdp_danmaku_hot_only") || "false"),
-  videoMuted: JSON.parse(localStorage.getItem("hmdp_video_muted") || "true"),
-  videoAutoplay: JSON.parse(localStorage.getItem("hmdp_video_autoplay") || "true"),
+  danmakuEnabled: JSON.parse(localStorage.getItem("xiaohongshu_danmaku_enabled") || "true"),
+  danmakuSpeed: Number(localStorage.getItem("xiaohongshu_danmaku_speed") || 8.5),
+  danmakuOpacity: Number(localStorage.getItem("xiaohongshu_danmaku_opacity") || 0.9),
+  danmakuBlockWords: localStorage.getItem("xiaohongshu_danmaku_block_words") || "",
+  danmakuHotOnly: JSON.parse(localStorage.getItem("xiaohongshu_danmaku_hot_only") || "false"),
+  videoMuted: JSON.parse(localStorage.getItem("xiaohongshu_video_muted") || "true"),
+  videoAutoplay: JSON.parse(localStorage.getItem("xiaohongshu_video_autoplay") || "true"),
   merchant: null,
   merchantProducts: [],
   merchantOrders: [],
@@ -132,10 +132,10 @@ window.state = {
   hotSearches: [],
   searchHistory: [],
   suggestionTimer: null,
-  wallet: new Set(readScopedJson("hmdp_wallet", [])),
-  collected: new Set(readScopedJson("hmdp_collected", [])),
-  followed: new Set(readScopedJson("hmdp_followed", [])),
-  aiSessionId: readScopedValue("hmdp_ai_session", crypto.randomUUID()),
+  wallet: new Set(readScopedJson("xiaohongshu_wallet", [])),
+  collected: new Set(readScopedJson("xiaohongshu_collected", [])),
+  followed: new Set(readScopedJson("xiaohongshu_followed", [])),
+  aiSessionId: readScopedValue("xiaohongshu_ai_session", crypto.randomUUID()),
   notificationFilter: "all",
   aiSearchInsight: "",
   aiComposerTimer: null,
@@ -160,7 +160,7 @@ window.state = {
   dmSearchTimer: null
 };
 
-writeScopedValue("hmdp_ai_session", state.aiSessionId);
+writeScopedValue("xiaohongshu_ai_session", state.aiSessionId);
 
 // ==================== DOM 引用缓存 ====================
 // 页面加载时一次性获取所有 DOM 元素的引用，避免各处重复 querySelector
@@ -374,7 +374,7 @@ window.defaultNoteImage = defaultNoteImage;
 // 自动处理 Token 注入、API 路径拼接、错误统一处理
 
 const API_ORIGIN = (() => {
-  const configured = localStorage.getItem("hmdp_api_origin");
+  const configured = localStorage.getItem("xiaohongshu_api_origin");
   if (configured) return configured.replace(/\/$/, "");
   if (location.port === "8082" || location.port === "5500" || location.port === "5173") {
     return `${location.protocol}//${location.hostname}:8081`;
@@ -399,7 +399,7 @@ function wsUrl(path, port) {
 window.wsUrl = wsUrl;
 
 function token() {
-  return localStorage.getItem("hmdp_token") || "";
+  return localStorage.getItem("xiaohongshu_token") || "";
 }
 window.token = token;
 
@@ -415,8 +415,8 @@ async function request(url, options = {}) {
     const error = new Error(response.status === 401 ? "登录已过期，请重新登录。" : `HTTP ${response.status}`);
     error.status = response.status;
     if (response.status === 401) {
-      localStorage.removeItem("hmdp_token");
-      localStorage.removeItem("hmdp_token_expire_at");
+      localStorage.removeItem("xiaohongshu_token");
+      localStorage.removeItem("xiaohongshu_token_expire_at");
       state.currentUser = null;
       window.renderUser?.(null);
     }

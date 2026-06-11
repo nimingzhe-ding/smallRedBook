@@ -1,6 +1,6 @@
 -- 作品级 MVP 演示数据
--- 依赖 hmdp.sql、upgrade-mall.sql、upgrade-content-community.sql 已执行。
-USE hmdp;
+-- 依赖 xiaohongshu.sql、upgrade-mall.sql、upgrade-content-community.sql 已执行。
+USE xiaohongshu;
 
 INSERT INTO `tb_user` (`id`, `phone`, `password`, `nick_name`, `icon`)
 VALUES

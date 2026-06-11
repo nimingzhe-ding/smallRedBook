@@ -1,6 +1,6 @@
 -- 内容社区增量脚本
 -- 用途：补充收藏、点赞、评论状态、商品挂载、话题、内容标签和行为事件表。
-USE hmdp;
+USE xiaohongshu;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS add_index_if_missing;

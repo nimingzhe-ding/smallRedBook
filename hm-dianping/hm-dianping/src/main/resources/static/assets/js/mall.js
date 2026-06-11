@@ -355,8 +355,8 @@ function isCommerceAuthError(error) {
 }
 
 function resetCommerceAuth() {
-  localStorage.removeItem("hmdp_token");
-  localStorage.removeItem("hmdp_token_expire_at");
+  localStorage.removeItem("xiaohongshu_token");
+  localStorage.removeItem("xiaohongshu_token_expire_at");
   state.currentUser = null;
   window.renderUser?.(null);
 }

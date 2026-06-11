@@ -5,11 +5,11 @@
   //   normalizeContentType, normalizeMedia, escapeHtml, checkAiRisk,
   //   aiFlow, resetAndLoad, closeDrawer
   // ------------------------------
-  var COMPOSER_DRAFT_KEY = "hmdp_composer_draft";
+  var COMPOSER_DRAFT_KEY = "xiaohongshu_composer_draft";
   var VIDEO_MULTIPART_THRESHOLD = 16 * 1024 * 1024;
   var VIDEO_MULTIPART_PART_SIZE = 8 * 1024 * 1024;
   var VIDEO_MULTIPART_CONCURRENCY = 3;
-  var VIDEO_MULTIPART_STORE = "hmdp_video_multipart_upload";
+  var VIDEO_MULTIPART_STORE = "xiaohongshu_video_multipart_upload";
 
   function composerDraftKey() {
     return scopedStorageKey(COMPOSER_DRAFT_KEY);

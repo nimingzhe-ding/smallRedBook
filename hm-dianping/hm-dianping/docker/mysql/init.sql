@@ -5,7 +5,7 @@
  Source Server Type    : MySQL
  Source Server Version : 50622
  Source Host           : localhost:3306
- Source Schema         : hmdp
+ Source Schema         : xiaohongshu
 
  Target Server Type    : MySQL
  Target Server Version : 50622
@@ -1367,7 +1367,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 商城第一版增量脚本
 -- 用途：新增商品、购物车、商城订单表，并插入示例商品。
 
-USE hmdp;
+USE xiaohongshu;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS add_index_if_missing;
@@ -1563,7 +1563,7 @@ DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS add_index_if_missing;
 -- 内容社区增量脚本
 -- 用途：补充收藏、点赞、评论状态、商品挂载、话题、内容标签和行为事件表。
-USE hmdp;
+USE xiaohongshu;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DELIMITER //
@@ -1872,13 +1872,13 @@ VALUES
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `status` = VALUES(`status`);
 -- ============================================================
 -- 为 tb_user 添加角色字段
--- 执行方式：mysql -u root -p hmdp < upgrade-roles.sql
+-- 执行方式：mysql -u root -p xiaohongshu < upgrade-roles.sql
 -- ============================================================
 
 ALTER TABLE `tb_user` ADD COLUMN `role` TINYINT NOT NULL DEFAULT 0 COMMENT '用户角色：0游客 1用户 2商家 3管理员' AFTER `icon`;
 -- ============================================================
 -- 补全缺失的数据库索引
--- 执行方式：mysql -u root -p hmdp < upgrade-indexes.sql
+-- 执行方式：mysql -u root -p xiaohongshu < upgrade-indexes.sql
 -- ============================================================
 
 -- tb_blog: 按用户/商户查询频繁，缺少索引

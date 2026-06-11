@@ -1,7 +1,7 @@
 -- ============================================================
 -- Private message Kafka outbox.
 -- Execute:
---   mysql -u root -p hmdp < upgrade-private-message-kafka.sql
+--   mysql -u root -p xiaohongshu < upgrade-private-message-kafka.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `tb_private_message_outbox` (

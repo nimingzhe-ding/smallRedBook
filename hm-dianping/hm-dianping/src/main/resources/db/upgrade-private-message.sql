@@ -1,4 +1,4 @@
-USE hmdp;
+USE xiaohongshu;
 
 CREATE TABLE IF NOT EXISTS `tb_private_conversation` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'primary key',

@@ -2,6 +2,7 @@ HELP.md
 target/
 *.log
 run.log
+.claude/
 .env
 .env.*
 !.env.example

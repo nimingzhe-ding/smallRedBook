@@ -1,5 +1,5 @@
 -- Add role column to tb_user.
--- Usage: mysql -u root -p hmdp < upgrade-roles.sql
+-- Usage: mysql -u root -p xiaohongshu < upgrade-roles.sql
 
 SET @column_exists := (
   SELECT COUNT(1)

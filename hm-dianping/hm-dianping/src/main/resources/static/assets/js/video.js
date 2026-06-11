@@ -123,7 +123,7 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-danmaku-toggle]").forEach(button => {
     button.addEventListener("click", () => {
       state.danmakuEnabled = !state.danmakuEnabled;
-      localStorage.setItem("hmdp_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
+      localStorage.setItem("xiaohongshu_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
       document.querySelectorAll("[data-danmaku-toggle]").forEach(item => {
         item.textContent = state.danmakuEnabled ? "弹幕开" : "弹幕关";
       });
@@ -135,7 +135,7 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-video-autoplay]").forEach(button => {
     button.addEventListener("click", () => {
       state.videoAutoplay = !state.videoAutoplay;
-      localStorage.setItem("hmdp_video_autoplay", JSON.stringify(state.videoAutoplay));
+      localStorage.setItem("xiaohongshu_video_autoplay", JSON.stringify(state.videoAutoplay));
       document.querySelectorAll("[data-video-autoplay]").forEach(item => {
         item.textContent = state.videoAutoplay ? "自动播开" : "自动播关";
       });
@@ -144,7 +144,7 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-video-mute]").forEach(button => {
     button.addEventListener("click", () => {
       state.videoMuted = !state.videoMuted;
-      localStorage.setItem("hmdp_video_muted", JSON.stringify(state.videoMuted));
+      localStorage.setItem("xiaohongshu_video_muted", JSON.stringify(state.videoMuted));
       document.querySelectorAll(".immersive-video").forEach(video => {
         video.muted = state.videoMuted;
         saveVideoState(video);
@@ -157,19 +157,19 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-danmaku-speed]").forEach(input => {
     input.addEventListener("input", () => {
       state.danmakuSpeed = Number(input.value);
-      localStorage.setItem("hmdp_danmaku_speed", String(state.danmakuSpeed));
+      localStorage.setItem("xiaohongshu_danmaku_speed", String(state.danmakuSpeed));
     });
   });
   els.videoFeed.querySelectorAll("[data-danmaku-opacity]").forEach(input => {
     input.addEventListener("input", () => {
       state.danmakuOpacity = Number(input.value);
-      localStorage.setItem("hmdp_danmaku_opacity", String(state.danmakuOpacity));
+      localStorage.setItem("xiaohongshu_danmaku_opacity", String(state.danmakuOpacity));
     });
   });
   els.videoFeed.querySelectorAll("[data-danmaku-block]").forEach(input => {
     input.addEventListener("change", () => {
       state.danmakuBlockWords = input.value.trim();
-      localStorage.setItem("hmdp_danmaku_block_words", state.danmakuBlockWords);
+      localStorage.setItem("xiaohongshu_danmaku_block_words", state.danmakuBlockWords);
       document.querySelectorAll("[data-danmaku-block]").forEach(item => {
         if (item !== input) item.value = state.danmakuBlockWords;
       });
@@ -178,7 +178,7 @@ function bindVideoFeedEvents(videos) {
   els.videoFeed.querySelectorAll("[data-danmaku-hot]").forEach(button => {
     button.addEventListener("click", () => {
       state.danmakuHotOnly = !state.danmakuHotOnly;
-      localStorage.setItem("hmdp_danmaku_hot_only", JSON.stringify(state.danmakuHotOnly));
+      localStorage.setItem("xiaohongshu_danmaku_hot_only", JSON.stringify(state.danmakuHotOnly));
       document.querySelectorAll("[data-danmaku-hot]").forEach(item => {
         item.textContent = state.danmakuHotOnly ? "热门开" : "热门关";
       });
@@ -213,7 +213,7 @@ function subscribeDanmaku(noteId) {
   closeDanmakuSource();
   if (typeof WebSocket === "undefined" || !token()) return;
   updateDanmakuStatus(noteId, "connecting");
-  const configured = window.HMDP_DANMAKU_WS_URL;
+  const configured = window.XHS_DANMAKU_WS_URL;
   const url = configured
     ? `${configured}${configured.includes("?") ? "&" : "?"}videoId=${encodeURIComponent(noteId)}&token=${encodeURIComponent(token())}`
     : `${wsUrl("/ws/danmaku", 8090)}?videoId=${encodeURIComponent(noteId)}&token=${encodeURIComponent(token())}`;
@@ -362,7 +362,7 @@ function filterDanmakuList(noteId, list) {
 }
 
 function videoStateKey(noteId) {
-  return `hmdp_video_state_${noteId}`;
+  return `xiaohongshu_video_state_${noteId}`;
 }
 
 function loadVideoState(noteId) {
@@ -410,7 +410,7 @@ function bindVideoPlaybackState(video) {
   });
   video.addEventListener("volumechange", () => {
     state.videoMuted = video.muted;
-    localStorage.setItem("hmdp_video_muted", JSON.stringify(state.videoMuted));
+    localStorage.setItem("xiaohongshu_video_muted", JSON.stringify(state.videoMuted));
     saveVideoState(video);
   });
   video.addEventListener("ended", () => {
@@ -797,14 +797,14 @@ function openVideoFullscreen(note, options = {}) {
   host.querySelector(".video-fullscreen-close").addEventListener("click", closeVideoFullscreen);
   host.querySelector("[data-video-mute]").addEventListener("click", button => {
     state.videoMuted = !state.videoMuted;
-    localStorage.setItem("hmdp_video_muted", JSON.stringify(state.videoMuted));
+    localStorage.setItem("xiaohongshu_video_muted", JSON.stringify(state.videoMuted));
     video.muted = state.videoMuted;
     button.currentTarget.textContent = state.videoMuted ? "静音" : "声音";
     button.currentTarget.setAttribute("aria-label", state.videoMuted ? "打开声音" : "静音");
   });
   host.querySelector("[data-danmaku-toggle]").addEventListener("click", button => {
     state.danmakuEnabled = !state.danmakuEnabled;
-    localStorage.setItem("hmdp_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
+    localStorage.setItem("xiaohongshu_danmaku_enabled", JSON.stringify(state.danmakuEnabled));
     slide.querySelector("[data-danmaku-layer]").hidden = !state.danmakuEnabled;
     syncFullscreenInteractionButtons(host, note);
   });
