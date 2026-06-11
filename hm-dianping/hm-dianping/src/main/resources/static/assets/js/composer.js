@@ -6,6 +6,10 @@
   //   aiFlow, resetAndLoad, closeDrawer
   // ------------------------------
   var COMPOSER_DRAFT_KEY = "hmdp_composer_draft";
+  var VIDEO_MULTIPART_THRESHOLD = 16 * 1024 * 1024;
+  var VIDEO_MULTIPART_PART_SIZE = 8 * 1024 * 1024;
+  var VIDEO_MULTIPART_CONCURRENCY = 3;
+  var VIDEO_MULTIPART_STORE = "hmdp_video_multipart_upload";
 
   function composerDraftKey() {
     return scopedStorageKey(COMPOSER_DRAFT_KEY);
@@ -296,6 +300,10 @@
   async function uploadSelectedVideo() {
     var file = els.videoFile?.files?.[0];
     if (!file) return "";
+    if (file.size >= VIDEO_MULTIPART_THRESHOLD) {
+      var multipartUrl = await uploadSelectedVideoMultipart(file);
+      if (multipartUrl) return multipartUrl;
+    }
     var directUrl = await uploadSelectedVideoDirect(file);
     if (directUrl) return directUrl;
     var formData = new FormData();
@@ -340,6 +348,217 @@
       console.warn("Direct video upload failed, fallback to server upload", error);
       return "";
     }
+  }
+
+  async function uploadSelectedVideoMultipart(file) {
+    var sessionKey = videoMultipartSessionKey(file);
+    var session = readVideoMultipartSession(sessionKey);
+    try {
+      cleanupVideoMultipartSessions();
+      if (!session || !session.uploadId || !session.objectName || session.size !== file.size) {
+        session = await initVideoMultipartSession(file);
+        writeVideoMultipartSession(sessionKey, session);
+      } else {
+        session.parts = await reconcileVideoMultipartParts(session);
+        writeVideoMultipartSession(sessionKey, session);
+      }
+      await uploadVideoMultipartParts(file, sessionKey, session);
+      var completed = await request("/upload/video/multipart/complete", {
+        method: "POST",
+        body: JSON.stringify({
+          objectName: session.objectName,
+          uploadId: session.uploadId,
+          contentType: session.contentType || file.type || "application/octet-stream",
+          size: file.size,
+          parts: Object.values(session.parts || {}).sort(function(a, b) {
+            return a.partNumber - b.partNumber;
+          })
+        })
+      });
+      localStorage.removeItem(sessionKey);
+      return uploadResultUrl(completed);
+    } catch (error) {
+      console.warn("Multipart video upload paused or failed", error);
+      showStatus("视频分片上传已暂停，重新发布同一个文件会从断点继续。");
+      return "";
+    }
+  }
+
+  async function initVideoMultipartSession(file) {
+    var result = await request("/upload/video/multipart/init", {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream",
+        size: file.size,
+        partSize: VIDEO_MULTIPART_PART_SIZE
+      })
+    });
+    return {
+      fileKey: videoMultipartFileKey(file),
+      objectName: result.objectName,
+      uploadId: result.uploadId,
+      url: result.url,
+      contentType: result.contentType || file.type || "application/octet-stream",
+      size: file.size,
+      partSize: result.partSize || VIDEO_MULTIPART_PART_SIZE,
+      partCount: result.partCount || Math.ceil(file.size / VIDEO_MULTIPART_PART_SIZE),
+      parts: partsArrayToMap(result.uploadedParts || []),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
+  async function reconcileVideoMultipartParts(session) {
+    var localParts = session.parts || {};
+    try {
+      var remoteParts = await request("/upload/video/multipart/parts", {
+        method: "POST",
+        body: JSON.stringify({
+          objectName: session.objectName,
+          uploadId: session.uploadId
+        })
+      });
+      return { ...localParts, ...partsArrayToMap(remoteParts || []) };
+    } catch {
+      return localParts;
+    }
+  }
+
+  async function uploadVideoMultipartParts(file, sessionKey, session) {
+    var partSize = session.partSize || VIDEO_MULTIPART_PART_SIZE;
+    var partCount = session.partCount || Math.ceil(file.size / partSize);
+    var completed = session.parts || {};
+    var pending = [];
+    for (var partNumber = 1; partNumber <= partCount; partNumber++) {
+      var start = (partNumber - 1) * partSize;
+      var end = Math.min(start + partSize, file.size);
+      var existed = completed[partNumber];
+      if (existed?.eTag && Number(existed.size || 0) === end - start) {
+        continue;
+      }
+      pending.push({ partNumber: partNumber, start: start, end: end });
+    }
+    var uploadedCount = partCount - pending.length;
+    updateVideoMultipartProgress(uploadedCount, partCount);
+    var cursor = 0;
+    async function worker() {
+      while (cursor < pending.length) {
+        var part = pending[cursor++];
+        var uploaded = await uploadVideoMultipartPart(file, session, part);
+        completed[part.partNumber] = uploaded;
+        session.parts = completed;
+        session.updatedAt = Date.now();
+        writeVideoMultipartSession(sessionKey, session);
+        uploadedCount++;
+        updateVideoMultipartProgress(uploadedCount, partCount);
+      }
+    }
+    var workers = Array.from({ length: Math.min(VIDEO_MULTIPART_CONCURRENCY, pending.length) }, worker);
+    await Promise.all(workers);
+  }
+
+  async function uploadVideoMultipartPart(file, session, part) {
+    var lastError = null;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        var signature = await request("/upload/video/multipart/part-signature", {
+          method: "POST",
+          body: JSON.stringify({
+            objectName: session.objectName,
+            uploadId: session.uploadId,
+            partNumber: part.partNumber,
+            contentType: session.contentType || file.type || "application/octet-stream",
+            partSize: part.end - part.start
+          })
+        });
+        var headers = new Headers(signature.headers || {});
+        if (!headers.has("Content-Type")) {
+          headers.set("Content-Type", session.contentType || file.type || "application/octet-stream");
+        }
+        var response = await fetch(signature.uploadUrl, {
+          method: signature.method || "PUT",
+          headers: headers,
+          body: file.slice(part.start, part.end)
+        });
+        if (!response.ok) {
+          throw new Error("OSS part " + part.partNumber + " HTTP " + response.status);
+        }
+        var eTag = response.headers.get("ETag") || response.headers.get("etag");
+        if (!eTag) {
+          throw new Error("OSS part " + part.partNumber + " missing ETag");
+        }
+        return {
+          partNumber: part.partNumber,
+          eTag: eTag.replaceAll("\"", ""),
+          size: part.end - part.start
+        };
+      } catch (error) {
+        lastError = error;
+        await sleep(400 * attempt);
+      }
+    }
+    throw lastError || new Error("视频分片上传失败");
+  }
+
+  function updateVideoMultipartProgress(done, total) {
+    var percent = total ? Math.floor(done * 100 / total) : 0;
+    setComposerSubmitText("上传视频 " + percent + "%");
+    if (els.videoUploadTip) {
+      els.videoUploadTip.textContent = "断点续传中：" + done + "/" + total + " 个分片";
+    }
+  }
+
+  function videoMultipartFileKey(file) {
+    return [file.name, file.size, file.lastModified || 0].join(":");
+  }
+
+  function videoMultipartSessionKey(file) {
+    return scopedStorageKey(VIDEO_MULTIPART_STORE + ":" + btoa(unescape(encodeURIComponent(videoMultipartFileKey(file)))));
+  }
+
+  function readVideoMultipartSession(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "null");
+    } catch {
+      return null;
+    }
+  }
+
+  function writeVideoMultipartSession(key, session) {
+    localStorage.setItem(key, JSON.stringify(session));
+  }
+
+  function partsArrayToMap(parts) {
+    return (parts || []).reduce(function(map, part) {
+      var eTag = part?.eTag || part?.etag || part?.ETag;
+      if (part && part.partNumber && eTag) {
+        map[part.partNumber] = {
+          partNumber: part.partNumber,
+          eTag: String(eTag).replaceAll("\"", ""),
+          size: part.size
+        };
+      }
+      return map;
+    }, {});
+  }
+
+  function cleanupVideoMultipartSessions() {
+    var now = Date.now();
+    var maxAge = 24 * 60 * 60 * 1000;
+    Object.keys(localStorage).forEach(function(key) {
+      if (!key.includes(VIDEO_MULTIPART_STORE)) return;
+      var session = readVideoMultipartSession(key);
+      if (!session || now - Number(session.updatedAt || session.createdAt || 0) > maxAge) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+
+  function sleep(ms) {
+    return new Promise(function(resolve) {
+      window.setTimeout(resolve, ms);
+    });
   }
 
   function uploadResultUrl(result) {
@@ -526,6 +745,7 @@
   window.uploadSelectedImages = uploadSelectedImages;
   window.uploadSelectedVideo = uploadSelectedVideo;
   window.uploadSelectedVideoDirect = uploadSelectedVideoDirect;
+  window.uploadSelectedVideoMultipart = uploadSelectedVideoMultipart;
   window.uploadResultUrl = uploadResultUrl;
   window.submitComposer = submitComposer;
   window.mergeTopics = mergeTopics;

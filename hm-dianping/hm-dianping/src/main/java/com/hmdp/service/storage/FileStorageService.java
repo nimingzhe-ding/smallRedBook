@@ -1,9 +1,13 @@
 package com.hmdp.service.storage;
 
 import com.hmdp.dto.DirectUploadResult;
+import com.hmdp.dto.MultipartUploadInitResult;
+import com.hmdp.dto.MultipartUploadPartSignResult;
+import com.hmdp.dto.MultipartUploadedPart;
 
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * 文件存储抽象接口。
@@ -41,6 +45,39 @@ public interface FileStorageService {
 
     default DirectUploadResult createDirectUpload(String objectName, String contentType, long size, Duration expiration) {
         throw new UnsupportedOperationException("Current storage does not support direct upload");
+    }
+
+    default MultipartUploadInitResult initiateMultipartUpload(String objectName,
+                                                             String contentType,
+                                                             long size,
+                                                             long partSize,
+                                                             Duration expiration) {
+        throw new UnsupportedOperationException("Current storage does not support multipart upload");
+    }
+
+    default MultipartUploadPartSignResult createMultipartPartUpload(String objectName,
+                                                                    String uploadId,
+                                                                    int partNumber,
+                                                                    String contentType,
+                                                                    long partSize,
+                                                                    Duration expiration) {
+        throw new UnsupportedOperationException("Current storage does not support multipart upload");
+    }
+
+    default List<MultipartUploadedPart> listMultipartUploadedParts(String objectName, String uploadId) {
+        throw new UnsupportedOperationException("Current storage does not support multipart upload");
+    }
+
+    default String completeMultipartUpload(String objectName,
+                                           String uploadId,
+                                           List<MultipartUploadedPart> parts,
+                                           String contentType,
+                                           Long size) {
+        throw new UnsupportedOperationException("Current storage does not support multipart upload");
+    }
+
+    default void abortMultipartUpload(String objectName, String uploadId) {
+        throw new UnsupportedOperationException("Current storage does not support multipart upload");
     }
 
     default boolean exists(String objectName) {
