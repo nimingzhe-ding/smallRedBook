@@ -186,6 +186,10 @@ public class AiAssistantController {
         chatRequest.setSessionId(StrUtil.blankToDefault(request == null ? null : request.getSessionId(), sceneName));
         chatRequest.setReset(request == null ? null : request.getReset());
         chatRequest.setMessage(message);
+        if (!aiAssistantService.isEnabled()) {
+            return Result.ok(new AiChatResponse(AiScene.FLOW.getCode(), chatRequest.getSessionId(),
+                    fallback, java.util.List.of(), null, java.time.LocalDateTime.now()));
+        }
         try {
             AiChatResponse response = aiAssistantService.flow(chatRequest);
             return Result.ok(response);

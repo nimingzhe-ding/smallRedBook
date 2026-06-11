@@ -1,19 +1,31 @@
 package com.hmdp.service.storage;
 
+import cn.hutool.core.util.StrUtil;
+import com.aliyun.oss.ClientBuilderConfiguration;
+import com.aliyun.oss.HttpMethod;
+import com.aliyun.oss.OSS;
+import com.aliyun.oss.OSSClientBuilder;
+import com.aliyun.oss.model.GeneratePresignedUrlRequest;
+import com.aliyun.oss.model.GetObjectRequest;
+import com.aliyun.oss.model.ObjectMetadata;
+import com.aliyun.oss.model.OSSObject;
+import com.hmdp.dto.DirectUploadResult;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Map;
 
-/**
- * 对象存储实现（桩）。
- * 启用方式：在 application.yaml 中设置 hmdp.storage.type=oss
- * 并配置 hmdp.storage.oss.endpoint / bucket / access-key / secret-key。
- *
- * TODO: 接入阿里云 OSS SDK 或其他对象存储 SDK。
- */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "hmdp.storage.type", havingValue = "oss")
@@ -31,24 +43,159 @@ public class OssStorageService implements FileStorageService {
     @Value("${hmdp.storage.oss.secret-key:}")
     private String secretKey;
 
+    @Value("${hmdp.storage.oss.domain:}")
+    private String domain;
+
+    private OSS ossClient;
+    private String normalizedEndpoint;
+
+    @PostConstruct
+    public void init() {
+        if (StrUtil.hasBlank(endpoint, bucket, accessKey, secretKey)) {
+            throw new IllegalStateException("OSS storage requires endpoint, bucket, access-key and secret-key");
+        }
+        normalizedEndpoint = normalizeEndpoint(endpoint);
+        ClientBuilderConfiguration configuration = new ClientBuilderConfiguration();
+        configuration.setConnectionTimeout(5000);
+        configuration.setSocketTimeout(30000);
+        configuration.setMaxConnections(128);
+        ossClient = new OSSClientBuilder().build(normalizedEndpoint, accessKey, secretKey, configuration);
+        log.info("OSS storage initialized, bucket={}, endpoint={}", bucket, normalizedEndpoint);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        if (ossClient != null) {
+            ossClient.shutdown();
+        }
+    }
+
     @Override
     public String upload(String objectName, InputStream inputStream, long size) {
-        // TODO: 实现 OSS 上传
-        // 1. 创建 OSSClient
-        // 2. client.putObject(bucket, objectName, inputStream)
-        // 3. 返回访问 URL
-        log.warn("OSS 存储尚未实现，objectName={}", objectName);
-        throw new UnsupportedOperationException("OSS 存储尚未实现，请配置 hmdp.storage.type=local 或接入 OSS SDK");
+        String key = normalizeObjectName(objectName);
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(size);
+        metadata.setContentType(contentTypeOf(key));
+        ossClient.putObject(bucket, key, inputStream, metadata);
+        log.debug("OSS upload success, key={}, size={}", key, size);
+        return key;
     }
 
     @Override
     public void delete(String objectName) {
-        log.warn("OSS 存储尚未实现，objectName={}", objectName);
-        throw new UnsupportedOperationException("OSS 存储尚未实现");
+        String key = normalizeObjectName(objectName);
+        if (StrUtil.isBlank(key)) {
+            return;
+        }
+        ossClient.deleteObject(bucket, key);
     }
 
     @Override
     public String getUrl(String objectName) {
-        return "https://" + bucket + "." + endpoint + "/" + objectName;
+        String key = normalizeObjectName(objectName);
+        return "/imgs/" + encodeKey(key);
+    }
+
+    @Override
+    public DirectUploadResult createDirectUpload(String objectName, String contentType, long size, Duration expiration) {
+        String key = normalizeObjectName(objectName);
+        String safeContentType = StrUtil.blankToDefault(contentType, contentTypeOf(key)).toLowerCase(Locale.ROOT);
+        Instant expireAt = Instant.now().plus(expiration);
+        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucket, key, HttpMethod.PUT);
+        request.setExpiration(Date.from(expireAt));
+        request.setContentType(safeContentType);
+        String uploadUrl = ossClient.generatePresignedUrl(request).toString();
+        return new DirectUploadResult(
+                key,
+                uploadUrl,
+                getUrl(key),
+                "PUT",
+                safeContentType,
+                size,
+                expireAt,
+                Map.of("Content-Type", safeContentType)
+        );
+    }
+
+    @Override
+    public boolean exists(String objectName) {
+        String key = normalizeObjectName(objectName);
+        return StrUtil.isNotBlank(key) && ossClient.doesObjectExist(bucket, key);
+    }
+
+    @Override
+    public StoredObject open(String objectName, Long rangeStart, Long rangeEnd) {
+        String key = normalizeObjectName(objectName);
+        ObjectMetadata metadata = ossClient.getObjectMetadata(bucket, key);
+        long total = metadata.getContentLength();
+        if (rangeStart == null && rangeEnd == null) {
+            OSSObject object = ossClient.getObject(bucket, key);
+            ObjectMetadata objectMetadata = object.getObjectMetadata();
+            return new StoredObject(object.getObjectContent(), safeContentType(objectMetadata, key), total);
+        }
+        long start = rangeStart == null ? 0 : Math.max(0, rangeStart);
+        long end = rangeEnd == null ? total - 1 : Math.min(rangeEnd, total - 1);
+        if (start >= total || end < start) {
+            throw new IllegalArgumentException("Invalid object range");
+        }
+        GetObjectRequest request = new GetObjectRequest(bucket, key);
+        request.setRange(start, end);
+        OSSObject object = ossClient.getObject(request);
+        long length = end - start + 1;
+        return new StoredObject(object.getObjectContent(), safeContentType(object.getObjectMetadata(), key),
+                length, total, start, end);
+    }
+
+    private String normalizeEndpoint(String value) {
+        String trimmed = value.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed;
+        }
+        return "https://" + trimmed;
+    }
+
+    private String defaultPublicDomain() {
+        String host = normalizedEndpoint
+                .replaceFirst("^https?://", "")
+                .replaceAll("/+$", "");
+        return "https://" + bucket + "." + host;
+    }
+
+    private String normalizeObjectName(String objectName) {
+        String normalized = StrUtil.blankToDefault(objectName, "").replace("\\", "/").trim();
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.contains("..")) {
+            throw new IllegalArgumentException("Illegal object name");
+        }
+        return normalized;
+    }
+
+    private String contentTypeOf(String key) {
+        String suffix = StrUtil.subAfter(key, ".", true).toLowerCase(Locale.ROOT);
+        return switch (suffix) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "webm" -> "video/webm";
+            case "mov" -> "video/quicktime";
+            case "mp4" -> "video/mp4";
+            default -> "application/octet-stream";
+        };
+    }
+
+    private String safeContentType(ObjectMetadata metadata, String key) {
+        String contentType = metadata == null ? null : metadata.getContentType();
+        return StrUtil.blankToDefault(contentType, contentTypeOf(key));
+    }
+
+    private String encodeKey(String key) {
+        return StrUtil.split(key, '/')
+                .stream()
+                .map(part -> URLEncoder.encode(part, StandardCharsets.UTF_8).replace("+", "%20"))
+                .reduce((left, right) -> left + "/" + right)
+                .orElse("");
     }
 }

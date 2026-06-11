@@ -243,11 +243,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (blog.getContent().trim().length() > 5000) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "正文不能超过5000个字");
         }
-        if (blog.getContent().trim().length() < 12) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "正文至少需要12个字，补充真实体验后再发布");
-        }
-        if (isLowQualityText(blog.getTitle(), blog.getContent())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "内容过于重复，建议补充具体体验、价格、环境或使用感受");
+        if (blog.getContent().trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "正文不能为空");
         }
         if (AD_PATTERN.matcher(joinText(blog.getTitle(), blog.getContent(), blog.getTags())).find()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "内容疑似广告、刷评或引流，请修改后再发布");

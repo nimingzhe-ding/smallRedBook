@@ -1,6 +1,9 @@
 package com.hmdp.controller;
 
 import cn.hutool.core.util.StrUtil;
+import com.hmdp.dto.CompleteUploadRequest;
+import com.hmdp.dto.DirectUploadRequest;
+import com.hmdp.dto.DirectUploadResult;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UploadResult;
 import com.hmdp.enums.ErrorCode;
@@ -8,13 +11,16 @@ import com.hmdp.exception.BusinessException;
 import com.hmdp.service.storage.FileStorageService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -24,21 +30,28 @@ import java.util.UUID;
 @RequestMapping("upload")
 public class UploadController {
 
-    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-    private static final long MAX_VIDEO_SIZE = 50 * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
 
     @Resource
     private FileStorageService fileStorageService;
 
+    @Value("${hmdp.upload.max-image-size:5242880}")
+    private long maxImageSize;
+
+    @Value("${hmdp.upload.max-video-size:524288000}")
+    private long maxVideoSize;
+
+    @Value("${hmdp.upload.direct-upload-expire-minutes:10}")
+    private long directUploadExpireMinutes;
+
     @PostMapping("note")
     public Result uploadImage(@RequestParam("file") MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
         }
-        if (image.getSize() > MAX_IMAGE_SIZE) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小不能超过5MB");
+        if (image.getSize() > maxImageSize) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "图片大小超出限制");
         }
 
         String suffix = getValidatedSuffix(image);
@@ -50,7 +63,7 @@ public class UploadController {
             String fileName = createNewFileName(suffix);
             String objectName = fileStorageService.upload(fileName, image.getInputStream(), image.getSize());
             String url = normalizeAccessUrl(fileStorageService.getUrl(objectName));
-            log.debug("图片上传成功: {}", objectName);
+            log.debug("Image upload success: {}", objectName);
             return Result.ok(new UploadResult(objectName, url, image.getContentType(), image.getSize()));
         } catch (IOException e) {
             throw new RuntimeException("文件上传失败", e);
@@ -62,8 +75,8 @@ public class UploadController {
         if (video == null || video.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
         }
-        if (video.getSize() > MAX_VIDEO_SIZE) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频大小不能超过50MB");
+        if (video.getSize() > maxVideoSize) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频大小超出限制");
         }
         String suffix = getValidatedVideoSuffix(video);
         if (suffix == null) {
@@ -73,11 +86,58 @@ public class UploadController {
             String fileName = createNewMediaFileName("videos", suffix);
             String objectName = fileStorageService.upload(fileName, video.getInputStream(), video.getSize());
             String url = normalizeAccessUrl(fileStorageService.getUrl(objectName));
-            log.debug("视频上传成功: {}", objectName);
+            log.debug("Video upload success: {}", objectName);
             return Result.ok(new UploadResult(objectName, url, video.getContentType(), video.getSize()));
         } catch (IOException e) {
             throw new RuntimeException("视频上传失败", e);
         }
+    }
+
+    @PostMapping("video/direct-signature")
+    public Result createVideoDirectUpload(@RequestBody DirectUploadRequest request) {
+        if (request == null || request.getSize() == null || request.getSize() <= 0) {
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "视频文件信息不能为空");
+        }
+        if (request.getSize() > maxVideoSize) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频大小超出限制");
+        }
+        String suffix = getValidatedVideoSuffix(request.getFileName(), request.getContentType());
+        if (suffix == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "只支持 mp4、webm、mov 视频");
+        }
+        String contentType = normalizeVideoContentType(request.getContentType(), suffix);
+        String objectName = createNewMediaFileName("videos", suffix);
+        DirectUploadResult result = fileStorageService.createDirectUpload(
+                objectName,
+                contentType,
+                request.getSize(),
+                Duration.ofMinutes(Math.max(1, directUploadExpireMinutes))
+        );
+        return Result.ok(result);
+    }
+
+    @PostMapping("video/complete")
+    public Result completeVideoUpload(@RequestBody CompleteUploadRequest request) {
+        if (request == null || StrUtil.isBlank(request.getObjectName())) {
+            throw new BusinessException(ErrorCode.PARAM_EMPTY, "视频对象路径不能为空");
+        }
+        String suffix = getValidatedVideoSuffix(request.getObjectName(), request.getContentType());
+        if (suffix == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频格式不支持");
+        }
+        if (request.getSize() != null && request.getSize() > maxVideoSize) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "视频大小超出限制");
+        }
+        if (!fileStorageService.exists(request.getObjectName())) {
+            throw new BusinessException(ErrorCode.UPLOAD_FAIL, "OSS 未找到已上传的视频文件");
+        }
+        String url = normalizeAccessUrl(fileStorageService.getUrl(request.getObjectName()));
+        return Result.ok(new UploadResult(
+                request.getObjectName(),
+                url,
+                normalizeVideoContentType(request.getContentType(), suffix),
+                request.getSize()
+        ));
     }
 
     private String getValidatedSuffix(MultipartFile image) {
@@ -94,16 +154,32 @@ public class UploadController {
     }
 
     private String getValidatedVideoSuffix(MultipartFile video) {
-        String originalFilename = StrUtil.blankToDefault(video.getOriginalFilename(), "");
+        return getValidatedVideoSuffix(video.getOriginalFilename(), video.getContentType());
+    }
+
+    private String getValidatedVideoSuffix(String fileName, String contentType) {
+        String originalFilename = StrUtil.blankToDefault(fileName, "");
         String suffix = StrUtil.subAfter(originalFilename, ".", true).toLowerCase(Locale.ROOT);
         if (!ALLOWED_VIDEO_EXTENSIONS.contains(suffix)) {
             return null;
         }
-        String contentType = StrUtil.blankToDefault(video.getContentType(), "").toLowerCase(Locale.ROOT);
-        if (!contentType.startsWith("video/") && !"application/octet-stream".equals(contentType)) {
+        String type = StrUtil.blankToDefault(contentType, "").toLowerCase(Locale.ROOT);
+        if (StrUtil.isNotBlank(type) && !type.startsWith("video/") && !"application/octet-stream".equals(type)) {
             return null;
         }
         return suffix;
+    }
+
+    private String normalizeVideoContentType(String contentType, String suffix) {
+        String type = StrUtil.blankToDefault(contentType, "").toLowerCase(Locale.ROOT);
+        if (type.startsWith("video/")) {
+            return type;
+        }
+        return switch (suffix) {
+            case "webm" -> "video/webm";
+            case "mov" -> "video/quicktime";
+            default -> "video/mp4";
+        };
     }
 
     private String createNewFileName(String suffix) {
@@ -119,7 +195,10 @@ public class UploadController {
     }
 
     private String normalizeAccessUrl(String objectName) {
-        if (StrUtil.isBlank(objectName) || objectName.startsWith("http://") || objectName.startsWith("https://")) {
+        if (StrUtil.isBlank(objectName)
+                || objectName.startsWith("http://")
+                || objectName.startsWith("https://")
+                || objectName.startsWith("/imgs/")) {
             return objectName;
         }
         return "/imgs" + (objectName.startsWith("/") ? objectName : "/" + objectName);

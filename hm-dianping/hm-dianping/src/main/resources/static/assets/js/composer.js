@@ -296,10 +296,50 @@
   async function uploadSelectedVideo() {
     var file = els.videoFile?.files?.[0];
     if (!file) return "";
+    var directUrl = await uploadSelectedVideoDirect(file);
+    if (directUrl) return directUrl;
     var formData = new FormData();
     formData.append("file", file);
     var result = await request("/upload/video", { method: "POST", body: formData });
     return uploadResultUrl(result);
+  }
+
+  async function uploadSelectedVideoDirect(file) {
+    try {
+      var signature = await request("/upload/video/direct-signature", {
+        method: "POST",
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          size: file.size
+        })
+      });
+      if (!signature?.uploadUrl || !signature?.objectName) return "";
+      var headers = new Headers(signature.headers || {});
+      if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", signature.contentType || file.type || "application/octet-stream");
+      }
+      var response = await fetch(signature.uploadUrl, {
+        method: signature.method || "PUT",
+        headers: headers,
+        body: file
+      });
+      if (!response.ok) {
+        throw new Error("OSS " + response.status);
+      }
+      var completed = await request("/upload/video/complete", {
+        method: "POST",
+        body: JSON.stringify({
+          objectName: signature.objectName,
+          contentType: signature.contentType || file.type || "application/octet-stream",
+          size: file.size
+        })
+      });
+      return uploadResultUrl(completed);
+    } catch (error) {
+      console.warn("Direct video upload failed, fallback to server upload", error);
+      return "";
+    }
   }
 
   function uploadResultUrl(result) {
@@ -357,8 +397,8 @@
         saveComposerDraft(true);
         return;
       }
-      if (content.length < 12) {
-        showStatus("正文再多写一点，会更像一篇有价值的探店笔记。");
+      if (!content) {
+        showStatus("正文不能为空。");
         saveComposerDraft(true);
         return;
       }
@@ -485,6 +525,7 @@
   window.parseProductIds = parseProductIds;
   window.uploadSelectedImages = uploadSelectedImages;
   window.uploadSelectedVideo = uploadSelectedVideo;
+  window.uploadSelectedVideoDirect = uploadSelectedVideoDirect;
   window.uploadResultUrl = uploadResultUrl;
   window.submitComposer = submitComposer;
   window.mergeTopics = mergeTopics;

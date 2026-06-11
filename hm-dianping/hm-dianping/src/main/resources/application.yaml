@@ -6,8 +6,13 @@ spring:
     allow-circular-references: true
   application:
     name: hmdp
+  servlet:
+    multipart:
+      max-file-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
+      max-request-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
   ai:
     dashscope:
+      enabled: ${HMDP_AI_ENABLED:false}
       api-key: "${DASHSCOPE_API_KEY:}"
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -61,8 +66,12 @@ hmdp:
       bucket: "${HMDP_OSS_BUCKET:}"
       access-key: "${HMDP_OSS_ACCESS_KEY:}"
       secret-key: "${HMDP_OSS_SECRET_KEY:}"
+      domain: "${HMDP_OSS_DOMAIN:}"
   upload:
     image-dir: "${HMDP_IMAGE_UPLOAD_DIR:D:/hmdp/nginx-1.18.0/html/hmdp/imgs}"
+    max-image-size: ${HMDP_UPLOAD_MAX_IMAGE_SIZE:5242880}
+    max-video-size: ${HMDP_UPLOAD_MAX_VIDEO_SIZE:524288000}
+    direct-upload-expire-minutes: ${HMDP_DIRECT_UPLOAD_EXPIRE_MINUTES:10}
   ai:
     model: qwen-plus
     customer-service-temperature: 0.6

@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Data
 @ConfigurationProperties(prefix = "hmdp.ai")
 public class AiAssistantProperties {
+    private Boolean enabled = false;
     private String model = "qwen-plus";
     private Double customerServiceTemperature = 0.6D;
     private Double queryTemperature = 0.2D;

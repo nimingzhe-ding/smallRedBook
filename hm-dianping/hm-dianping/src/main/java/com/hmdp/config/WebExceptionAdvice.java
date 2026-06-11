@@ -1,5 +1,6 @@
 package com.hmdp.config;
 
+import com.aliyun.oss.OSSException;
 import com.hmdp.dto.Result;
 import com.hmdp.enums.ErrorCode;
 import com.hmdp.exception.BusinessException;
@@ -46,6 +47,16 @@ public class WebExceptionAdvice {
             }
         }
         return new Result(false, ErrorCode.BAD_REQUEST.getCode(), message, null, null);
+    }
+
+    @ExceptionHandler(OSSException.class)
+    public Result handleOssException(OSSException e) {
+        if ("AccessDenied".equalsIgnoreCase(e.getErrorCode())) {
+            log.warn("OSS access denied: action may be missing permission, requestId={}", e.getRequestId());
+            return Result.fail(ErrorCode.UPLOAD_FAIL, "OSS 上传被拒绝，请检查 RAM 用户是否已授权 oss:PutObject 到当前 Bucket");
+        }
+        log.error("OSS upload exception", e);
+        return Result.fail(ErrorCode.UPLOAD_FAIL, "OSS 上传失败，请检查 Bucket、Endpoint、AccessKey 和网络配置");
     }
 
     @ExceptionHandler(RuntimeException.class)

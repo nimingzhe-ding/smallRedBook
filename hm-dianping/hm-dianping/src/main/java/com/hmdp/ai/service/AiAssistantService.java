@@ -55,6 +55,10 @@ public class AiAssistantService {
         return chat(AiScene.FLOW, request);
     }
 
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(properties.getEnabled());
+    }
+
     public void clearConversation(AiScene scene, String sessionId) {
         if (StrUtil.isBlank(sessionId)) {
             throw new IllegalArgumentException("sessionId 不能为空");
@@ -65,6 +69,9 @@ public class AiAssistantService {
     private AiChatResponse chat(AiScene scene, AiChatRequest request) {
         if (request == null || StrUtil.isBlank(request.getMessage())) {
             throw new IllegalArgumentException("消息内容不能为空");
+        }
+        if (!isEnabled()) {
+            throw new IllegalStateException("AI assistant is disabled");
         }
         String sessionId = StrUtil.blankToDefault(StrUtil.trim(request.getSessionId()), IdUtil.fastSimpleUUID());
         String conversationId = scene.conversationId(sessionId);

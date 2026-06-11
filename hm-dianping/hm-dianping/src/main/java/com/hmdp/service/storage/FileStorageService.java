@@ -1,6 +1,9 @@
 package com.hmdp.service.storage;
 
+import com.hmdp.dto.DirectUploadResult;
+
 import java.io.InputStream;
+import java.time.Duration;
 
 /**
  * 文件存储抽象接口。
@@ -31,4 +34,16 @@ public interface FileStorageService {
      * @return 可访问的 URL
      */
     String getUrl(String objectName);
+
+    default StoredObject open(String objectName, Long rangeStart, Long rangeEnd) {
+        throw new UnsupportedOperationException("Current storage does not support object streaming");
+    }
+
+    default DirectUploadResult createDirectUpload(String objectName, String contentType, long size, Duration expiration) {
+        throw new UnsupportedOperationException("Current storage does not support direct upload");
+    }
+
+    default boolean exists(String objectName) {
+        return true;
+    }
 }
