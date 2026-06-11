@@ -25,6 +25,11 @@ public class RedisConstants {
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
     public static final String BLOG_LIKED_KEY = "blog:liked:";
     public static final String FEED_KEY = "feed:";
+    public static final String FEED_OUTBOX_KEY = "feed:outbox:";
+    public static final int FEED_PUSH_FANOUT_THRESHOLD = 1000;
+    public static final int FEED_INBOX_MAX_SIZE = 1000;
+    public static final int FEED_OUTBOX_MAX_SIZE = 300;
+    public static final int FEED_PULL_CANDIDATE_MAX = 300;
     public static final String SHOP_GEO_KEY = "shop:geo:";
     public static final String USER_SIGN_KEY = "sign:";
     public static final String CACHE_SHOP_TYPE_KEY = "cache:shopType:";

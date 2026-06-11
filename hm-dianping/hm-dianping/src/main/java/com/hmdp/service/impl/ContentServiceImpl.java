@@ -56,10 +56,12 @@ import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import java.util.ArrayList;
+import java.time.ZoneId;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -143,6 +145,10 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
     @Override
     public Result feed(String channel, String query, Integer current, Double x, Double y) {
         int pageNo = normalizePage(current);
+        String normalizedChannel = StrUtil.blankToDefault(channel, "recommend").trim().toLowerCase();
+        if ("follow".equals(normalizedChannel)) {
+            return Result.ok(buildHybridFollowFeed(query, pageNo));
+        }
         Page<Blog> page = buildFeedQuery(channel, query, pageNo, x, y);
         return Result.ok(toFeedResult(page, query));
     }
@@ -563,11 +569,127 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
     /**
      * 构造内容流查询条件。
      * hot → 推荐分 = 点赞×3 + 收藏×5 + 评论×4 + 点击×1 + 完播率×8 + 新鲜度;
-     * follow → Redis 收件箱（Feed 推送），降级到 DB 关注列表;
+     * follow → Redis 收件箱 + DB 关注作者拉取，推拉结合;
      * nearby → Redis GEO 查找附近店铺，再反查关联笔记;
      * video → 视频完成率 + 互动分;
      * recommend → 基于用户兴趣标签 Redis ZSET 的个性化推荐。
      */
+    private NoteFeedResult buildHybridFollowFeed(String query, int pageNo) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            return new NoteFeedResult(List.of(), 0L, false, query);
+        }
+
+        List<Long> followUserIds = loadFollowUserIds(user.getId());
+        if (followUserIds.isEmpty()) {
+            return new NoteFeedResult(List.of(), 0L, false, query);
+        }
+
+        int pageSize = SystemConstants.MAX_PAGE_SIZE;
+        int candidateLimit = Math.max(RedisConstants.FEED_PULL_CANDIDATE_MAX, pageNo * pageSize + pageSize);
+        Map<Long, Long> candidateScores = new LinkedHashMap<>();
+        if (StrUtil.isBlank(query)) {
+            collectPushedInboxCandidates(user.getId(), candidateLimit, candidateScores);
+        }
+        collectPulledFollowCandidates(followUserIds, query, candidateLimit, candidateScores);
+
+        List<Long> orderedIds = candidateScores.entrySet().stream()
+                .sorted((left, right) -> {
+                    int scoreCompare = Long.compare(right.getValue(), left.getValue());
+                    return scoreCompare != 0 ? scoreCompare : Long.compare(right.getKey(), left.getKey());
+                })
+                .map(Map.Entry::getKey)
+                .toList();
+
+        int from = Math.min((pageNo - 1) * pageSize, orderedIds.size());
+        int to = Math.min(from + pageSize, orderedIds.size());
+        List<ContentNoteDTO> notes = findNotesByIds(orderedIds.subList(from, to));
+        long total = countFollowBlogs(followUserIds, query);
+        boolean hasMore = total > (long) pageNo * pageSize;
+        return new NoteFeedResult(notes, total, hasMore, query);
+    }
+
+    private List<Long> loadFollowUserIds(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return followService.query()
+                .select("follow_user_id")
+                .eq("user_id", userId)
+                .list()
+                .stream()
+                .map(Follow::getFollowUserId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+    }
+
+    private void collectPushedInboxCandidates(Long userId, int limit, Map<Long, Long> candidateScores) {
+        if (userId == null || limit <= 0) {
+            return;
+        }
+        Set<ZSetOperations.TypedTuple<String>> tuples = stringRedisTemplate.opsForZSet()
+                .reverseRangeWithScores(RedisConstants.FEED_KEY + userId, 0, limit - 1);
+        if (tuples == null || tuples.isEmpty()) {
+            return;
+        }
+        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+            Long blogId = parseNullableLong(tuple.getValue());
+            if (blogId == null) {
+                continue;
+            }
+            Double score = tuple.getScore();
+            mergeFeedCandidate(candidateScores, blogId, score == null ? 0L : score.longValue());
+        }
+    }
+
+    private void collectPulledFollowCandidates(List<Long> followUserIds,
+                                               String query,
+                                               int limit,
+                                               Map<Long, Long> candidateScores) {
+        if (followUserIds == null || followUserIds.isEmpty() || limit <= 0) {
+            return;
+        }
+        QueryWrapper<Blog> wrapper = followBlogWrapper(followUserIds, query)
+                .select("id", "user_id", "create_time")
+                .orderByDesc("create_time")
+                .last("limit " + limit);
+        List<Blog> blogs = blogService.list(wrapper);
+        for (Blog blog : blogs) {
+            if (blog.getId() != null) {
+                mergeFeedCandidate(candidateScores, blog.getId(), createTimeScore(blog));
+            }
+        }
+    }
+
+    private long countFollowBlogs(List<Long> followUserIds, String query) {
+        if (followUserIds == null || followUserIds.isEmpty()) {
+            return 0L;
+        }
+        return blogService.count(followBlogWrapper(followUserIds, query));
+    }
+
+    private QueryWrapper<Blog> followBlogWrapper(List<Long> followUserIds, String query) {
+        QueryWrapper<Blog> wrapper = new QueryWrapper<Blog>()
+                .in("user_id", followUserIds)
+                .eq("status", CONTENT_STATUS_NORMAL);
+        if (StrUtil.isNotBlank(query)) {
+            wrapper.and(w -> w.like("title", query).or().like("content", query).or().like("tags", query));
+        }
+        return wrapper;
+    }
+
+    private void mergeFeedCandidate(Map<Long, Long> candidateScores, Long blogId, long score) {
+        candidateScores.merge(blogId, score, Math::max);
+    }
+
+    private long createTimeScore(Blog blog) {
+        if (blog == null || blog.getCreateTime() == null) {
+            return blog == null || blog.getId() == null ? 0L : blog.getId();
+        }
+        return blog.getCreateTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
     private Page<Blog> buildFeedQuery(String channel, String query, int pageNo, Double x, Double y) {
         String normalizedChannel = StrUtil.blankToDefault(channel, "recommend");
         Page<Blog> page = new Page<>(pageNo, SystemConstants.MAX_PAGE_SIZE);
@@ -1697,6 +1819,17 @@ public class ContentServiceImpl implements IContentService, NoteService, Profile
             return Long.parseLong(value.toString());
         } catch (NumberFormatException e) {
             return 0L;
+        }
+    }
+
+    private Long parseNullableLong(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

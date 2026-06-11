@@ -133,14 +133,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         }
         saveBlogProducts(blog.getId(), productIds);
         syncBlogTopics(blog);
-        List<Follow> follows = followService.query().eq("follow_user_id", id).list();
-        //推送粉丝
-        for (Follow follow : follows) {
-            Long userId = follow.getUserId();
-            String key = "feed:" + userId;
-            stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(),System.currentTimeMillis());
-        }
-        //返回id
+        publishToHybridFeed(blog, id);
         return Result.ok(blog.getId());
     }
 
@@ -215,13 +208,61 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         blogCollectMapper.delete(new QueryWrapper<BlogCollect>().eq("blog_id", id));
         blogCommentsMapper.delete(new QueryWrapper<BlogComments>().eq("blog_id", id));
         stringRedisTemplate.delete("blog:liked:" + id);
-        List<Follow> follows = followService.query().eq("follow_user_id", blog.getUserId()).list();
-        for (Follow follow : follows) {
-            stringRedisTemplate.opsForZSet().remove("feed:" + follow.getUserId(), id.toString());
-        }
+        removeFromHybridFeed(blog);
         return Result.ok(id);
     }
 
+    private void publishToHybridFeed(Blog blog, Long authorId) {
+        if (blog == null || blog.getId() == null || authorId == null) {
+            return;
+        }
+        String blogId = blog.getId().toString();
+        long score = System.currentTimeMillis();
+        String outboxKey = RedisConstants.FEED_OUTBOX_KEY + authorId;
+        stringRedisTemplate.opsForZSet().add(outboxKey, blogId, score);
+        trimFeedZSet(outboxKey, RedisConstants.FEED_OUTBOX_MAX_SIZE);
+
+        long followerCount = followService.query().eq("follow_user_id", authorId).count();
+        if (followerCount > RedisConstants.FEED_PUSH_FANOUT_THRESHOLD) {
+            return;
+        }
+
+        List<Follow> follows = followService.query().eq("follow_user_id", authorId).list();
+        for (Follow follow : follows) {
+            Long userId = follow.getUserId();
+            if (userId == null) {
+                continue;
+            }
+            String inboxKey = RedisConstants.FEED_KEY + userId;
+            stringRedisTemplate.opsForZSet().add(inboxKey, blogId, score);
+            trimFeedZSet(inboxKey, RedisConstants.FEED_INBOX_MAX_SIZE);
+        }
+    }
+
+    private void removeFromHybridFeed(Blog blog) {
+        if (blog == null || blog.getId() == null || blog.getUserId() == null) {
+            return;
+        }
+        String blogId = blog.getId().toString();
+        stringRedisTemplate.opsForZSet().remove(RedisConstants.FEED_OUTBOX_KEY + blog.getUserId(), blogId);
+        List<Follow> follows = followService.query().eq("follow_user_id", blog.getUserId()).list();
+        for (Follow follow : follows) {
+            if (follow.getUserId() != null) {
+                stringRedisTemplate.opsForZSet().remove(RedisConstants.FEED_KEY + follow.getUserId(), blogId);
+            }
+        }
+    }
+
+    private void trimFeedZSet(String key, int maxSize) {
+        if (maxSize <= 0) {
+            return;
+        }
+        Long size = stringRedisTemplate.opsForZSet().zCard(key);
+        if (size == null || size <= maxSize) {
+            return;
+        }
+        stringRedisTemplate.opsForZSet().removeRange(key, 0, size - maxSize - 1);
+    }
     private List<Long> normalizeProductIds(List<Long> productIds) {
         if (productIds == null || productIds.isEmpty()) {
             return List.of();
@@ -544,7 +585,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         }
         Long userId = user.getId();
         //查询收件箱
-        String key = "feed:"+userId;
+        String key = RedisConstants.FEED_KEY + userId;
         Set<ZSetOperations.TypedTuple<String>> typedTuples = stringRedisTemplate.opsForZSet()
                 .reverseRangeByScoreWithScores(key, 0, max, offset, 10);
         if(typedTuples==null||typedTuples.isEmpty()){
